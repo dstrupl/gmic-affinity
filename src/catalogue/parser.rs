@@ -289,24 +289,37 @@ fn is_gmic_qt_only(command: &str) -> bool {
 }
 
 fn parse_kind(decl: &str) -> ParamKind {
-    let Some(open) = decl.find('(') else {
-        return ParamKind::Unknown(sanitize_display(decl));
+    // G'MIC accepts either `kind(args)` or `kind{args}` as the
+    // grouping syntax — the brace form is used when the args contain
+    // unbalanced parens (typical for `note{"...(see §4)..."}` and
+    // `text{"cos(x)"}`). Choose whichever opener appears first so we
+    // don't latch onto a `(` that's *inside* the brace body
+    // (otherwise `note{"(Set to 0...)"}` parses as `note{"` followed
+    // by an unsupported sea of comma-separated junk).
+    let paren = decl.find('(');
+    let brace = decl.find('{');
+    let (open_idx, open_ch, close_ch) = match (paren, brace) {
+        (Some(p), Some(b)) if b < p => (b, '{', '}'),
+        (Some(p), _) => (p, '(', ')'),
+        (None, Some(b)) => (b, '{', '}'),
+        (None, None) => return ParamKind::Unknown(sanitize_display(decl)),
     };
-    let (head, rest) = decl.split_at(open);
+    let (head, rest) = decl.split_at(open_idx);
     let inner = rest
-        .strip_prefix('(')
-        .and_then(|s| s.rsplit_once(')'))
+        .strip_prefix(open_ch)
+        .and_then(|s| s.rsplit_once(close_ch))
         .map(|(args, _)| args)
         .unwrap_or("");
-    // G'MIC's `~`-prefixed type names (`~float`, `~choice`, …) mark
-    // the parameter as "advanced" (gmic-qt collapses it under a
-    // disclosure triangle). The accepted argument syntax is
-    // identical to the un-prefixed form, so we drop the `~` and
-    // parse normally — losing the "advanced" flag is acceptable
-    // until we have UI for it. Without this, every advanced
-    // parameter rendered as `(unsupported: ~float(...))` instead of
-    // a slider.
-    let head_trim = head.trim().trim_start_matches('~');
+    // G'MIC type-name modifier prefixes:
+    //   `~kind(...)`  — advanced (gmic-qt collapses under a triangle).
+    //   `_kind(...)`  — silent (no UI in gmic-qt; default is sent to
+    //                    the filter as-is). We surface them as normal
+    //                    interactive controls so the user can still
+    //                    inspect / override what's being sent.
+    // Stripping both prefixes makes ~400 extra catalogue params
+    // resolvable. Losing the "advanced/silent" UI flags is acceptable
+    // until we have a polished accordion + read-only-row affordance.
+    let head_trim = head.trim().trim_start_matches(['~', '_']);
     match head_trim {
         "int" => parse_int(inner),
         "float" => parse_float(inner),
@@ -320,6 +333,15 @@ fn parse_kind(decl: &str) -> ParamKind {
         "note" => ParamKind::Note(sanitize_display(strip_quotes(inner))),
         "separator" => ParamKind::Separator,
         "link" => parse_link(inner),
+        // T-after-T10: parse new gmic kinds into existing UI controls
+        // so the picker stops rendering them as "(unsupported: ...)"
+        // — see `src/bin/audit-unsupported.rs` for the prioritisation
+        // matrix.
+        "point" => parse_point(inner),
+        "value" => parse_internal("value", inner),
+        "button" => parse_internal("button", inner),
+        "file" | "filein" | "fileout" => parse_path(inner),
+        "folder" => parse_path(inner),
         _ => ParamKind::Unknown(sanitize_display(decl)),
     }
 }
@@ -347,10 +369,23 @@ fn parse_float(s: &str) -> ParamKind {
 }
 
 fn parse_bool(s: &str) -> ParamKind {
-    match s.trim() {
+    // Some community filters use Python-style `bool(True)` /
+    // `bool(False)`; G'MIC itself accepts `1`/`0`/`true`/`false`.
+    // Compare case-insensitively so the audit bucket for these
+    // (~56 occurrences in v3.7.6) collapses to zero.
+    let lower = s.trim().to_ascii_lowercase();
+    // Tolerate `bool(default, min, max)` — community filters use that
+    // shape (effectively `int(0, 0, 1)`) when they really want a
+    // checkbox; we only care about the first arg.
+    let first = lower.split(',').next().unwrap_or("").trim();
+    match first {
         "true" | "1" => ParamKind::Bool { default: true },
-        "false" | "0" => ParamKind::Bool { default: false },
-        other => ParamKind::Unknown(sanitize_display(&format!("bool({other})"))),
+        // G'MIC stdlib emits a fair number of bare `bool()` decls; the
+        // documented behaviour is "default to off", which matches what
+        // gmic-qt does too. Without this branch ~166 parameters in
+        // the bundled snapshot would render as unsupported.
+        "" | "false" | "0" => ParamKind::Bool { default: false },
+        _ => ParamKind::Unknown(sanitize_display(&format!("bool({s})"))),
     }
 }
 
@@ -389,8 +424,23 @@ fn parse_choice(s: &str) -> ParamKind {
 }
 
 fn parse_color(s: &str) -> ParamKind {
-    let parts: Vec<&str> = s.split(',').map(str::trim).collect();
-    if parts.len() != 3 {
+    let trimmed = s.trim();
+    // Hex form (`#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`) is by far
+    // the most common in user-contributed filters — `assets/gmic-
+    // catalogue.toc.txt` shows ~950 occurrences in v3.7.6. Alpha is
+    // dropped because our NSColorWell is RGB-only; users who want a
+    // specific alpha can edit it after the fact via the gmic argv
+    // override path.
+    if let Some(hex) = trimmed.strip_prefix('#') {
+        if let Some(rgb) = parse_hex_rgb(hex) {
+            return ParamKind::Color { default_rgb: rgb };
+        }
+        return ParamKind::Unknown(sanitize_display(&format!("color({s})")));
+    }
+    // Comma-separated RGB byte form (`color(255, 128, 0)`).
+    let parts: Vec<&str> = trimmed.split(',').map(str::trim).collect();
+    if parts.len() != 3 && parts.len() != 4 {
+        // 3 = RGB, 4 = RGBA (drop alpha as above).
         return ParamKind::Unknown(sanitize_display(&format!("color({s})")));
     }
     match (parts[0].parse(), parts[1].parse(), parts[2].parse()) {
@@ -398,6 +448,75 @@ fn parse_color(s: &str) -> ParamKind {
             default_rgb: [r, g, b],
         },
         _ => ParamKind::Unknown(sanitize_display(&format!("color({s})"))),
+    }
+}
+
+/// Decode `RGB`, `RGBA`, `RRGGBB`, or `RRGGBBAA` hex (case-insensitive,
+/// no leading `#`) into an RGB triple. Alpha is discarded.
+fn parse_hex_rgb(hex: &str) -> Option<[u8; 3]> {
+    let hex = hex.trim();
+    let (r, g, b) = match hex.len() {
+        3 | 4 => {
+            // 4-bit-per-channel shorthand: expand each digit (`a` -> `0xaa`).
+            let mut chars = hex.chars();
+            let r = expand_nibble(chars.next()?)?;
+            let g = expand_nibble(chars.next()?)?;
+            let b = expand_nibble(chars.next()?)?;
+            (r, g, b)
+        }
+        6 | 8 => {
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            (r, g, b)
+        }
+        _ => return None,
+    };
+    Some([r, g, b])
+}
+
+fn expand_nibble(c: char) -> Option<u8> {
+    let n = c.to_digit(16)? as u8;
+    Some((n << 4) | n)
+}
+
+/// G'MIC `point(x, y, removed?, burst?, R, G, B, A, radius)`: only the
+/// first two coords are user-meaningful and 0..=100 in percent units.
+/// We render them as a single editable text field of the form `x,y`
+/// because adding a true two-spinner row would require a new
+/// `ParamKind` variant + matching `FormCell` plumbing. Round-tripping
+/// happens because gmic only reads as many args as the filter
+/// declares, and the saved-args reconcile path treats this as a
+/// single-string parameter.
+fn parse_point(s: &str) -> ParamKind {
+    let parts: Vec<&str> = split_top_level(s).map(str::trim).collect();
+    if parts.len() < 2 {
+        return ParamKind::Unknown(sanitize_display(&format!("point({s})")));
+    }
+    ParamKind::Text {
+        default: format!("{},{}", parts[0], parts[1]),
+    }
+}
+
+/// File- or folder-path picker. Today we just expose the default as
+/// editable text; a future iteration can add an NSOpenPanel-backed
+/// "Browse..." button.
+fn parse_path(s: &str) -> ParamKind {
+    ParamKind::Text {
+        default: sanitize_display(strip_quotes(s)),
+    }
+}
+
+/// G'MIC internal-state parameters — `value(default)`, `button(size)`
+/// — that gmic-qt hides but the filter still reads from the command
+/// line. We surface them as a tiny static label so the user can see
+/// what's being forwarded, and the form's `collect_values` path
+/// emits the same default back into argv.
+fn parse_internal(kind: &str, s: &str) -> ParamKind {
+    let trimmed = strip_quotes(s.trim());
+    ParamKind::Internal {
+        label: kind.to_string(),
+        default: sanitize_display(trimmed),
     }
 }
 
@@ -680,6 +799,154 @@ mod tests {
             ParamKind::Color {
                 default_rgb: [255, 0, 128]
             },
+        );
+    }
+
+    #[test]
+    fn parses_color_hex_with_alpha() {
+        // `#RRGGBBAA` is by far the most common color form in
+        // community filters (~950 occurrences in the bundled
+        // snapshot); regression-guard the alpha-stripping path.
+        let cat = parse("#@gui A\n#@gui F : f\n#@gui : Border = color(#000000ff)\n").unwrap();
+        assert_eq!(
+            first_filter(&cat).params[0].kind,
+            ParamKind::Color {
+                default_rgb: [0, 0, 0]
+            },
+        );
+        let cat = parse("#@gui A\n#@gui F : f\n#@gui : Tint = color(#abc)\n").unwrap();
+        assert_eq!(
+            first_filter(&cat).params[0].kind,
+            ParamKind::Color {
+                default_rgb: [0xaa, 0xbb, 0xcc]
+            },
+        );
+    }
+
+    #[test]
+    fn parses_underscore_prefixed_kinds() {
+        // `_kind(...)` is the "silent" variant — must round-trip into
+        // the same ParamKind as the bare form so the form pane stops
+        // showing "(unsupported: _bool())" etc.
+        let cat = parse(
+            "#@gui A\n#@gui F : f\n\
+             #@gui : Inner = _int(2,0,9)\n\
+             #@gui : Hidden = _bool(true)\n",
+        )
+        .unwrap();
+        let params = &first_filter(&cat).params;
+        assert_eq!(
+            params[0].kind,
+            ParamKind::Int {
+                default: 2,
+                min: 0,
+                max: 9
+            }
+        );
+        assert_eq!(params[1].kind, ParamKind::Bool { default: true });
+    }
+
+    #[test]
+    fn parses_brace_grouping() {
+        // Filters whose note/text bodies contain parens use `{...}`
+        // grouping; we need to pick the brace opener even when an
+        // inner `(` appears earlier in the line.
+        let cat = parse("#@gui A\n#@gui F : f\n#@gui : help = note{\"(Set to 0 to disable)\"}\n")
+            .unwrap();
+        match &first_filter(&cat).params[0].kind {
+            ParamKind::Note(s) => assert!(s.contains("Set to 0"), "got {s:?}"),
+            other => panic!("expected Note, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_point_first_two_coords() {
+        let cat = parse("#@gui A\n#@gui F : f\n#@gui : Corner = point(5,10,0,1,255,0,0,128,3)\n")
+            .unwrap();
+        assert_eq!(
+            first_filter(&cat).params[0].kind,
+            ParamKind::Text {
+                default: "5,10".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parses_value_and_button_as_internal() {
+        let cat = parse(
+            "#@gui A\n#@gui F : f\n\
+             #@gui : v = value(42)\n\
+             #@gui : b = button(2)\n",
+        )
+        .unwrap();
+        let params = &first_filter(&cat).params;
+        assert!(matches!(
+            &params[0].kind,
+            ParamKind::Internal { default, .. } if default == "42"
+        ));
+        assert!(matches!(
+            &params[1].kind,
+            ParamKind::Internal { default, .. } if default == "2"
+        ));
+    }
+
+    #[test]
+    fn parses_loose_bool_forms() {
+        // `bool(True)` (Python-style capitalisation) and
+        // `bool(0,0,1)` (author overloaded with int args) both appear
+        // in v3.7.6 stdlib.
+        let cat = parse("#@gui A\n#@gui F : f\n#@gui : x = bool(True)\n").unwrap();
+        assert_eq!(
+            first_filter(&cat).params[0].kind,
+            ParamKind::Bool { default: true }
+        );
+        let cat = parse("#@gui A\n#@gui F : f\n#@gui : y = bool(0,0,1)\n").unwrap();
+        assert_eq!(
+            first_filter(&cat).params[0].kind,
+            ParamKind::Bool { default: false }
+        );
+    }
+
+    #[test]
+    fn bundled_catalogue_has_no_unsupported_params() {
+        // Lock the audit invariant: every parameter in the shipped
+        // snapshot resolves to a real ParamKind. If gmic ships a new
+        // syntax we'll see this fail on the next `make refresh-
+        // catalogue` and can decide whether to add a parser arm or
+        // intentionally widen the test. See `src/bin/audit-
+        // unsupported.rs` for the diagnostic that motivated this
+        // guard.
+        let cat = crate::catalogue::builtin();
+        let mut offenders: Vec<String> = Vec::new();
+        fn walk(folder: &Folder, path: &[&str], out: &mut Vec<String>) {
+            for child in &folder.children {
+                match child {
+                    Node::Folder(f) => {
+                        let mut p = path.to_vec();
+                        p.push(&f.name);
+                        walk(f, &p, out);
+                    }
+                    Node::Filter(f) => {
+                        for param in &f.params {
+                            if let ParamKind::Unknown(raw) = &param.kind {
+                                out.push(format!(
+                                    "{} / {} :: {} = {raw}",
+                                    path.join(" / "),
+                                    f.display_name,
+                                    param.label
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        walk(&cat.root, &[], &mut offenders);
+        assert!(
+            offenders.is_empty(),
+            "bundled catalogue still has {} unsupported param(s) — first 5: {:#?}",
+            offenders.len(),
+            offenders.iter().take(5).collect::<Vec<_>>()
         );
     }
 

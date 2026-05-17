@@ -409,6 +409,33 @@ instead uses `beginModalSessionForWindow:` + a hand-rolled
 flowing while the panel is up. See `src/ui/runloop.rs` for the pump
 and the `ModalCloseDelegate` that stops the session on window close.
 
+### Parser coverage — `make audit-unsupported`
+
+The picker form treats any parameter that doesn't parse cleanly as a
+read-only `(unsupported: …)` row. To prevent silent regressions when
+the bundled gmic snapshot is refreshed, the parser ships with a
+diagnostic:
+
+- `cargo run --bin audit-unsupported` (or `make audit-unsupported`)
+  walks the bundled catalogue, groups every `ParamKind::Unknown` by
+  leading function name, and prints a frequency histogram with one
+  sample payload per bucket. The shipped v3.7.6 snapshot resolves to
+  **0 unsupported parameters** (down from 12.2 % before the
+  `color(#hex)`, `_<kind>(...)`, `{...}` grouping, `point(...)`,
+  `value(...)`, `button(...)`, `file(...)`, and tolerant-`bool(...)`
+  arms were added).
+- `bundled_catalogue_has_no_unsupported_params` (in
+  `src/catalogue/parser.rs`) locks the invariant: if a future
+  `make refresh-catalogue` introduces a new syntax, the test fails
+  and points at the first five offenders so we can add a `parse_*`
+  arm intentionally instead of shipping ugly placeholder rows.
+
+`ParamKind::Internal` is the catch-all for declarations that gmic-qt
+hides (chiefly `value(...)` and `button(...)`): the form pane renders
+them as a tiny `(internal: <default>)` row when they have a user
+label and skips them otherwise, but `collect_values` still emits the
+default verbatim so the gmic argv stays positionally correct.
+
 ---
 
 ## 10. Manual end-to-end pre-release checklist (picker)

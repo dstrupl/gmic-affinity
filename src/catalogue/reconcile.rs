@@ -38,6 +38,10 @@ fn value_matches_kind(value: &str, kind: &ParamKind) -> bool {
         }
         ParamKind::Text { .. } => true,
         ParamKind::Note(_) | ParamKind::Separator | ParamKind::Link { .. } => true,
+        // Internal params are non-interactive — we always overwrite
+        // any saved value with the declaration's default when
+        // forming argv, so the round-trip is trivially "valid".
+        ParamKind::Internal { .. } => true,
         ParamKind::Unknown(_) => true,
     }
 }
@@ -55,6 +59,7 @@ fn default_for(kind: &ParamKind) -> String {
         }
         ParamKind::Text { default } => default.clone(),
         ParamKind::Note(_) | ParamKind::Separator | ParamKind::Link { .. } => String::new(),
+        ParamKind::Internal { default, .. } => default.clone(),
         ParamKind::Unknown(s) => s.clone(),
     }
 }

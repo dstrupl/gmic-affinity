@@ -19,19 +19,20 @@
 //! `NSView` document with manual `(x, y, w, h)` placement is enough
 //! for this much.
 
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 
 use objc2::declare_class;
 use objc2::rc::Retained;
 use objc2::runtime::{NSObject, NSObjectProtocol, ProtocolObject};
-use objc2::{msg_send_id, mutability, ClassType, DeclaredClass};
+use objc2::{msg_send_id, mutability, sel, ClassType, DeclaredClass};
 use objc2_app_kit::{
-    NSAutoresizingMaskOptions, NSBox, NSBoxType, NSButton, NSButtonType, NSColor, NSColorWell,
-    NSControlStateValueOff, NSControlStateValueOn, NSControlTextEditingDelegate, NSOutlineView,
-    NSOutlineViewDelegate, NSPopUpButton, NSScrollView, NSSlider, NSTextField, NSView,
+    NSBox, NSBoxType, NSButton, NSButtonType, NSColor, NSColorWell, NSControlStateValueOff,
+    NSControlStateValueOn, NSControlTextEditingDelegate, NSOutlineView, NSOutlineViewDelegate,
+    NSPopUpButton, NSScrollView, NSSlider, NSTextField, NSView, NSViewFrameDidChangeNotification,
 };
 use objc2_foundation::{
-    CGFloat, CGPoint, CGRect, CGSize, MainThreadMarker, NSNotification, NSString,
+    CGFloat, CGPoint, CGRect, CGSize, MainThreadMarker, NSNotification, NSNotificationCenter,
+    NSString,
 };
 
 use crate::catalogue::{Filter, Param, ParamKind};
@@ -53,11 +54,18 @@ const FORM_ROW_HEIGHT: CGFloat = 22.0;
 const FORM_LABEL_WIDTH: CGFloat = 130.0;
 /// Gap between the label column and the control column.
 const FORM_LABEL_GAP: CGFloat = 8.0;
-/// Initial document-view width / height. We resize the document view
-/// to match the clip view after every form rebuild so the content
-/// fills the visible area.
-const FORM_INITIAL_DOC_WIDTH: CGFloat = 400.0;
-const FORM_INITIAL_DOC_HEIGHT: CGFloat = 600.0;
+/// Initial document-view height. The width is *always* slaved to the
+/// enclosing clip view's bounds width — we never use AppKit's
+/// `NSViewWidthSizable` autoresizing on the document because it is
+/// delta-based and starts from the (0, 0) clip-view bounds the scroll
+/// view is built with, so the first split-view resize would grow the
+/// document by the entire pane width (e.g. 400 + 600 = 1000) and
+/// push every control off the right edge of the visible area. We
+/// instead listen for `NSViewFrameDidChangeNotification` on the clip
+/// view and rebuild the form deterministically against the new
+/// width. Height stays zero until the first build computes the real
+/// stack height.
+const FORM_INITIAL_DOC_HEIGHT: CGFloat = 0.0;
 
 declare_class! {
     /// Flipped subclass of `NSView` used as the form's document view.
@@ -146,18 +154,39 @@ pub(crate) fn build_form_pane(
         CGRect {
             origin: CGPoint { x: 0.0, y: 0.0 },
             size: CGSize {
-                width: FORM_INITIAL_DOC_WIDTH,
+                width: 0.0,
                 height: FORM_INITIAL_DOC_HEIGHT,
             },
         },
     );
     let document_as_view: Retained<NSView> = unsafe { Retained::cast(document.clone()) };
+    // Intentionally no `setAutoresizingMask` on the document view —
+    // see the FORM_INITIAL_DOC_HEIGHT comment. The clip view's
+    // frame-changed notification drives every resize instead.
     unsafe {
-        document_as_view.setAutoresizingMask(NSAutoresizingMaskOptions::NSViewWidthSizable);
         scroll.setDocumentView(Some(&document_as_view));
     }
 
     let controller = FormController::new(mtm, document_as_view, data_source, remembered);
+
+    // Subscribe to the clip view's frame-changed notification so we
+    // can keep the document width in lockstep with the visible pane
+    // and rebuild the parameter rows. `setPostsFrameChangedNotifications`
+    // defaults to YES on NSClipView but we set it explicitly here to
+    // be defensive against future AppKit changes.
+    unsafe {
+        let clip = scroll.contentView();
+        let clip_as_view: &NSView = &clip;
+        clip_as_view.setPostsFrameChangedNotifications(true);
+        let center = NSNotificationCenter::defaultCenter();
+        center.addObserver_selector_name_object(
+            &controller,
+            sel!(clipViewFrameDidChange:),
+            Some(NSViewFrameDidChangeNotification),
+            Some(clip_as_view),
+        );
+    }
+
     controller.show_empty_placeholder();
 
     FormPane {
@@ -202,6 +231,12 @@ pub(crate) enum FormCell {
     /// Non-interactive cell (note, separator, link, unknown). The
     /// view itself is held by [`FormControllerIvars::extra_views`].
     Static,
+    /// Hidden parameter whose user-visible row is just a read-only
+    /// label, but which still contributes its `default` verbatim to
+    /// the gmic argv (for `value(...)`, `button(...)`, etc.).
+    /// Stored, not rendered, so a filter with eight `value(0)`
+    /// internals doesn't crowd the form with eight identical rows.
+    Internal { default: String },
 }
 
 /// Per-controller mutable state. Held inside the `declare_class!`
@@ -238,8 +273,22 @@ pub(crate) struct FormControllerIvars {
     /// filter: the saved `remembered_args[command]` becomes the
     /// initial values for the form rather than the hard-coded
     /// kind defaults. Captured at panel-open time so live mutations
-    /// during the session don't surprise the user.
-    remembered: std::collections::BTreeMap<String, Vec<String>>,
+    /// during the session don't surprise the user; the [`RefCell`]
+    /// allows `show_filter_with_prefill` to fold an explicit
+    /// per-call prefill into the lookup so subsequent relayouts
+    /// (driven by clip-view frame-change notifications, which can't
+    /// see the original per-call prefill argument) still rebuild
+    /// the form with the user's saved values rather than stdlib
+    /// defaults.
+    remembered: RefCell<std::collections::BTreeMap<String, Vec<String>>>,
+    /// Raw pointer to the currently-displayed filter (or `None` for
+    /// the empty placeholder). Used by the clip-view frame-change
+    /// handler to rebuild the same form against a new width without
+    /// the controller needing a back-channel into the outline view.
+    /// Safe to store as a raw pointer because every `Filter` we get
+    /// here comes from the `'static` `Catalogue` interned in
+    /// [`crate::catalogue::builtin`].
+    current_filter: Cell<Option<*const Filter>>,
 }
 
 // `NSOutlineViewDelegate` inherits from `NSControlTextEditingDelegate`
@@ -268,6 +317,18 @@ declare_class! {
 
     unsafe impl NSObjectProtocol for FormController {}
 
+    unsafe impl FormController {
+        // Notification handler: fires when the scroll view's clip
+        // view changes size (window resize, split-divider drag,
+        // initial layout pass). We snap the document view's width to
+        // the new clip width and re-lay the rows against it so
+        // sliders / popups stay flush with the visible pane edge.
+        #[method(clipViewFrameDidChange:)]
+        fn clip_view_frame_did_change(&self, _notification: &NSNotification) {
+            self.relayout_for_current_width();
+        }
+    }
+
     unsafe impl NSOutlineViewDelegate for FormController {
         // `outlineViewSelectionDidChange:` — fires every time the
         // user (or our own programmatic `selectRowIndexes:` from
@@ -295,12 +356,12 @@ declare_class! {
             let item_obj: &objc2::runtime::AnyObject = &item;
             match self.ivars().data_source.resolve_filter(item_obj) {
                 Some(filter) => {
-                    let prefill = self
-                        .ivars()
-                        .remembered
-                        .get(&filter.command)
-                        .map(|v| v.as_slice());
-                    self.show_filter_with_prefill(filter, prefill);
+                    // `render_filter` already reads the remembered map
+                    // itself; calling it through `show_filter_with_prefill`
+                    // with `None` keeps `current_filter` updated and
+                    // routes through the single source of truth for
+                    // prefill values.
+                    self.show_filter_with_prefill(filter, None);
                 }
                 None => self.show_empty_placeholder(),
             }
@@ -325,7 +386,8 @@ impl FormController {
             cells: RefCell::new(Vec::new()),
             extra_views: RefCell::new(Vec::new()),
             actions: OnceCell::new(),
-            remembered,
+            remembered: RefCell::new(remembered),
+            current_filter: Cell::new(None),
         });
         unsafe { msg_send_id![super(this), init] }
     }
@@ -395,6 +457,13 @@ impl FormController {
                     Some(s.to_string())
                 }
                 FormCell::Static => None,
+                // Internal params are not user-editable but still need
+                // to appear in argv at their declared position, so we
+                // emit the stored default verbatim. This is how
+                // `value(0)` / `button(2)` filter declarations stay
+                // round-trippable through the picker even though no
+                // NSControl is bound to them.
+                FormCell::Internal { default } => Some(default.clone()),
             })
             .collect()
     }
@@ -402,20 +471,8 @@ impl FormController {
     /// Replace the form contents with the empty-selection
     /// placeholder.
     pub(crate) fn show_empty_placeholder(&self) {
-        let mtm = MainThreadMarker::from(&*self.ivars().document);
-        self.clear_rows();
-        let width = self.row_width();
-        let mut cursor_y = FORM_TOP_MARGIN;
-        let h = self.add_label(
-            mtm,
-            "Select a filter on the left to see its parameters.",
-            13.0,
-            FORM_HMARGIN,
-            cursor_y,
-            width,
-        );
-        cursor_y += h + FORM_ROW_GAP;
-        self.fit_document_height(cursor_y);
+        self.ivars().current_filter.set(None);
+        self.render_empty_placeholder();
     }
 
     /// Replace the form contents with the selected filter's name,
@@ -433,10 +490,106 @@ impl FormController {
     /// the form when a non-interactive param sits between two
     /// interactive ones.
     pub(crate) fn show_filter_with_prefill(&self, filter: &Filter, prefill: Option<&[String]>) {
+        // Remember the filter so clip-view frame-change notifications
+        // can rebuild it against a new width. Safe to store as a raw
+        // pointer because every `Filter` comes from the `'static`
+        // built-in catalogue.
+        self.ivars()
+            .current_filter
+            .set(Some(filter as *const Filter));
+        // Persist remembered prefill *into* the lookup map so that a
+        // later relayout (driven by the clip view's frame-change
+        // notification, which doesn't know about the per-call prefill)
+        // still uses the correct starting values rather than falling
+        // back to stdlib defaults.
+        if let Some(values) = prefill {
+            self.ivars()
+                .remembered
+                .borrow_mut()
+                .insert(filter.command.clone(), values.to_vec());
+        }
+        self.render_filter(filter);
+    }
+
+    /// Snap the document view's width to the current clip-view width
+    /// and re-lay the form rows. Called from the clip-view frame-
+    /// change handler so resizes (initial layout, window drag, split
+    /// divider drag) keep every control inside the visible pane.
+    fn relayout_for_current_width(&self) {
+        let clip_width = self.clip_view_width();
+        let doc = &self.ivars().document;
+        let doc_frame = doc.frame();
+        // Width must always be >= some minimum so `row_width` doesn't
+        // saturate at the 60px clamp; height keeps whatever the last
+        // `fit_document_height` set so the scroll view's thumb stays
+        // put across the relayout.
+        let new_width = clip_width.max(0.0);
+        if (doc_frame.size.width - new_width).abs() > 0.5 {
+            let new_frame = CGRect {
+                origin: doc_frame.origin,
+                size: CGSize {
+                    width: new_width,
+                    height: doc_frame.size.height,
+                },
+            };
+            unsafe { doc.setFrame(new_frame) };
+        }
+        match self.ivars().current_filter.get() {
+            Some(p) => {
+                let filter: &Filter = unsafe { &*p };
+                self.render_filter(filter);
+            }
+            None => self.render_empty_placeholder(),
+        }
+    }
+
+    /// Width of the document view's superview (the scroll view's
+    /// `NSClipView`). Returns 0 when the document hasn't been added
+    /// yet (defensive: callers clamp with `.max(MIN)`).
+    fn clip_view_width(&self) -> CGFloat {
+        let doc = &self.ivars().document;
+        let superview: Option<Retained<NSView>> = unsafe { doc.superview() };
+        match superview {
+            Some(clip) => clip.frame().size.width,
+            None => 0.0,
+        }
+    }
+
+    fn render_empty_placeholder(&self) {
         let mtm = MainThreadMarker::from(&*self.ivars().document);
         self.clear_rows();
         let width = self.row_width();
         let mut cursor_y = FORM_TOP_MARGIN;
+        let h = self.add_label(
+            mtm,
+            "Select a filter on the left to see its parameters.",
+            13.0,
+            FORM_HMARGIN,
+            cursor_y,
+            width,
+        );
+        cursor_y += h + FORM_ROW_GAP;
+        self.fit_document_height(cursor_y);
+    }
+
+    /// Internal entry point used by both the user-driven
+    /// `show_filter_with_prefill` and the clip-view frame-change
+    /// relayout. Reads the prefill from the remembered map so both
+    /// callers go through one code path.
+    fn render_filter(&self, filter: &Filter) {
+        let mtm = MainThreadMarker::from(&*self.ivars().document);
+        self.clear_rows();
+        let width = self.row_width();
+        let mut cursor_y = FORM_TOP_MARGIN;
+        // Snapshot the remembered prefill so the borrow on the ivars
+        // map doesn't outlast any of the `self.add_*` calls below
+        // (which themselves borrow other ivars).
+        let prefill: Option<Vec<String>> = self
+            .ivars()
+            .remembered
+            .borrow()
+            .get(&filter.command)
+            .cloned();
 
         let h = self.add_label(
             mtm,
@@ -470,7 +623,7 @@ impl FormController {
         // of-range or wrong-type entries silently fall back to the
         // kind's default — same contract as `reconcile::reconcile`.
         let reconciled: Vec<String> = match prefill {
-            Some(saved) => crate::catalogue::reconcile::reconcile(saved, &filter.params),
+            Some(saved) => crate::catalogue::reconcile::reconcile(&saved, &filter.params),
             None => Vec::new(),
         };
         let starting = if reconciled.is_empty() {
@@ -632,6 +785,31 @@ impl FormController {
                 cell = FormCell::Static;
                 row_height = label_h;
             }
+            ParamKind::Internal { label: _, default } => {
+                // Render as a single light-weight row so the user can
+                // see what's being passed to the filter without it
+                // dominating the form, then store the value so OK
+                // emits it back into argv. If the param itself has
+                // no label (the common case for `value(...)` /
+                // `button(...)` decls in gmic stdlib), skip rendering
+                // entirely — the param still contributes via the
+                // FormCell below.
+                let user_label = param.label.trim();
+                if user_label.is_empty() {
+                    self.ivars().cells.borrow_mut().push(FormCell::Internal {
+                        default: default.clone(),
+                    });
+                    return y;
+                }
+                let label_h =
+                    self.add_label(mtm, user_label, 12.0, FORM_HMARGIN, y, FORM_LABEL_WIDTH);
+                let display = format!("(internal: {default})");
+                let value_h = self.add_label(mtm, &display, 11.0, cell_x, y, cell_w);
+                cell = FormCell::Internal {
+                    default: default.clone(),
+                };
+                row_height = label_h.max(value_h).max(FORM_ROW_HEIGHT);
+            }
             ParamKind::Unknown(raw) => {
                 let label = param.label.trim();
                 let raw_trim = raw.trim();
@@ -688,7 +866,7 @@ impl FormController {
                     let v: &NSView = &field;
                     v.removeFromSuperview();
                 },
-                FormCell::Static => {}
+                FormCell::Static | FormCell::Internal { .. } => {}
             }
         }
         for v in self.ivars().extra_views.borrow_mut().drain(..) {
@@ -744,7 +922,10 @@ impl FormController {
         };
         let (label, height) = build_label_view(mtm, text, font_size, initial_frame, w);
         unsafe {
-            label.setAutoresizingMask(NSAutoresizingMaskOptions::NSViewWidthSizable);
+            // No autoresizing mask: the form is fully rebuilt by
+            // `relayout_for_current_width` whenever the clip view's
+            // frame changes, so the label's frame is always set
+            // explicitly relative to the live `row_width()`.
             self.ivars().document.addSubview(&label);
         }
         self.ivars().extra_views.borrow_mut().push(label);
@@ -772,7 +953,7 @@ impl FormController {
         };
         let slider: Retained<NSSlider> = unsafe { NSSlider::initWithFrame(mtm.alloc(), frame) };
         unsafe {
-            slider.setAutoresizingMask(NSAutoresizingMaskOptions::NSViewWidthSizable);
+            // No autoresizing mask: see `add_label` for the rationale.
             slider.setMinValue(min);
             slider.setMaxValue(max);
             slider.setDoubleValue(default.clamp(min, max));
@@ -807,7 +988,6 @@ impl FormController {
         };
         let button: Retained<NSButton> = unsafe { NSButton::initWithFrame(mtm.alloc(), frame) };
         unsafe {
-            button.setAutoresizingMask(NSAutoresizingMaskOptions::NSViewWidthSizable);
             button.setButtonType(NSButtonType::Switch);
             button.setTitle(&NSString::from_str(title));
             button.setState(if default {
@@ -840,7 +1020,6 @@ impl FormController {
         let popup: Retained<NSPopUpButton> =
             unsafe { NSPopUpButton::initWithFrame_pullsDown(mtm.alloc(), frame, false) };
         unsafe {
-            popup.setAutoresizingMask(NSAutoresizingMaskOptions::NSViewWidthSizable);
             for choice in choices {
                 popup.addItemWithTitle(&NSString::from_str(choice));
             }
@@ -904,7 +1083,6 @@ impl FormController {
         let field: Retained<NSTextField> =
             unsafe { NSTextField::initWithFrame(mtm.alloc(), frame) };
         unsafe {
-            field.setAutoresizingMask(NSAutoresizingMaskOptions::NSViewWidthSizable);
             field.setStringValue(&NSString::from_str(default));
             field.setEditable(true);
             field.setBezeled(true);
@@ -926,7 +1104,6 @@ impl FormController {
         let box_view: Retained<NSBox> = unsafe { NSBox::initWithFrame(mtm.alloc(), frame) };
         unsafe {
             box_view.setBoxType(NSBoxType::NSBoxSeparator);
-            box_view.setAutoresizingMask(NSAutoresizingMaskOptions::NSViewWidthSizable);
             let v: &NSView = &box_view;
             self.ivars().document.addSubview(v);
         }

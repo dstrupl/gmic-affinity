@@ -71,6 +71,16 @@ pub enum ParamKind {
         label: String,
         url: String,
     },
+    /// Internal-only parameter (G'MIC `value(...)`, `button(...)`,
+    /// most `_<type>(...)` forms where the host has no useful UI but
+    /// still needs to forward a default to the filter on the
+    /// command line). Renders as a small read-only label so users
+    /// can see what is going to be sent and contributes
+    /// [`InternalValue::default`] verbatim when collecting argv.
+    Internal {
+        label: String,
+        default: String,
+    },
     Unknown(String),
 }
 

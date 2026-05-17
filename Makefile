@@ -121,7 +121,7 @@ REZ_FLAGS := \
   -d "PRAGMA_ONCE=0" \
   -useDF
 
-.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy help pipl check-lfs refresh-catalogue picker-example
+.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy help pipl check-lfs refresh-catalogue picker-example audit-unsupported
 
 all: bundle
 
@@ -134,6 +134,7 @@ help:
 	@echo "  make uninstall          Remove the installed plugin."
 	@echo "  make picker-example     Open the picker standalone (no Affinity install needed)."
 	@echo "  make refresh-catalogue  Regenerate assets/gmic-catalogue.* from local gmic."
+	@echo "  make audit-unsupported  Histogram of catalogue params still missing a parser."
 	@echo "  make test               Run cargo test under both default and --features live."
 	@echo "  make clippy             Run cargo clippy --all-targets --all-features -D warnings."
 	@echo "  make fmt                Run cargo fmt."
@@ -323,3 +324,13 @@ refresh-catalogue:
 # (see examples/picker.rs header).
 picker-example: check-lfs
 	cargo run --release --example picker --features live
+
+# Diagnose which gmic parameter syntaxes our parser still maps to
+# `ParamKind::Unknown`. Source-of-truth for prioritising new
+# `parse_*` arms in src/catalogue/parser.rs. The bundled v3.7.6
+# snapshot resolves to 0 unsupported params; a non-zero count after
+# `make refresh-catalogue` is the signal to look at this output and
+# either add a new arm or widen the
+# `bundled_catalogue_has_no_unsupported_params` test deliberately.
+audit-unsupported: check-lfs
+	@cargo run --quiet --bin audit-unsupported
