@@ -21,13 +21,25 @@ Documentation set:
 When installed into Affinity Photo's plugins folder, this adds a `G'MIC...` entry
 to the **Filters → Plugins → G'MIC** submenu. Invoking it:
 
-1. Receives the current 8-bit RGB / RGBA / Greyscale pixel data from Affinity via the
-   Photoshop SDK's `FilterRecord` + `advanceState` protocol.
-2. Writes the input region to a temporary TIFF in a per-call 0700 tempdir.
-3. Runs the Homebrew-installed `gmic` binary with a configurable filter command,
-   in a cleared environment with a tight argv allow-list.
-4. Reads the (possibly float, u16, u32) result TIFF back, quantises to 8-bit, and
-   copies it into Affinity's output buffer — no manual file roundtrip required.
+1. Opens a native macOS picker dialog (Cocoa) with the full G'MIC filter
+   catalogue (~1500 filters, drawn from the bundled annotated
+   `update*.gmic` snapshot). Search by name; pick a leaf; the right pane
+   builds a parameter form for that filter (sliders, popups, color
+   wells, …) pre-filled with either remembered or stdlib defaults.
+2. On OK, receives the current 8-bit RGB / RGBA / Greyscale pixel data
+   from Affinity via the Photoshop SDK's `FilterRecord` + `advanceState`
+   protocol.
+3. Writes the input region to a temporary TIFF in a per-call 0700 tempdir.
+4. Runs the Homebrew-installed `gmic` binary with the chosen filter
+   command and argument vector, in a cleared environment with a tight
+   argv allow-list.
+5. Reads the (possibly float, u16, u32) result TIFF back, quantises to
+   8-bit, resamples to the host's filter rect if the filter changed
+   dimensions (T12-C, e.g. rotate / crop), and copies it into
+   Affinity's output buffer.
+
+`Filter → Last Filter` (`Cmd-F`) replays the last picked filter without
+re-opening the dialog.
 
 ## Requirements
 
@@ -36,6 +48,10 @@ to the **Filters → Plugins → G'MIC** submenu. Invoking it:
   `x86_64-apple-darwin` targets for a universal build)
 - `gmic` via Homebrew: `brew install gmic-qt`
 - Affinity Photo 2 or later
+- Git LFS — one-time per machine: `git lfs install`. After cloning,
+  `git lfs pull` once. The bundled catalogue snapshot
+  (`assets/gmic-catalogue.gmic.gz`) is LFS-tracked; without hydration
+  the build fails fast with a `check-lfs` error from the Makefile.
 
 ## Build
 
@@ -57,13 +73,15 @@ so the `live` build is safe to install whenever `cargo test` is green.
 Common targets:
 
 ```bash
-make             # ARM-only no-op bundle (fast iteration)
-make universal   # ARM + x86_64 lipo'd bundle
-make install     # copy GmicFilter.plugin into Affinity Photo 2 plugins folder
-make uninstall   # remove the installed plugin
-make test        # cargo test under both default and --features live
-make clippy      # cargo clippy --all-targets --all-features -D warnings
-make help        # full list of targets
+make                    # ARM-only no-op bundle (fast iteration)
+make universal          # ARM + x86_64 lipo'd bundle
+make install            # copy GmicFilter.plugin into Affinity Photo 2 plugins folder
+make uninstall          # remove the installed plugin
+make picker-example     # open the picker standalone (no Affinity install needed)
+make refresh-catalogue  # regenerate assets/gmic-catalogue.* from local gmic
+make test               # cargo test under both default and --features live
+make clippy             # cargo clippy --all-targets --all-features -D warnings
+make help               # full list of targets
 ```
 
 ### Plugin metadata: legacy `.rsrc` *and* modern `PiPLs.json`
@@ -114,21 +132,23 @@ See [PRD.md](./PRD.md) §7 for the full PRD-side build and install procedure.
 
 ## Configuration
 
-The argv passed to `gmic` is read from `~/.config/gmic-affinity/filter.txt`
-if present, otherwise `-fx_oldphoto` is used. The file must be at most 4 KiB
-and may not contain NUL or other control characters (tab, newline, and CR
-are allowed). Examples:
+The picker (v2) supersedes the older `~/.config/gmic-affinity/filter.txt`
+mechanism. User state — the last filter, the recents MRU, and
+per-filter remembered argument values — lives in:
 
 ```
-# ~/.config/gmic-affinity/filter.txt
--blur 8
+~/Library/Application Support/gmic-affinity/settings.json
 ```
 
-```
--fx_rodilius 10,2,200,20,3,0
-```
+It is written atomically (temp + rename) after every OK from the
+picker. If the file is unreadable on next open it is renamed to
+`settings.json.broken-<ts>` and a fresh empty one is written; the
+user-visible effect is loss of recents / remembered values, never a
+crash.
 
-A proper parameter UI is planned for v2.
+`Filter → Last Filter` (Cmd-F) reads `settings.last` directly: even
+across an Affinity restart, Cmd-F replays the last filter you picked
+without opening the dialog.
 
 ## Troubleshooting
 

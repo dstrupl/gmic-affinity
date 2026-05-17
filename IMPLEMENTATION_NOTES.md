@@ -342,17 +342,105 @@ gmic-affinity/
 ├── src/
 │   ├── lib.rs                       # PluginMain + selector dispatch
 │   ├── ps_types.rs                  # FilterRecord + VRect + AdvanceStateProc
+│   ├── ps_data.rs                   # typed Box-leak helpers for *data slot (v2)
 │   ├── filter.rs                    # bridge from FilterRecord to gmic invocation
 │   ├── gmic.rs                      # hardened subprocess wrapper
 │   ├── tiff_io.rs                   # multi-bit-depth TIFF read, U8 write
-│   └── logging.rs                   # file logger to ~/Library/Logs/
+│   ├── logging.rs                   # file logger to ~/Library/Logs/
+│   ├── settings.rs                  # JSON persistence: last filter, recents, remembered args (v2)
+│   ├── catalogue/                   # parsed #@gui annotations + ChosenFilter type (v2)
+│   └── ui/                          # Cocoa picker dialog + NSAlert sink (v2, live-only)
 ├── tests/
-│   └── layout.rs                    # FilterRecord offset / size assertions
+│   ├── layout.rs                    # FilterRecord offset / size assertions
+│   ├── catalogue_snapshot.rs        # smoke-test the bundled gmic snapshot (v2)
+│   └── error_matrix.rs              # NSAlert message-formatting matrix (v2)
+├── examples/
+│   └── picker.rs                    # standalone picker for AppKit dev iteration (v2)
+├── assets/
+│   ├── gmic-catalogue.gmic.gz       # LFS-tracked gmic update*.gmic snapshot (v2)
+│   ├── gmic-catalogue.toc.txt       # human-diffable dump for code review (v2)
+│   └── gmic-catalogue.version.txt   # gmic --version + ISO timestamp (v2)
 ├── PRD.md
 ├── IMPLEMENTATION_NOTES.md          # ← this file
 ├── README.md
 └── LICENSE
 ```
+
+---
+
+## 9. The catalogue picker (v2)
+
+The v1 plugin took its single `gmic` command from a hand-edited
+`~/.config/gmic-affinity/filter.txt`. v2 replaces that with a native
+Cocoa dialog backed by the parsed G'MIC stdlib catalogue. The full
+design is in `docs/design/2026-05-17-gmic-picker-dialog.md`; this
+section is a 30-second map of the moving parts.
+
+**Five-module split** (all under `src/`):
+
+| Module        | Responsibility                                                       |
+|---------------|----------------------------------------------------------------------|
+| `catalogue/`  | Parses `#@gui` annotations into a tree of folders/filters/params and exposes `ChosenFilter { command, args }`. Snapshot bundled via `include_bytes!` from `assets/gmic-catalogue.gmic.gz`. |
+| `settings.rs` | Atomic JSON read/write of `~/Library/Application Support/gmic-affinity/settings.json` (last pick + recents MRU + per-filter remembered args). Corrupt files are renamed `.broken-<ts>` and replaced. |
+| `ps_data.rs`  | Generic `leak<T> / borrow<T> / take_and_drop<T>` helpers for the host's plugin-private `*data` slot. PARAMETERS leaks a `ChosenFilter`, CONTINUE borrows it, FINISH drops it. |
+| `ui::picker`  | The dialog itself: NSPanel + NSSplitView + NSOutlineView + NSSearchField + dynamic parameter form. Returns `Option<ChosenFilter>`. AppKit-only (`#[cfg(feature = "live")]`). |
+| `ui::alert`   | `Sink` trait + `NsAlertSink` (production NSAlert) + `CaptureSink` (used by `tests/error_matrix.rs`). Keeps every user-facing error string under a tested matrix. |
+
+**LFS gotcha + fail-fast.** `assets/gmic-catalogue.gmic.gz` is Git
+LFS-tracked because gzipped catalogue snapshots (≈2 MB) bloat regular
+git history. The Makefile's `check-lfs` target verifies the gzip
+magic bytes before every `bundle` / `universal` build — without that
+guard a forgotten `git lfs pull` would compile the LFS pointer text
+into the binary and the picker would open empty. Same flavour of
+silent-failure trap as the PiPL story in §2.
+
+**`examples/picker` for dev iteration.** Driving the picker through
+Affinity Photo means restarting the host on every change. The
+`cargo run --release --example picker --features live` standalone
+binary opens the same panel against the same catalogue/settings and
+prints the resulting `ChosenFilter` to stdout. The `GMIC_PRESELECT=…`
+env var pre-opens a specific filter's form for fast layout iteration.
+
+**Run-loop modal pattern.** Plain `NSApp.runModal` froze Affinity
+because Affinity is already running its own event loop. The picker
+instead uses `beginModalSessionForWindow:` + a hand-rolled
+`runModalSession:` pump that drains both the default and
+`NSEventTrackingRunLoopMode` modes, so scroll-wheel events keep
+flowing while the panel is up. See `src/ui/runloop.rs` for the pump
+and the `ModalCloseDelegate` that stops the session on window close.
+
+---
+
+## 10. Manual end-to-end pre-release checklist (picker)
+
+Run these by hand before each release of the picker. None of them are
+worth automating against Affinity itself.
+
+1. [ ] `cargo run --release --example picker --features live` — opens
+   the dialog standalone. Verify the tree, search field, parameter
+   form, OK, Cancel, double-click leaf, Esc, Return all behave per
+   the design doc §4.
+2. [ ] `make universal-install FEATURES=live` — installs the universal
+   bundle. Verify `make verify-bundle` passes (filetype 8 on both
+   slices).
+3. [ ] Open Affinity Photo 2, fresh launch, open an 8-bit RGB doc.
+   Filter → Plugins → G'MIC → G'MIC…  Pick `Artistic / Paint Brush`
+   with defaults. OK. Image transforms visibly. No crash.
+4. [ ] Filter → Last Filter (`Cmd-F`). The same filter re-runs without
+   the dialog. No crash.
+5. [ ] Quit Affinity. Relaunch. Open the dialog. Paint Brush is
+   pre-selected and its sliders show the values from step 3 (not gmic
+   stdlib defaults).
+6. [ ] Force errors:
+   - [ ] `sudo mv $(which gmic) /tmp/`; pick a filter → NSAlert
+     "G'MIC isn't installed…"; restore the binary.
+   - [ ] Corrupt `~/Library/Application Support/gmic-affinity/settings.json`
+     → next picker open still works; the broken file is renamed to
+     `.broken-<ts>` and a fresh one is written.
+   - [ ] Delete `settings.json` and press `Cmd-F` → NSAlert
+     "No previous G'MIC filter to repeat…".
+7. [ ] `~/Library/Logs/gmic-affinity.log` shows one structured line
+   per interesting event across the run; no panics; no stray prints.
 
 ---
 
