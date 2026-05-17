@@ -29,6 +29,12 @@ LIB_NAME    := libGmicFilter.dylib
 ARM_LIB     := target/aarch64-apple-darwin/release/$(LIB_NAME)
 X86_LIB     := target/x86_64-apple-darwin/release/$(LIB_NAME)
 
+# Cargo features. The default build is a safe no-op PluginMain; set
+# `make ... FEATURES=live` once the FilterRecord layout is reconciled
+# against PIFilter.h to enable the real pixel pipeline.
+FEATURES ?=
+CARGO_FEATURE_ARGS := $(if $(FEATURES),--features $(FEATURES),)
+
 # Default install path is Affinity Photo 2. The Affinity v3 path is
 #   $(HOME)/Library/Application Support/Affinity/Plugins
 # but v3 is not the M1 target.
@@ -67,11 +73,16 @@ universal: $(ARM_LIB) $(X86_LIB)
 	fi
 	codesign --force --deep --sign - "$(BUNDLE)"
 
+# Note: the architecture-specific outputs are intentionally PHONY because the
+# enabled feature set changes their contents but not their path; we always
+# want cargo to re-evaluate.
+.PHONY: $(ARM_LIB) $(X86_LIB)
+
 $(ARM_LIB):
-	cargo build --release --target aarch64-apple-darwin
+	cargo build --release --target aarch64-apple-darwin $(CARGO_FEATURE_ARGS)
 
 $(X86_LIB):
-	cargo build --release --target x86_64-apple-darwin
+	cargo build --release --target x86_64-apple-darwin $(CARGO_FEATURE_ARGS)
 
 pipl:
 	@if [ ! -d "$(PHOTOSHOP_SDK_RESOURCES)" ]; then \
@@ -93,13 +104,14 @@ uninstall:
 	@echo "Removed $(AFFINITY_PLUGINS_DIR)/$(BUNDLE) (if it existed)."
 
 test:
-	cargo test
+	cargo test $(CARGO_FEATURE_ARGS)
+	cargo test --features live
 
 fmt:
 	cargo fmt
 
 clippy:
-	cargo clippy --all-targets -- -D warnings
+	cargo clippy --all-targets --all-features -- -D warnings
 
 clean:
 	cargo clean

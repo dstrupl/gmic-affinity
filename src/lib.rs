@@ -9,13 +9,20 @@
 //! and looks up the exported `PluginMain` symbol. It then calls us with one
 //! of the selectors defined in `ps_types.rs`.
 //!
-//! M1 (current): a no-op `PluginMain` that returns `NO_ERR` for every
-//! selector and never dereferences the `FilterRecord`. This is intentional:
-//! it lets us verify the bundle loads, the symbol resolves, and the plugin
-//! appears in Affinity's Filters menu without any risk of crashing the host
-//! due to a layout mismatch in `FilterRecord` (see `ps_types.rs`).
+//! Two build modes:
+//!
+//! - Default build (`cargo build`): a no-op `PluginMain` that returns
+//!   `NO_ERR` for every selector and never dereferences `FilterRecord`.
+//!   Safe to install in Affinity even before the SDK-verified struct layout
+//!   has been reconciled.
+//! - `--features live`: the real M3+ `PluginMain` that reads pixels and
+//!   (M4+) shells out to gmic. Only install this once `cargo test --
+//!   --ignored` confirms `FilterRecord` offsets match `PIFilter.h`.
 
 pub mod ps_types;
+
+#[cfg(feature = "live")]
+pub mod filter;
 
 use ps_types::{
     NO_ERR, SELECTOR_ABOUT, SELECTOR_CONTINUE, SELECTOR_FINISH, SELECTOR_PARAMETERS,
@@ -23,33 +30,78 @@ use ps_types::{
 };
 use std::ffi::c_void;
 
+#[cfg(feature = "live")]
+use ps_types::{FilterRecord, USER_CANCEL, VRect};
+
 /// Photoshop-compatible filter entry point.
 ///
 /// # Safety
-/// All four pointers are supplied by the host. We do not dereference
-/// `filter_record` or `data` in M1; we only write a result code through
-/// `result` if it is non-null.
+/// All four pointers are supplied by the host. The default build does not
+/// dereference `filter_record`; the `live` build does, and assumes the
+/// caller (the host) has provided a valid pointer to a `FilterRecord`.
 #[no_mangle]
 pub unsafe extern "C" fn PluginMain(
     selector:      i16,
-    _filter_record: *mut c_void,
-    _data:          *mut isize,
-    result:         *mut i16,
+    filter_record: *mut c_void,
+    data:          *mut isize,
+    result:        *mut i16,
 ) {
     log_selector(selector);
 
-    let code: i16 = match selector {
-        SELECTOR_ABOUT
-        | SELECTOR_PARAMETERS
-        | SELECTOR_PREPARE
-        | SELECTOR_START
-        | SELECTOR_CONTINUE
-        | SELECTOR_FINISH => NO_ERR,
-        _ => NO_ERR,
-    };
+    let code: i16 = dispatch(selector, filter_record, data);
 
     if !result.is_null() {
         *result = code;
+    }
+}
+
+#[cfg(not(feature = "live"))]
+unsafe fn dispatch(_selector: i16, _filter_record: *mut c_void, _data: *mut isize) -> i16 {
+    NO_ERR
+}
+
+#[cfg(feature = "live")]
+unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize) -> i16 {
+    if filter_record.is_null() {
+        eprintln!("[gmic-affinity] null FilterRecord pointer; refusing");
+        return USER_CANCEL;
+    }
+    let fr = &mut *(filter_record as *mut FilterRecord);
+
+    match selector {
+        SELECTOR_ABOUT      => NO_ERR,
+        SELECTOR_PARAMETERS => NO_ERR,
+        SELECTOR_PREPARE => {
+            fr.buffer_space = 0;
+            fr.max_space    = 0;
+            NO_ERR
+        }
+        SELECTOR_START => {
+            // Tell the host we want the whole filter rect, all planes.
+            fr.in_rect      = fr.filter_rect;
+            fr.in_lo_plane  = 0;
+            fr.in_hi_plane  = fr.planes - 1;
+            fr.out_rect     = fr.filter_rect;
+            fr.out_lo_plane = 0;
+            fr.out_hi_plane = fr.planes - 1;
+            NO_ERR
+        }
+        SELECTOR_CONTINUE => {
+            match filter::run_passthrough(fr) {
+                Ok(()) => {
+                    // Signal "done, no more tiles" by zeroing the rects.
+                    fr.in_rect  = VRect { top: 0, left: 0, bottom: 0, right: 0 };
+                    fr.out_rect = VRect { top: 0, left: 0, bottom: 0, right: 0 };
+                    NO_ERR
+                }
+                Err(e) => {
+                    eprintln!("[gmic-affinity] filter failed: {e}");
+                    USER_CANCEL
+                }
+            }
+        }
+        SELECTOR_FINISH => NO_ERR,
+        _ => NO_ERR,
     }
 }
 

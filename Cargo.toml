@@ -14,6 +14,16 @@ name       = "GmicFilter"
 # can be linked into integration tests under `tests/`.
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# Default: the no-op M1 PluginMain. Safe to install in Affinity even if the
+# FilterRecord layout has not been reconciled against PIFilter.h, because the
+# entry point never dereferences the struct.
+default = []
+# `live`: the real M3/M4 PluginMain that dereferences FilterRecord, writes
+# TIFFs, and shells out to gmic. Do NOT install a live bundle in Affinity
+# until `cargo test -- --ignored` passes (i.e. struct offsets match the SDK).
+live = []
+
 [dependencies]
 libc     = "0.2"
 tiff     = "0.9"
