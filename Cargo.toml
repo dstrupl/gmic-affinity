@@ -1,0 +1,27 @@
+[package]
+name        = "gmic-affinity"
+version     = "0.1.0"
+edition     = "2021"
+authors     = ["dstrupl"]
+description = "Photoshop-compatible filter plugin for Affinity Photo on macOS that bridges G'MIC."
+license     = "MIT"
+repository  = "https://github.com/dstrupl/gmic-affinity"
+readme      = "README.md"
+
+[lib]
+name       = "GmicFilter"
+# cdylib for the .plugin bundle's loadable executable; rlib so the same crate
+# can be linked into integration tests under `tests/`.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+libc     = "0.2"
+tiff     = "0.9"
+tempfile = "3"
+
+[profile.release]
+opt-level     = 3
+lto           = "thin"
+codegen-units = 1
+strip         = "symbols"
+panic         = "abort"
