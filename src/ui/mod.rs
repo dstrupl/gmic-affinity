@@ -1,11 +1,18 @@
-//! macOS AppKit-facing UI for the plugin.
+//! UI helpers for the plugin.
 //!
-//! Everything in this module needs to run on the main thread, where
-//! Affinity calls `PluginMain` for us. This module is only exposed when the
-//! crate is built with the `live` feature (`#[cfg(feature = "live")] pub mod ui`
-//! in `lib.rs`).
+//! `alert` is pure Rust and is always compiled so the PluginMain
+//! error-handling matrix can be table-tested in the default build.
+//!
+//! `picker`, `runloop`, and `modal_close_delegate` drive AppKit and
+//! are only compiled under `--features live` (the build that actually
+//! dereferences `FilterRecord` and renders the modal panel inside
+//! Affinity Photo).
 
 pub mod alert;
+
+#[cfg(feature = "live")]
 pub(crate) mod modal_close_delegate;
+#[cfg(feature = "live")]
 pub mod picker;
+#[cfg(feature = "live")]
 pub mod runloop;
