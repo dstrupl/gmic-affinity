@@ -37,6 +37,17 @@ pub fn run_modal_window(window: &Retained<NSWindow>) -> NSModalResponse {
     let app = NSApplication::sharedApplication(mtm);
     window.makeKeyAndOrderFront(None);
 
+    // NOTE: `beginModalSessionForWindow:` / `runModalSession:` /
+    // `endModalSession:` trip `objc2`'s debug-build type-encoding
+    // check (the binding declares the session as a typed struct
+    // pointer, but the runtime exposes it as `void *`). We compile
+    // the production `.plugin` with `--release` via `make install`,
+    // which disables `debug_assertions` and silences the check. The
+    // standalone `examples/picker` binary therefore needs to be run
+    // as `cargo run --release --example picker --features live` for
+    // the same reason (or `cargo build --release` first then run
+    // `./target/release/examples/picker`). The README and Makefile
+    // capture that contract.
     let session = unsafe { app.beginModalSessionForWindow(window) };
     let mut response: NSModalResponse = NSModalResponseContinue;
     while response == NSModalResponseContinue {

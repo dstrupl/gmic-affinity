@@ -17,10 +17,10 @@ use std::ffi::c_void;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct Rect {
-    pub top:    i16,
-    pub left:   i16,
+    pub top: i16,
+    pub left: i16,
     pub bottom: i16,
-    pub right:  i16,
+    pub right: i16,
 }
 
 // Compatibility alias for code that still imports the old PRD name.
@@ -38,8 +38,8 @@ pub struct Point {
 /// `sizeof(PSRGBColor) == 6`.
 pub type PSRGBColor = [u8; 6];
 
-pub type TestAbortProc    = Option<unsafe extern "C" fn() -> i16>;
-pub type ProgressProc     = Option<unsafe extern "C" fn(i32, i32)>;
+pub type TestAbortProc = Option<unsafe extern "C" fn() -> i16>;
+pub type ProgressProc = Option<unsafe extern "C" fn(i32, i32)>;
 pub type AdvanceStateProc = Option<unsafe extern "C" fn() -> i16>;
 
 /// Partial `FilterRecord`. Field order and names match `PIFilter.h` exactly
@@ -48,36 +48,36 @@ pub type AdvanceStateProc = Option<unsafe extern "C" fn() -> i16>;
 /// any of them, requires updating `tests/layout.rs`.
 #[repr(C)]
 pub struct FilterRecord {
-    pub serial_number: i32,         // offset 0
+    pub serial_number: i32, // offset 0
     // 4 bytes of padding here for 8-byte pointer alignment.
-    pub abort_proc:    TestAbortProc, // offset 8
-    pub progress_proc: ProgressProc,  // offset 16
-    pub parameters:    *mut c_void,   // offset 24 (Handle)
-    pub image_size:    Point,         // offset 32 (legacy 16-bit Point)
-    pub planes:        i16,           // offset 36
-    pub filter_rect:   Rect,          // offset 38
-    pub background:    PSRGBColor,    // offset 46
-    pub foreground:    PSRGBColor,    // offset 52
+    pub abort_proc: TestAbortProc,   // offset 8
+    pub progress_proc: ProgressProc, // offset 16
+    pub parameters: *mut c_void,     // offset 24 (Handle)
+    pub image_size: Point,           // offset 32 (legacy 16-bit Point)
+    pub planes: i16,                 // offset 36
+    pub filter_rect: Rect,           // offset 38
+    pub background: PSRGBColor,      // offset 46
+    pub foreground: PSRGBColor,      // offset 52
     // 2 bytes of padding for i32 alignment.
-    pub max_space:     i32,           // offset 60
-    pub buffer_space:  i32,           // offset 64
-    pub in_rect:       Rect,          // offset 68
-    pub in_lo_plane:   i16,           // offset 76
-    pub in_hi_plane:   i16,           // offset 78
-    pub out_rect:      Rect,          // offset 80
-    pub out_lo_plane:  i16,           // offset 88
-    pub out_hi_plane:  i16,           // offset 90
+    pub max_space: i32,    // offset 60
+    pub buffer_space: i32, // offset 64
+    pub in_rect: Rect,     // offset 68
+    pub in_lo_plane: i16,  // offset 76
+    pub in_hi_plane: i16,  // offset 78
+    pub out_rect: Rect,    // offset 80
+    pub out_lo_plane: i16, // offset 88
+    pub out_hi_plane: i16, // offset 90
     // 4 bytes of padding for 8-byte pointer alignment.
-    pub in_data:       *mut u8,       // offset 96
-    pub in_row_bytes:  i32,           // offset 104
+    pub in_data: *mut u8,  // offset 96
+    pub in_row_bytes: i32, // offset 104
     // 4 bytes of padding for 8-byte pointer alignment.
-    pub out_data:      *mut u8,       // offset 112
-    pub out_row_bytes: i32,           // offset 120
+    pub out_data: *mut u8,  // offset 112
+    pub out_row_bytes: i32, // offset 120
     // Bytes 124..296 cover isFloating/haveMask/autoMask, maskRect/maskData,
     // imageMode, imageHRes/VRes, floatCoord, wholeSize and the other
     // 3.0-era fields. We don't read them; the host's pointer arithmetic
     // still needs them to be sized correctly though.
-    pub _pad1:         [u8; 296 - 124],
+    pub _pad1: [u8; 296 - 124],
     /// Function the plugin calls *inside* `SELECTOR_START` (and again
     /// from `SELECTOR_CONTINUE` if tiling) to ask the host to fill
     /// `in_data` / `in_row_bytes` and allocate `out_data` matching the
@@ -88,22 +88,22 @@ pub struct FilterRecord {
     pub advance_state: AdvanceStateProc, // offset 296
     // Remaining post-advanceState fields (supportsAbsolute, padding,
     // inputPadding, outputPadding, etc.). Still opaque to us.
-    pub _pad2:         [u8; 648 - 304],
+    pub _pad2: [u8; 648 - 304],
 }
 
 // Selector codes from PIFilter.h (verified via `offsetof` probe against
 // the SDK 2026 v2 headers).
-pub const SELECTOR_ABOUT:      i16 = 0;
+pub const SELECTOR_ABOUT: i16 = 0;
 pub const SELECTOR_PARAMETERS: i16 = 1;
-pub const SELECTOR_PREPARE:    i16 = 2;
-pub const SELECTOR_START:      i16 = 3;
-pub const SELECTOR_CONTINUE:   i16 = 4;
-pub const SELECTOR_FINISH:     i16 = 5;
+pub const SELECTOR_PREPARE: i16 = 2;
+pub const SELECTOR_START: i16 = 3;
+pub const SELECTOR_CONTINUE: i16 = 4;
+pub const SELECTOR_FINISH: i16 = 5;
 
 // Result codes from PIGeneral.h.
-pub const NO_ERR:           i16 = 0;
-pub const USER_CANCELED:    i16 = -128;
-pub const FILTER_BAD_MODE:  i16 = -30101;
+pub const NO_ERR: i16 = 0;
+pub const USER_CANCELED: i16 = -128;
+pub const FILTER_BAD_MODE: i16 = -30101;
 
 // Legacy alias kept so M3 code that returned `USER_CANCEL` still compiles
 // to the right value.

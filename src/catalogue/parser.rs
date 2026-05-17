@@ -13,15 +13,25 @@ use crate::catalogue::{Catalogue, Filter, Folder, Node, Param, ParamKind};
 
 #[derive(Debug)]
 pub enum ParseError {
-    OrphanParam { line: usize, raw: String },
-    Malformed { line: usize, reason: String, raw: String },
+    OrphanParam {
+        line: usize,
+        raw: String,
+    },
+    Malformed {
+        line: usize,
+        reason: String,
+        raw: String,
+    },
 }
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::OrphanParam { line, raw } => {
-                write!(f, "line {line}: parameter row without an open filter: {raw}")
+                write!(
+                    f,
+                    "line {line}: parameter row without an open filter: {raw}"
+                )
             }
             Self::Malformed { line, reason, raw } => {
                 write!(f, "line {line}: {reason}: {raw}")
@@ -193,7 +203,18 @@ impl ParseState {
             });
             return Ok(());
         };
-        let label = sanitize_display(label_part.trim());
+        // G'MIC convention: a label of `_` (or `_` with leading
+        // underscores) marks an anonymous row. The visible content
+        // belongs to the value (a Note body, a separator, a hidden
+        // `value(0)` placeholder, ...). Treat that as an empty
+        // label so the form pane never renders a stray `_` glyph or
+        // takes label-column space for it.
+        let label_raw = sanitize_display(label_part.trim());
+        let label = if label_raw.trim_matches('_').is_empty() {
+            String::new()
+        } else {
+            label_raw
+        };
         let kind = parse_kind(decl_part.trim());
         filter.params.push(Param { label, kind });
         Ok(())
@@ -264,14 +285,12 @@ fn prune_empty(folder: &mut Folder) {
 /// excluded from the catalogue — they require gmic-qt's IPC and fail
 /// headlessly. Documented in plan §9 risk #4.
 fn is_gmic_qt_only(command: &str) -> bool {
-    command.starts_with("gmic_qt_")
-        || command.starts_with("_gmic_qt_")
-        || command.starts_with('_')
+    command.starts_with("gmic_qt_") || command.starts_with("_gmic_qt_") || command.starts_with('_')
 }
 
 fn parse_kind(decl: &str) -> ParamKind {
     let Some(open) = decl.find('(') else {
-        return ParamKind::Unknown(decl.to_string());
+        return ParamKind::Unknown(sanitize_display(decl));
     };
     let (head, rest) = decl.split_at(open);
     let inner = rest
@@ -279,17 +298,29 @@ fn parse_kind(decl: &str) -> ParamKind {
         .and_then(|s| s.rsplit_once(')'))
         .map(|(args, _)| args)
         .unwrap_or("");
-    match head.trim() {
+    // G'MIC's `~`-prefixed type names (`~float`, `~choice`, …) mark
+    // the parameter as "advanced" (gmic-qt collapses it under a
+    // disclosure triangle). The accepted argument syntax is
+    // identical to the un-prefixed form, so we drop the `~` and
+    // parse normally — losing the "advanced" flag is acceptable
+    // until we have UI for it. Without this, every advanced
+    // parameter rendered as `(unsupported: ~float(...))` instead of
+    // a slider.
+    let head_trim = head.trim().trim_start_matches('~');
+    match head_trim {
         "int" => parse_int(inner),
         "float" => parse_float(inner),
         "bool" => parse_bool(inner),
         "choice" => parse_choice(inner),
         "color" => parse_color(inner),
         "text" => parse_text(inner),
-        "note" => ParamKind::Note(strip_quotes(inner).to_string()),
+        // Note bodies routinely embed HTML markup like
+        // `<small><b>Author: ...</b></small>` — sanitise so the form
+        // never renders raw tags.
+        "note" => ParamKind::Note(sanitize_display(strip_quotes(inner))),
         "separator" => ParamKind::Separator,
         "link" => parse_link(inner),
-        _ => ParamKind::Unknown(decl.to_string()),
+        _ => ParamKind::Unknown(sanitize_display(decl)),
     }
 }
 
@@ -298,9 +329,9 @@ fn parse_int(s: &str) -> ParamKind {
     match parts.as_slice() {
         [d, lo, hi] => match (d.parse(), lo.parse(), hi.parse()) {
             (Ok(default), Ok(min), Ok(max)) => ParamKind::Int { default, min, max },
-            _ => ParamKind::Unknown(format!("int({s})")),
+            _ => ParamKind::Unknown(sanitize_display(&format!("int({s})"))),
         },
-        _ => ParamKind::Unknown(format!("int({s})")),
+        _ => ParamKind::Unknown(sanitize_display(&format!("int({s})"))),
     }
 }
 
@@ -309,9 +340,9 @@ fn parse_float(s: &str) -> ParamKind {
     match parts.as_slice() {
         [d, lo, hi] => match (d.parse(), lo.parse(), hi.parse()) {
             (Ok(default), Ok(min), Ok(max)) => ParamKind::Float { default, min, max },
-            _ => ParamKind::Unknown(format!("float({s})")),
+            _ => ParamKind::Unknown(sanitize_display(&format!("float({s})"))),
         },
-        _ => ParamKind::Unknown(format!("float({s})")),
+        _ => ParamKind::Unknown(sanitize_display(&format!("float({s})"))),
     }
 }
 
@@ -319,19 +350,39 @@ fn parse_bool(s: &str) -> ParamKind {
     match s.trim() {
         "true" | "1" => ParamKind::Bool { default: true },
         "false" | "0" => ParamKind::Bool { default: false },
-        other => ParamKind::Unknown(format!("bool({other})")),
+        other => ParamKind::Unknown(sanitize_display(&format!("bool({other})"))),
     }
 }
 
 fn parse_choice(s: &str) -> ParamKind {
-    let mut iter = split_top_level(s);
-    let default = iter
-        .next()
-        .and_then(|d| d.trim().parse().ok())
-        .unwrap_or(0);
-    let choices: Vec<String> = iter.map(|c| strip_quotes(c).to_string()).collect();
+    // G'MIC accepts two syntaxes:
+    //   choice(default_index, "a", "b", "c")
+    //   choice("a", "b", "c")               // implicit default = 0
+    // Detect which one we have by peeking at the first item: if it
+    // parses as an integer it's the default index; otherwise the
+    // first item is a choice label and the default is 0. Without
+    // this, a filter like Frame [Cube] (whose orientation uses the
+    // implicit-default form) loses its first choice and reports
+    // "Mirror-X" as the apparent default.
+    let raw: Vec<&str> = split_top_level(s).collect();
+    let (default, label_slice) = match raw.split_first() {
+        Some((first, rest)) => match first.trim().parse::<usize>() {
+            Ok(idx) => (idx, rest),
+            // First token isn't a bare integer — it's a quoted
+            // label, so treat the whole list as labels with
+            // default 0.
+            Err(_) => (0, raw.as_slice()),
+        },
+        None => return ParamKind::Unknown(sanitize_display(&format!("choice({s})"))),
+    };
+    // Sanitise every choice label — they appear directly in the
+    // NSPopUpButton menu and routinely include `<i>...</i>` markup.
+    let choices: Vec<String> = label_slice
+        .iter()
+        .map(|c| sanitize_display(strip_quotes(c)))
+        .collect();
     if choices.is_empty() {
-        ParamKind::Unknown(format!("choice({s})"))
+        ParamKind::Unknown(sanitize_display(&format!("choice({s})")))
     } else {
         ParamKind::Choice { choices, default }
     }
@@ -340,36 +391,32 @@ fn parse_choice(s: &str) -> ParamKind {
 fn parse_color(s: &str) -> ParamKind {
     let parts: Vec<&str> = s.split(',').map(str::trim).collect();
     if parts.len() != 3 {
-        return ParamKind::Unknown(format!("color({s})"));
+        return ParamKind::Unknown(sanitize_display(&format!("color({s})")));
     }
     match (parts[0].parse(), parts[1].parse(), parts[2].parse()) {
         (Ok(r), Ok(g), Ok(b)) => ParamKind::Color {
             default_rgb: [r, g, b],
         },
-        _ => ParamKind::Unknown(format!("color({s})")),
+        _ => ParamKind::Unknown(sanitize_display(&format!("color({s})"))),
     }
 }
 
 fn parse_text(s: &str) -> ParamKind {
+    // Default text is shown in the editable NSTextField; HTML markup
+    // here would be very visible to the user.
     ParamKind::Text {
-        default: strip_quotes(s).to_string(),
+        default: sanitize_display(strip_quotes(s)),
     }
 }
 
 fn parse_link(s: &str) -> ParamKind {
     let mut iter = split_top_level(s);
-    let label = iter
-        .next()
-        .map(strip_quotes)
-        .unwrap_or("")
-        .to_string();
-    let url = iter
-        .next()
-        .map(strip_quotes)
-        .unwrap_or("")
-        .to_string();
+    // Link label is user-visible (shown in the row); URL is shown
+    // verbatim today, so sanitise it too just in case.
+    let label = sanitize_display(iter.next().map(strip_quotes).unwrap_or(""));
+    let url = sanitize_display(iter.next().map(strip_quotes).unwrap_or(""));
     if label.is_empty() && url.is_empty() {
-        ParamKind::Unknown(format!("link({s})"))
+        ParamKind::Unknown(sanitize_display(&format!("link({s})")))
     } else {
         ParamKind::Link { label, url }
     }
@@ -482,9 +529,19 @@ fn sanitize_display(s: &str) -> String {
         out.push(ch);
         i += ch.len_utf8();
     }
-    // Collapse whitespace runs left over from tag removal so a tag-rich
-    // label like "<b>Foo</b>  <i>Bar</i>" comes out as "Foo Bar".
-    out.split_whitespace().collect::<Vec<_>>().join(" ")
+    // Convert literal `\n` (the two-character escape G'MIC uses to
+    // embed soft line breaks inside a single-line annotation) into
+    // an actual newline. Done before the whitespace-collapse pass so
+    // we preserve the line break intent while still squashing the
+    // surrounding spaces introduced by tag removal. We split / rejoin
+    // on real newlines to preserve them through the per-line
+    // whitespace collapse below.
+    let with_newlines = out.replace("\\n", "\n");
+    with_newlines
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn decode_entity(name: &str) -> Option<String> {
@@ -554,7 +611,9 @@ mod tests {
 
     #[test]
     fn parses_int_param() {
-        let cat = parse("#@gui Artistic\n#@gui Paint : fx_paint_brush\n#@gui : Radius = int(5,1,30)\n").unwrap();
+        let cat =
+            parse("#@gui Artistic\n#@gui Paint : fx_paint_brush\n#@gui : Radius = int(5,1,30)\n")
+                .unwrap();
         let p = &first_filter(&cat).params[0];
         assert_eq!(p.label, "Radius");
         assert_eq!(
@@ -569,7 +628,10 @@ mod tests {
 
     #[test]
     fn parses_float_param() {
-        let cat = parse("#@gui Artistic\n#@gui Paint : fx_paint_brush\n#@gui : Density (%) = float(50,0,100)\n").unwrap();
+        let cat = parse(
+            "#@gui Artistic\n#@gui Paint : fx_paint_brush\n#@gui : Density (%) = float(50,0,100)\n",
+        )
+        .unwrap();
         let p = &first_filter(&cat).params[0];
         assert_eq!(p.label, "Density (%)");
         assert_eq!(
@@ -598,10 +660,9 @@ mod tests {
 
     #[test]
     fn parses_choice_with_commas_inside_strings() {
-        let cat = parse(
-            "#@gui A\n#@gui F : f\n#@gui : Mode = choice(2,\"Red, Green\",\"Other\")\n",
-        )
-        .unwrap();
+        let cat =
+            parse("#@gui A\n#@gui F : f\n#@gui : Mode = choice(2,\"Red, Green\",\"Other\")\n")
+                .unwrap();
         assert_eq!(
             first_filter(&cat).params[0].kind,
             ParamKind::Choice {
@@ -657,7 +718,10 @@ mod tests {
     #[test]
     fn unknown_kind_does_not_fail_the_parse() {
         let cat = parse("#@gui A\n#@gui F : f\n#@gui : X = wat(1,2,3)\n").unwrap();
-        assert!(matches!(first_filter(&cat).params[0].kind, ParamKind::Unknown(_)));
+        assert!(matches!(
+            first_filter(&cat).params[0].kind,
+            ParamKind::Unknown(_)
+        ));
     }
 
     #[test]
@@ -707,10 +771,7 @@ mod tests {
 
     #[test]
     fn comment_after_filter_command_strips_preview() {
-        let cat = parse(
-            "#@gui A\n#@gui F : fx_real, fx_real_preview(0)\n",
-        )
-        .unwrap();
+        let cat = parse("#@gui A\n#@gui F : fx_real, fx_real_preview(0)\n").unwrap();
         assert_eq!(first_filter(&cat).command, "fx_real");
     }
 
@@ -778,6 +839,111 @@ mod tests {
     #[test]
     fn sanitize_collapses_whitespace_left_by_tag_removal() {
         assert_eq!(sanitize_display("<b>Foo</b>  <i>Bar</i>"), "Foo Bar");
+    }
+
+    #[test]
+    fn sanitize_converts_literal_backslash_n_to_newline() {
+        // G'MIC routinely embeds soft line breaks as the two-character
+        // sequence `\n` inside a single-line `#@gui` annotation. We
+        // want the form to render an actual line break instead of the
+        // literal sequence.
+        assert_eq!(
+            sanitize_display("first line\\nsecond line"),
+            "first line\nsecond line",
+        );
+        // ...and we still collapse intra-line whitespace introduced
+        // by tag removal on both sides of the break.
+        assert_eq!(
+            sanitize_display("<b>A</b>  <i>B</i>\\n<b>C</b>  D"),
+            "A B\nC D",
+        );
+    }
+
+    #[test]
+    fn sanitize_strips_html_inside_note_bodies_via_parse_kind() {
+        // The previous bug: parse_kind's "note" arm stored the raw
+        // body, so a note like `note("<small><b>Author: x</b></small>")`
+        // surfaced as literal markup in the form pane.
+        let kind = parse_kind("note(\"<small><b>Author:</b> Foo</small>\")");
+        assert_eq!(kind, ParamKind::Note("Author: Foo".to_string()));
+    }
+
+    #[test]
+    fn consume_param_row_treats_underscore_label_as_anonymous() {
+        // G'MIC uses `_` (or `__`, `___`, …) as the param label for
+        // "anonymous" rows whose payload is in the value (notes,
+        // separators, hidden placeholders). Without this
+        // normalisation the form pane would render a literal `_`
+        // label next to every Note and separator.
+        let cat = parse(
+            "#@gui Cat\n\
+             #@gui F : fx\n\
+             #@gui :_=note(\"hello\")\n\
+             #@gui :__=separator()\n",
+        )
+        .unwrap();
+        let folder = match &cat.root.children[0] {
+            Node::Folder(f) => f,
+            _ => panic!("expected folder"),
+        };
+        let filter = match &folder.children[0] {
+            Node::Filter(f) => f,
+            _ => panic!("expected filter"),
+        };
+        assert_eq!(filter.params[0].label, "");
+        assert_eq!(filter.params[1].label, "");
+    }
+
+    #[test]
+    fn parse_kind_strips_tilde_advanced_prefix() {
+        // G'MIC marks "advanced" params with a leading `~` on the
+        // type name. The arg syntax is identical to the un-prefixed
+        // form so we parse it normally — anything else means the
+        // form pane renders every advanced row as
+        // `(unsupported: ~float(...))`, which is what we shipped
+        // before this fix.
+        assert!(matches!(
+            parse_kind("~float(3,0,30)"),
+            ParamKind::Float {
+                default: 3.0,
+                min: 0.0,
+                max: 30.0
+            }
+        ));
+        assert!(matches!(
+            parse_kind("~int(5,1,10)"),
+            ParamKind::Int {
+                default: 5,
+                min: 1,
+                max: 10
+            }
+        ));
+        // G'MIC choice syntax with an explicit default index.
+        match parse_kind("~choice(0,\"Normal\",\"Mirror-X\")") {
+            ParamKind::Choice {
+                ref choices,
+                default,
+            } => {
+                assert_eq!(default, 0);
+                assert_eq!(choices, &["Normal", "Mirror-X"]);
+            }
+            other => panic!("expected Choice, got {other:?}"),
+        }
+        // ...and the implicit-default form (Frame [Cube] uses this).
+        match parse_kind("~choice(\"Normal\",\"Mirror-X\",\"Mirror-Y\")") {
+            ParamKind::Choice {
+                ref choices,
+                default,
+            } => {
+                assert_eq!(default, 0);
+                assert_eq!(choices, &["Normal", "Mirror-X", "Mirror-Y"]);
+            }
+            other => panic!("expected Choice, got {other:?}"),
+        }
+        assert!(matches!(
+            parse_kind("~bool(true)"),
+            ParamKind::Bool { default: true }
+        ));
     }
 
     #[test]

@@ -117,7 +117,11 @@ mod tests {
             take_and_drop::<Probe>(slot);
             _free_data_slot(slot);
         }
-        assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 2, "old + new must both be dropped");
+        assert_eq!(
+            DROP_COUNT.load(Ordering::SeqCst),
+            2,
+            "old + new must both be dropped"
+        );
     }
 
     #[test]

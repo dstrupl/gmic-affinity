@@ -114,13 +114,7 @@ impl Settings {
 
     /// Record a user pick into `last`, push onto `recent` (dedup +
     /// cap), and update `remembered_args[command]` with the same args.
-    pub fn record_pick(
-        &mut self,
-        command: &str,
-        args: Vec<String>,
-        display_path: &str,
-        ts: &str,
-    ) {
+    pub fn record_pick(&mut self, command: &str, args: Vec<String>, display_path: &str, ts: &str) {
         self.version = SCHEMA_VERSION;
         self.last = Some(LastChoice {
             command: command.to_string(),
@@ -166,10 +160,7 @@ impl Settings {
 
 fn settings_path() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
-    Some(
-        PathBuf::from(home)
-            .join("Library/Application Support/gmic-affinity/settings.json"),
-    )
+    Some(PathBuf::from(home).join("Library/Application Support/gmic-affinity/settings.json"))
 }
 
 fn load_from(path: &Path) -> Option<Settings> {
@@ -278,7 +269,8 @@ mod tests {
         let bytes = serde_json::to_vec_pretty(&s).unwrap();
         write_atomic(&tmp, &path, &bytes).unwrap();
         assert!(!tmp.exists());
-        let back: Settings = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let back: Settings =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(back, s);
     }
 
