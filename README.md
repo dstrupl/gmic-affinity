@@ -6,9 +6,15 @@ and later versions (including Affinity by Canva v3).
 
 Status: **MVP shipped (2026-05-17).** The plugin loads in Affinity Photo 2,
 appears as `Filters → Plugins → G'MIC → G'MIC...`, hands pixels through gmic
-end-to-end and writes the result back inline. See [PRD.md](./PRD.md) for the
-original product spec and the post-mortem at the bottom that records what we
-learned wrestling Affinity into actually loading us.
+end-to-end and writes the result back inline.
+
+Documentation set:
+
+- [PRD.md](./PRD.md) — product spec: requirements, goals, status.
+- [IMPLEMENTATION_NOTES.md](./IMPLEMENTATION_NOTES.md) — engineering
+  detail: plugin format, `FilterRecord` layout, build pipeline, and the
+  post-mortem of the five surprises that ate most of the bring-up.
+- This file — install + day-to-day troubleshooting.
 
 ## What it does
 
