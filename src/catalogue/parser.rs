@@ -54,6 +54,7 @@ pub fn parse(input: &str) -> Result<Catalogue, ParseError> {
     // skip, and for any internal-only group whose every entry was
     // gmic-qt-only and got filtered out.
     prune_empty(&mut cat.root);
+    sort_tree(&mut cat.root);
     Ok(cat)
 }
 
@@ -279,6 +280,39 @@ fn prune_empty(folder: &mut Folder) {
         Node::Folder(f) => !f.children.is_empty(),
         Node::Filter(_) => true,
     });
+}
+
+/// Sort every level of the tree alphabetically (case-insensitive),
+/// folders first then filters. The catalogue's source order is "the
+/// order #@gui blocks appear in update<ver>.gmic", which is roughly
+/// historical / author-grouped and unhelpful for navigation — users
+/// expect to scroll a long list of community filters alphabetically.
+/// We keep folders before filters at the same level so the
+/// disclosure-triangle items always sit above the leaf rows, matching
+/// the macOS Finder convention.
+fn sort_tree(folder: &mut Folder) {
+    folder.children.sort_by(|a, b| match (a, b) {
+        (Node::Folder(x), Node::Folder(y)) => natural_cmp(&x.name, &y.name),
+        (Node::Filter(x), Node::Filter(y)) => natural_cmp(&x.display_name, &y.display_name),
+        // Folders sort before filters at the same level.
+        (Node::Folder(_), Node::Filter(_)) => std::cmp::Ordering::Less,
+        (Node::Filter(_), Node::Folder(_)) => std::cmp::Ordering::Greater,
+    });
+    for child in folder.children.iter_mut() {
+        if let Node::Folder(sub) = child {
+            sort_tree(sub);
+        }
+    }
+}
+
+/// Case-insensitive lexicographic compare with a stable tiebreaker
+/// on the original casing so two names that differ only in case keep
+/// a deterministic order between catalogue refreshes (otherwise the
+/// snapshot diff in `make refresh-catalogue` becomes noisy).
+fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    a.to_lowercase()
+        .cmp(&b.to_lowercase())
+        .then_with(|| a.cmp(b))
 }
 
 /// Filters whose primary command matches any of these patterns are
@@ -905,6 +939,74 @@ mod tests {
             first_filter(&cat).params[0].kind,
             ParamKind::Bool { default: false }
         );
+    }
+
+    #[test]
+    fn sort_orders_folders_alphabetically_case_insensitively() {
+        // Source order intentionally NOT alphabetical so we know the
+        // sort actually ran (rather than being a no-op on already-
+        // ordered input). The inner filters double as a check that
+        // sort recurses into folders.
+        let cat = parse(
+            "#@gui Zeta\n\
+             #@gui zfx : zfx_cmd\n\
+             #@gui afx : afx_cmd\n\
+             #@gui Alpha\n\
+             #@gui yankee : y_cmd\n\
+             #@gui Bravo : b_cmd\n",
+        )
+        .unwrap();
+        let top: Vec<&str> = cat
+            .root
+            .children
+            .iter()
+            .filter_map(|n| match n {
+                Node::Folder(f) => Some(f.name.as_str()),
+                Node::Filter(_) => None,
+            })
+            .collect();
+        assert_eq!(top, vec!["Alpha", "Zeta"], "top-level folders sorted");
+
+        // Inside Alpha we expect Bravo, then yankee (B before y,
+        // case-insensitive).
+        let alpha = cat
+            .root
+            .children
+            .iter()
+            .find_map(|n| match n {
+                Node::Folder(f) if f.name == "Alpha" => Some(f),
+                _ => None,
+            })
+            .unwrap();
+        let alpha_leaves: Vec<&str> = alpha
+            .children
+            .iter()
+            .filter_map(|n| match n {
+                Node::Filter(f) => Some(f.display_name.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(alpha_leaves, vec!["Bravo", "yankee"]);
+
+        // Inside Zeta we expect afx before zfx (sort recursed).
+        let zeta = cat
+            .root
+            .children
+            .iter()
+            .find_map(|n| match n {
+                Node::Folder(f) if f.name == "Zeta" => Some(f),
+                _ => None,
+            })
+            .unwrap();
+        let zeta_leaves: Vec<&str> = zeta
+            .children
+            .iter()
+            .filter_map(|n| match n {
+                Node::Filter(f) => Some(f.display_name.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(zeta_leaves, vec!["afx", "zfx"]);
     }
 
     #[test]
