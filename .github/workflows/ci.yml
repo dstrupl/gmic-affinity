@@ -56,9 +56,12 @@ jobs:
       - name: cargo test (--features live)
         run: cargo test --locked --features live
 
-      - name: cargo build (universal, both targets)
-        run: |
-          cargo build --release --target aarch64-apple-darwin --locked
-          cargo build --release --target x86_64-apple-darwin --locked
-          # No Affinity host in CI -> we don't 'make install', just verify
-          # both architectures build cleanly.
+      - name: make universal (default features)
+        # Builds both architectures AND runs `clang -bundle` + the
+        # `verify-bundle` gate, so a regression that turns the output back
+        # into MH_DYLIB (filetype 6) -- which Affinity / Photoshop hosts
+        # silently reject -- fails the build instead of shipping silently.
+        run: make universal
+
+      - name: make universal (--features live)
+        run: make universal FEATURES=live

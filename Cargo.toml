@@ -10,9 +10,15 @@ readme      = "README.md"
 
 [lib]
 name       = "GmicFilter"
-# cdylib for the .plugin bundle's loadable executable; rlib so the same crate
-# can be linked into integration tests under `tests/`.
-crate-type = ["cdylib", "rlib"]
+# staticlib for the .plugin bundle's loadable executable: we relink the
+# resulting libGmicFilter.a with `clang -bundle` in the Makefile to produce
+# an MH_BUNDLE Mach-O (filetype 8). Cargo's `cdylib` would invoke the
+# linker with `-dynamiclib` and produce MH_DYLIB (filetype 6), which
+# Affinity Photo 2 (and other Photoshop-plugin hosts) silently reject when
+# loading a `.plugin` bundle via CFBundleLoadExecutable / dlopen.
+# `rlib` is kept so the same crate can still be linked into integration
+# tests under `tests/`.
+crate-type = ["staticlib", "rlib"]
 
 [features]
 # Default: the no-op M1 PluginMain. Safe to install in Affinity even if the
