@@ -2,8 +2,8 @@
 //! has to touch `objc2` directly for the run-loop dance.
 //!
 //! The first milestone of the picker design is "open an empty `NSPanel`
-//! from `SELECTOR_PARAMETERS`, click Cancel, return cleanly to
-//! Affinity". This file is the surface that proves that works. If
+//! from `SELECTOR_PARAMETERS`, close it with the title bar's close button,
+//! return cleanly to Affinity". This file is the surface that proves that works. If
 //! `runModal` misbehaves inside Affinity's run loop, this is where
 //! we will find out and decide on the sheet-based fallback.
 
