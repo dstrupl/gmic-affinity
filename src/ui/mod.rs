@@ -6,4 +6,5 @@
 //! in `lib.rs`).
 
 pub mod runloop;
+pub(crate) mod modal_close_delegate;
 pub mod picker;
