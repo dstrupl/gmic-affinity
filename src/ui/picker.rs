@@ -328,6 +328,19 @@ pub fn show_picker(
     // explicitly drop them here so the order is unambiguous: the
     // modal pump has already exited and AppKit will not call back
     // into them.
+    // The form controller registered itself as an
+    // NSViewFrameDidChangeNotification observer on the scroll view's
+    // clip view in `build_form_pane`. NSNotificationCenter keeps a
+    // raw, non-retaining reference to its observers, so dropping the
+    // controller without first removing it would leave the clip view
+    // posting notifications into a freed Objective-C object the next
+    // time something resizes the right pane (e.g. a Cmd-W close
+    // animation while the modal pump is still draining its
+    // NSEventTrackingRunLoopMode events). Unregister first, then
+    // drop.
+    unsafe {
+        objc2_foundation::NSNotificationCenter::defaultCenter().removeObserver(&form_controller);
+    }
     drop(actions);
     drop(form_controller);
     drop(data_source);
