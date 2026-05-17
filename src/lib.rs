@@ -19,10 +19,13 @@
 //!   (M4+) shells out to gmic. Only install this once `cargo test --
 //!   --ignored` confirms `FilterRecord` offsets match `PIFilter.h`.
 
+pub mod catalogue;
 pub mod filter;
 pub mod gmic;
 pub mod logging;
+pub mod ps_data;
 pub mod ps_types;
+pub mod settings;
 pub mod tiff_io;
 
 #[cfg(feature = "live")]

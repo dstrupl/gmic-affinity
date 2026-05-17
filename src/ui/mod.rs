@@ -5,6 +5,7 @@
 //! crate is built with the `live` feature (`#[cfg(feature = "live")] pub mod ui`
 //! in `lib.rs`).
 
-pub mod runloop;
+pub mod alert;
 pub(crate) mod modal_close_delegate;
 pub mod picker;
+pub mod runloop;
