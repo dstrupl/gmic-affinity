@@ -28,7 +28,6 @@ pub mod ps_types;
 pub mod settings;
 pub mod tiff_io;
 
-#[cfg(feature = "live")]
 pub mod ui;
 
 use logging::log;

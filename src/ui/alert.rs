@@ -1,10 +1,13 @@
-//! User-facing error reporting via `NSAlert`.
+//! User-facing error reporting.
 //!
-//! `Sink::display(title, message)` is the single point of contact
-//! with AppKit for error UI. Tests substitute a capture `Sink` that
-//! pushes the alert text into a `Mutex<Vec<…>>` so the error-handling
-//! matrix in PluginMain can be table-tested without ever opening a
-//! window.
+//! The pure-Rust core of this module — the `Sink` trait, the
+//! `alert_error` helper, and the `CaptureSink` capture impl — is
+//! compiled in every build so that PluginMain's error-handling
+//! matrix can be table-tested without ever opening a window.
+//!
+//! The AppKit `NSAlert` backend lives in the `nsalert` submodule and
+//! is only compiled under `--features live`, where the rest of the
+//! `ui` module (picker, runloop, modal-close delegate) is wired up.
 
 use std::sync::Mutex;
 
@@ -15,55 +18,19 @@ pub trait Sink: Send + Sync {
 /// Append the standard log-hint footer to a message when appropriate.
 fn with_log_hint(message: &str, log_hint: bool) -> String {
     if log_hint {
-        format!(
-            "{message}\n\nSee ~/Library/Logs/gmic-affinity.log for details.",
-        )
+        format!("{message}\n\nSee ~/Library/Logs/gmic-affinity.log for details.")
     } else {
         message.to_string()
     }
 }
 
-/// Convenience: route an error through the configured sink with an
-/// optional log-file pointer footer.
+/// Route an error through the configured sink with an optional
+/// log-file pointer footer.
 pub fn alert_error(sink: &dyn Sink, title: &str, message: &str, log_hint: bool) {
     sink.display(title, &with_log_hint(message, log_hint));
 }
 
-// ---- Production NSAlert implementation ----
-
-pub struct NsAlertSink;
-
-impl Sink for NsAlertSink {
-    fn display(&self, title: &str, message: &str) {
-        nsalert_runmodal(title, message);
-    }
-}
-
-fn nsalert_runmodal(title: &str, message: &str) {
-    use objc2::rc::Retained;
-    use objc2_app_kit::{NSAlert, NSAlertStyle};
-    use objc2_foundation::{MainThreadMarker, NSString};
-
-    let Some(mtm) = MainThreadMarker::new() else {
-        // Off the main thread: log instead of crashing. Should never
-        // happen from PluginMain but worth defending.
-        crate::logging::log(&format!(
-            "alert: not on main thread; would have shown title={title:?}, message={message:?}",
-        ));
-        return;
-    };
-    unsafe {
-        let alert: Retained<NSAlert> = NSAlert::new(mtm);
-        let title_ns = NSString::from_str(title);
-        let message_ns = NSString::from_str(message);
-        alert.setMessageText(&title_ns);
-        alert.setInformativeText(&message_ns);
-        alert.setAlertStyle(NSAlertStyle::Warning);
-        let _ = alert.runModal();
-    }
-}
-
-// ---- Test capture sink ----
+// ---- Test / headless capture sink ----
 
 #[derive(Default)]
 pub struct CaptureSink {
@@ -78,6 +45,43 @@ impl Sink for CaptureSink {
             .push((title.to_string(), message.to_string()));
     }
 }
+
+// ---- Production NSAlert backend (live builds only) ----
+
+#[cfg(feature = "live")]
+mod nsalert {
+    use super::Sink;
+    use objc2::rc::Retained;
+    use objc2_app_kit::{NSAlert, NSAlertStyle};
+    use objc2_foundation::{MainThreadMarker, NSString};
+
+    pub struct NsAlertSink;
+
+    impl Sink for NsAlertSink {
+        fn display(&self, title: &str, message: &str) {
+            let Some(mtm) = MainThreadMarker::new() else {
+                // Off the main thread: log instead of crashing. Should
+                // never happen from PluginMain but worth defending.
+                crate::logging::log(&format!(
+                    "alert: not on main thread; would have shown title={title:?}, message={message:?}",
+                ));
+                return;
+            };
+            unsafe {
+                let alert: Retained<NSAlert> = NSAlert::new(mtm);
+                let title_ns = NSString::from_str(title);
+                let message_ns = NSString::from_str(message);
+                alert.setMessageText(&title_ns);
+                alert.setInformativeText(&message_ns);
+                alert.setAlertStyle(NSAlertStyle::Warning);
+                let _ = alert.runModal();
+            }
+        }
+    }
+}
+
+#[cfg(feature = "live")]
+pub use nsalert::NsAlertSink;
 
 #[cfg(test)]
 mod tests {
