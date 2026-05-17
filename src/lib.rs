@@ -20,9 +20,9 @@
 //!   --ignored` confirms `FilterRecord` offsets match `PIFilter.h`.
 
 pub mod ps_types;
-
-#[cfg(feature = "live")]
 pub mod filter;
+pub mod tiff_io;
+pub mod gmic;
 
 use ps_types::{
     NO_ERR, SELECTOR_ABOUT, SELECTOR_CONTINUE, SELECTOR_FINISH, SELECTOR_PARAMETERS,
@@ -87,7 +87,11 @@ unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize)
             NO_ERR
         }
         SELECTOR_CONTINUE => {
-            match filter::run_passthrough(fr) {
+            // M4: real gmic round-trip. The M3 pass-through is still
+            // available via `filter::run_passthrough` for debugging the
+            // pointer path in isolation; we don't expose a runtime switch
+            // in v1 because Affinity has no parameter UI yet.
+            match gmic::run_filter(fr) {
                 Ok(()) => {
                     // Signal "done, no more tiles" by zeroing the rects.
                     fr.in_rect  = VRect { top: 0, left: 0, bottom: 0, right: 0 };

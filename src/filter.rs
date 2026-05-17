@@ -153,8 +153,8 @@ fn invert_red_into(src: &[u8], dst: &mut [u8], planes: i16) {
     let mut i = 0;
     while i + step <= src.len() {
         dst[i] = 255 - src[i];
-        for ch in 1..step {
-            dst[i + ch] = src[i + ch];
+        if step > 1 {
+            dst[i + 1..i + step].copy_from_slice(&src[i + 1..i + step]);
         }
         i += step;
     }
@@ -167,7 +167,7 @@ mod tests {
     fn make_buffers(width: i32, height: i32, planes: i16, in_row_bytes: i32) -> (Vec<u8>, Vec<u8>) {
         let h = height as usize;
         let rb = in_row_bytes as usize;
-        let in_buf  = (0..(rb * h) as usize).map(|i| (i % 251) as u8).collect();
+        let in_buf  = (0..(rb * h)).map(|i| (i % 251) as u8).collect();
         let out_buf = vec![0u8; rb * h];
         let _ = (width, planes);
         (in_buf, out_buf)
@@ -243,9 +243,9 @@ mod tests {
             let mut fr = std::mem::zeroed::<FilterRecord>();
             fr.filter_rect = crate::ps_types::VRect { top: 0, left: 0, bottom: 0, right: 0 };
             fr.planes        = 3;
-            fr.in_data       = 1 as *mut u8;
+            fr.in_data       = std::ptr::dangling_mut();
             fr.in_row_bytes  = 1;
-            fr.out_data      = 1 as *mut u8;
+            fr.out_data      = std::ptr::dangling_mut();
             fr.out_row_bytes = 1;
             assert!(matches!(run_passthrough(&mut fr), Err(FilterError::BadDimensions { .. })));
         }
@@ -280,7 +280,7 @@ mod tests {
             fr.planes        = 3;
             fr.in_data       = std::ptr::null_mut();
             fr.in_row_bytes  = 3;
-            fr.out_data      = 1 as *mut u8;
+            fr.out_data      = std::ptr::dangling_mut();
             fr.out_row_bytes = 3;
             assert!(matches!(run_passthrough(&mut fr), Err(FilterError::NullPointer("in_data"))));
         }
@@ -292,9 +292,9 @@ mod tests {
             let mut fr = std::mem::zeroed::<FilterRecord>();
             fr.filter_rect = crate::ps_types::VRect { top: 0, left: 0, bottom: 1, right: 4 };
             fr.planes        = 3;
-            fr.in_data       = 1 as *mut u8;
+            fr.in_data       = std::ptr::dangling_mut();
             fr.in_row_bytes  = 5; // need 12
-            fr.out_data      = 1 as *mut u8;
+            fr.out_data      = std::ptr::dangling_mut();
             fr.out_row_bytes = 12;
             assert!(matches!(run_passthrough(&mut fr), Err(FilterError::RowStrideTooSmall { .. })));
         }
