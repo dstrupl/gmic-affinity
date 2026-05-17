@@ -246,7 +246,122 @@ pub fn run_subprocess(gmic: &Path, args: &[OsString], tmpdir: &Path) -> Result<(
 /// read output TIFF back into host buffer. The temp directory is created
 /// with the user's default umask (typically 0700 for tempfile crate's
 /// `tempdir()`); both TIFFs live inside it and are auto-removed on drop.
+///
+/// Uses the legacy `filter.txt` config file to pick the command. Kept
+/// for back-compat with the M3 / M4 bring-up tests; production callers
+/// (`PluginMain::SELECTOR_CONTINUE`) go through [`run_filter_with`].
 pub fn run_filter(fr: &mut FilterRecord) -> Result<(), GmicError> {
+    let cmd = read_filter_config()?;
+    log(&format!("filter config: {cmd:?}"));
+    // `read_filter_config` returns the full command line as a single
+    // whitespace-separated string. Tokenise it the same way we did
+    // before so `run_with_tokens` sees a stable shape regardless of
+    // who composed it.
+    let tokens: Vec<String> = cmd.split_whitespace().map(str::to_owned).collect();
+    if tokens.is_empty() {
+        // Empty config file: surface the same "filter has bad bytes"
+        // error rather than passing an empty argv to gmic (which
+        // would happily run on the input image and produce an
+        // identity output, masking the configuration mistake).
+        return Err(GmicError::InvalidCharsInConfig);
+    }
+    run_with_tokens(fr, &tokens)
+}
+
+/// Like [`run_filter`] but takes a [`ChosenFilter`] directly (from the
+/// picker) instead of reading `filter.txt`. Goes through the same
+/// `MAX_FILTER_ARGS` / `MAX_ARG_BYTES` / NUL & control-char checks as
+/// the existing file-based path; those move from "validate parsed
+/// file" to "validate dialog output".
+pub fn run_filter_with(
+    fr: &mut FilterRecord,
+    chosen: &crate::catalogue::ChosenFilter,
+) -> Result<(), GmicError> {
+    if chosen.args.len() > MAX_FILTER_ARGS - 4 {
+        return Err(GmicError::TooManyArgs(chosen.args.len()));
+    }
+    for arg in &chosen.args {
+        if arg.len() > MAX_ARG_BYTES {
+            return Err(GmicError::ArgTooLong(arg.len()));
+        }
+        if arg
+            .bytes()
+            .any(|b| b == 0 || (b.is_ascii_control() && !matches!(b, b'\t' | b'\n' | b'\r')))
+        {
+            return Err(GmicError::InvalidCharsInConfig);
+        }
+    }
+    // gmic's CLI is `cmd a,b,c` — every parameter for a single
+    // filter invocation is one comma-joined token, NOT one process
+    // argv per parameter. Earlier we pushed each arg as its own
+    // token; gmic then saw the parameters as separate top-level
+    // commands and the filter's internal `${1-N}` substitution had
+    // nothing to grab, producing
+    //   *** Error in ./fx_paint_with_brush/*substitute/ ***
+    //   Unknown command or filename '1-35'.
+    // (The literal '1-35' is fx_paint_with_brush asking for "args
+    // 1 through 35" of its declared parameter list.)
+    let command = if chosen.command.starts_with('-') {
+        chosen.command.clone()
+    } else {
+        format!("-{}", chosen.command)
+    };
+    let mut tokens: Vec<String> = Vec::with_capacity(2);
+    tokens.push(command);
+    if !chosen.args.is_empty() {
+        let joined = chosen
+            .args
+            .iter()
+            .map(|a| quote_gmic_arg(a))
+            .collect::<Vec<_>>()
+            .join(",");
+        tokens.push(joined);
+    }
+    run_with_tokens(fr, &tokens)
+}
+
+/// Quote a single parameter value according to gmic CLI rules so it
+/// survives being pasted into a comma-separated parameter list.
+///
+/// gmic accepts the bare form for any value that contains none of:
+///   - a comma  (would split the parameter list)
+///   - leading or trailing whitespace (gmic trims those)
+///   - an embedded double quote (would close the quoted form)
+///
+/// Anything else gets wrapped in `"..."` with internal `"` escaped
+/// to `\"`. Embedded newlines / tabs are allowed both bare and
+/// quoted; gmic treats them as ordinary characters once the
+/// parameter boundary is established.
+///
+/// This matters for, among others, our `point(...)` parser which
+/// stores the picker default as the Text value `"x,y"` — without
+/// quoting, the embedded comma would silently split a 35-arg filter
+/// into a 36-arg one and shift every subsequent positional value.
+fn quote_gmic_arg(value: &str) -> String {
+    let needs_quoting = value.contains(',')
+        || value.contains('"')
+        || value.starts_with(|c: char| c.is_whitespace())
+        || value.ends_with(|c: char| c.is_whitespace());
+    if !needs_quoting {
+        return value.to_string();
+    }
+    let mut out = String::with_capacity(value.len() + 2);
+    out.push('"');
+    for ch in value.chars() {
+        if ch == '"' {
+            out.push('\\');
+        }
+        out.push(ch);
+    }
+    out.push('"');
+    out
+}
+
+/// Shared body of [`run_filter`] and [`run_filter_with`]: validate
+/// the filter record, write the input TIFF, exec gmic, read the
+/// output TIFF back. `tokens` is `[command, arg, arg, …]` with the
+/// command already prefixed by `-` if it was a builtin filter.
+fn run_with_tokens(fr: &mut FilterRecord, tokens: &[String]) -> Result<(), GmicError> {
     let buf = validate_filter_record(fr)?;
     log(&format!(
         "run_filter: width={} height={} planes={} in_row_bytes={} out_row_bytes={}",
@@ -255,8 +370,6 @@ pub fn run_filter(fr: &mut FilterRecord) -> Result<(), GmicError> {
 
     let gmic = locate_gmic()?;
     log(&format!("located gmic at {}", gmic.display()));
-    let cmd = read_filter_config()?;
-    log(&format!("filter config: {cmd:?}"));
 
     let dir = tempfile::Builder::new()
         .prefix("gmic-affinity-")
@@ -267,7 +380,6 @@ pub fn run_filter(fr: &mut FilterRecord) -> Result<(), GmicError> {
     let in_path = dir.path().join("in.tif");
     let out_path = dir.path().join("out.tif");
 
-    // Re-construct slices from validated raw parts.
     let in_total = (buf.in_row_bytes as usize) * (buf.height as usize);
     let out_total = (buf.out_row_bytes as usize) * (buf.height as usize);
     let in_slice = unsafe { std::slice::from_raw_parts(buf.in_data, in_total) };
@@ -282,7 +394,7 @@ pub fn run_filter(fr: &mut FilterRecord) -> Result<(), GmicError> {
         buf.in_row_bytes as u32,
     )?;
 
-    let argv = build_argv(&in_path, &out_path, &cmd)?;
+    let argv = build_argv_from_tokens(&in_path, &out_path, tokens)?;
     run_subprocess(&gmic, &argv, dir.path())?;
 
     read_tiff(
@@ -294,8 +406,35 @@ pub fn run_filter(fr: &mut FilterRecord) -> Result<(), GmicError> {
         buf.out_row_bytes as u32,
     )?;
 
-    // `dir` drops here -> tempfile removes in.tif, out.tif and the dir.
     Ok(())
+}
+
+/// Token-based variant of [`build_argv`]: every element of `tokens`
+/// becomes its own argv entry so `chosen.args` with spaces in a single
+/// parameter (text fields!) survive intact across the subprocess
+/// boundary. Same length / size caps as the file-based path.
+fn build_argv_from_tokens(
+    input: &Path,
+    output: &Path,
+    tokens: &[String],
+) -> Result<Vec<OsString>, GmicError> {
+    if tokens.is_empty() {
+        return Err(GmicError::InvalidCharsInConfig);
+    }
+    if tokens.len() > MAX_FILTER_ARGS {
+        return Err(GmicError::TooManyArgs(tokens.len()));
+    }
+    let mut args: Vec<OsString> = Vec::with_capacity(tokens.len() + 3);
+    args.push(input.as_os_str().to_owned());
+    for tok in tokens {
+        if tok.len() > MAX_ARG_BYTES {
+            return Err(GmicError::ArgTooLong(tok.len()));
+        }
+        args.push(OsString::from(tok));
+    }
+    args.push(OsString::from("-output"));
+    args.push(output.as_os_str().to_owned());
+    Ok(args)
 }
 
 #[cfg(test)]
@@ -383,5 +522,194 @@ mod tests {
         let p = locate_gmic().expect("gmic not found");
         assert!(p.exists());
         assert!(p.metadata().unwrap().permissions().mode() & 0o111 != 0);
+    }
+
+    #[test]
+    fn argv_from_tokens_quotes_each_arg_separately() {
+        let argv = build_argv_from_tokens(
+            Path::new("/in.tif"),
+            Path::new("/out.tif"),
+            &[
+                "-blur".to_string(),
+                "3 5".to_string(), // contains whitespace; must not be re-split
+                "-sharpen".to_string(),
+            ],
+        )
+        .unwrap();
+        let strs: Vec<&str> = argv.iter().map(|s| s.to_str().unwrap()).collect();
+        assert_eq!(
+            strs,
+            vec!["/in.tif", "-blur", "3 5", "-sharpen", "-output", "/out.tif"]
+        );
+    }
+
+    #[test]
+    fn argv_from_tokens_rejects_too_many() {
+        let many: Vec<String> = (0..MAX_FILTER_ARGS + 5).map(|i| i.to_string()).collect();
+        assert!(matches!(
+            build_argv_from_tokens(Path::new("a"), Path::new("b"), &many),
+            Err(GmicError::TooManyArgs(_))
+        ));
+    }
+
+    #[test]
+    fn argv_from_tokens_rejects_oversized() {
+        let big = "x".repeat(MAX_ARG_BYTES + 1);
+        assert!(matches!(
+            build_argv_from_tokens(Path::new("a"), Path::new("b"), &["-blur".into(), big]),
+            Err(GmicError::ArgTooLong(_))
+        ));
+    }
+}
+
+#[cfg(test)]
+mod tests_chosen {
+    use super::*;
+    use crate::catalogue::ChosenFilter;
+
+    #[test]
+    fn run_filter_with_rejects_too_many_args() {
+        let chosen = ChosenFilter {
+            command: "fx".into(),
+            args: (0..MAX_FILTER_ARGS).map(|i| i.to_string()).collect(),
+        };
+        let mut fr = unsafe { std::mem::zeroed() };
+        let err = run_filter_with(&mut fr, &chosen).err();
+        assert!(matches!(err, Some(GmicError::TooManyArgs(_))));
+    }
+
+    #[test]
+    fn run_filter_with_rejects_oversized_arg() {
+        let chosen = ChosenFilter {
+            command: "fx".into(),
+            args: vec!["x".repeat(MAX_ARG_BYTES + 1)],
+        };
+        let mut fr = unsafe { std::mem::zeroed() };
+        let err = run_filter_with(&mut fr, &chosen).err();
+        assert!(matches!(err, Some(GmicError::ArgTooLong(_))));
+    }
+
+    #[test]
+    fn run_filter_with_rejects_nul_byte() {
+        let chosen = ChosenFilter {
+            command: "fx".into(),
+            args: vec!["bad\0value".into()],
+        };
+        let mut fr = unsafe { std::mem::zeroed() };
+        let err = run_filter_with(&mut fr, &chosen).err();
+        assert!(matches!(err, Some(GmicError::InvalidCharsInConfig)));
+    }
+
+    #[test]
+    fn run_filter_with_rejects_control_chars() {
+        let chosen = ChosenFilter {
+            command: "fx".into(),
+            args: vec!["x\x1by".into()],
+        };
+        let mut fr = unsafe { std::mem::zeroed() };
+        let err = run_filter_with(&mut fr, &chosen).err();
+        assert!(matches!(err, Some(GmicError::InvalidCharsInConfig)));
+    }
+
+    /// Reproduces the Sunday-evening Affinity round-trip failure:
+    /// every parameter value was sent as its own process argv,
+    /// causing fx_paint_with_brush to fail with
+    ///   Unknown command or filename '1-35'.
+    /// because gmic could not find its declared parameter list.
+    /// `build_argv_for_chosen_unit` simulates the inner joining
+    /// step so we can assert the exact argv shape without exec'ing
+    /// gmic from a unit test.
+    #[test]
+    fn chosen_args_collapse_into_one_comma_joined_token() {
+        let tokens = build_tokens_for_test(&ChosenFilter {
+            command: "fx_paint_with_brush".into(),
+            args: (1..=35).map(|i| i.to_string()).collect(),
+        });
+        assert_eq!(tokens.len(), 2, "got {tokens:?}");
+        assert_eq!(tokens[0], "-fx_paint_with_brush");
+        assert_eq!(
+            tokens[1],
+            "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,\
+             21,22,23,24,25,26,27,28,29,30,31,32,33,34,35"
+        );
+    }
+
+    #[test]
+    fn chosen_command_with_leading_dash_is_preserved() {
+        let tokens = build_tokens_for_test(&ChosenFilter {
+            command: "-blur".into(),
+            args: vec!["3".into()],
+        });
+        assert_eq!(tokens[0], "-blur");
+    }
+
+    #[test]
+    fn chosen_text_value_with_comma_is_quoted() {
+        // Our `point(...)` parser stores the default as "x,y" — the
+        // join step has to quote it so the embedded comma doesn't
+        // become a parameter separator.
+        let tokens = build_tokens_for_test(&ChosenFilter {
+            command: "iain_auto_wb".into(),
+            args: vec!["5,5".into(), "95,95".into(), "1".into(), "0".into()],
+        });
+        assert_eq!(tokens[1], "\"5,5\",\"95,95\",1,0");
+    }
+
+    #[test]
+    fn chosen_text_value_with_embedded_quote_is_escaped() {
+        let tokens = build_tokens_for_test(&ChosenFilter {
+            command: "fx".into(),
+            args: vec!["he said \"hi\"".into()],
+        });
+        // Quoted because of the embedded ", with the " escaped.
+        assert_eq!(tokens[1], "\"he said \\\"hi\\\"\"");
+    }
+
+    #[test]
+    fn chosen_no_args_emits_only_command_token() {
+        let tokens = build_tokens_for_test(&ChosenFilter {
+            command: "fx_drama".into(),
+            args: vec![],
+        });
+        assert_eq!(tokens, vec!["-fx_drama"]);
+    }
+
+    /// Helper that runs the same join+quote logic as
+    /// `run_filter_with` but without touching FilterRecord or
+    /// spawning gmic, so we can unit-test the argv shape headlessly.
+    fn build_tokens_for_test(chosen: &ChosenFilter) -> Vec<String> {
+        let command = if chosen.command.starts_with('-') {
+            chosen.command.clone()
+        } else {
+            format!("-{}", chosen.command)
+        };
+        let mut tokens = vec![command];
+        if !chosen.args.is_empty() {
+            tokens.push(
+                chosen
+                    .args
+                    .iter()
+                    .map(|a| super::quote_gmic_arg(a))
+                    .collect::<Vec<_>>()
+                    .join(","),
+            );
+        }
+        tokens
+    }
+
+    #[test]
+    fn run_filter_with_allows_tabs_and_newlines() {
+        // Argument validation should not reject benign whitespace
+        // (multi-line text fields). The actual command execution path
+        // is exercised by integration tests with a live gmic binary.
+        let chosen = ChosenFilter {
+            command: "fx".into(),
+            args: vec!["first line\nsecond line\twith tab".into()],
+        };
+        // Don't `.unwrap()` — there is no gmic to actually run; we
+        // just assert the error is not InvalidCharsInConfig.
+        let mut fr = unsafe { std::mem::zeroed() };
+        let err = run_filter_with(&mut fr, &chosen).err();
+        assert!(!matches!(err, Some(GmicError::InvalidCharsInConfig)));
     }
 }

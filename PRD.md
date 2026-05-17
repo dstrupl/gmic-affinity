@@ -55,8 +55,9 @@ stable across those versions.
 
 ## 3. Non-Goals
 
-- A graphical parameter UI (the initial version uses a hardcoded or
-  config-file-based filter command).
+- ~~A graphical parameter UI (the initial version uses a hardcoded or
+  config-file-based filter command).~~ **Shipped in v2 — see
+  `docs/design/2026-05-17-gmic-picker-dialog.md`.**
 - Windows support.
 - Tiled / chunked processing (whole-image only in v1).
 - Distribution via any plugin marketplace.
@@ -75,7 +76,7 @@ Homebrew `gmic` present:
 | 2 | Bundle appears in **Preferences → Photoshop Plugins → Detected** (Unknown status is acceptable).                       | ✅     |
 | 3 | A filter entry `G'MIC...` exists under **Filters → Plugins → G'MIC**.                                                  | ✅     |
 | 4 | Invoking the filter on an 8-bit RGB document produces a visibly transformed image in-place (no separate file dialog).  | ✅     |
-| 5 | The filter command is configurable via `~/.config/gmic-affinity/filter.txt` without rebuilding the plugin.             | ✅     |
+| 5 | The filter command is chosen interactively from a native picker dialog (catalogue + parameter form) without rebuilding the plugin. The user's last pick is remembered and replayed by `Filter → Last Filter` (`Cmd-F`). | ✅     |
 | 6 | Plugin runs natively on both Apple Silicon and Intel without Rosetta translation.                                      | ✅     |
 | 7 | Plugin loads under ad-hoc code signing (no paid Apple Developer ID required for personal use).                         | ✅     |
 | 8 | Plugin failure (gmic missing, gmic returns non-zero, malformed TIFF) reports a non-zero result code and does not crash Affinity. | ✅     |
@@ -105,7 +106,7 @@ Homebrew `gmic` present:
 | `FilterRecord` layout pinned vs SDK by tests      | ✅ shipped              |
 | CI build (no Adobe SDK required)                  | ✅ shipped              |
 | 16-bit / 32-bit per-channel modes                 | ⛔ v2                   |
-| Parameter UI (`filterSelectorParameters`)         | ⛔ v2                   |
+| Parameter UI (catalogue picker + dynamic form)    | ✅ shipped (v2 — see `docs/design/2026-05-17-gmic-picker-dialog.md`) |
 | Tiled / chunked processing                        | ⛔ v2                   |
 | Notarised distribution / Apple Developer ID       | ⛔ post-v1              |
 | G'MIC-Qt interactive GUI launch                   | ⛔ post-v1              |
@@ -118,9 +119,12 @@ Homebrew `gmic` present:
   proportional amount of RAM during the temp-file round trip.
 - **8-bit only.** The PiPL `EnableInfo` greys out the filter for 16- or
   32-bit documents.
-- **Single hardcoded filter per invocation.** No interactive parameter
+- ~~**Single hardcoded filter per invocation.** No interactive parameter
   dialog; the command is either a compile-time default or whatever the
-  user puts in `~/.config/gmic-affinity/filter.txt`.
+  user puts in `~/.config/gmic-affinity/filter.txt`.~~ Resolved in v2:
+  the picker dialog now exposes the full catalogue with per-filter
+  parameter editing; user state is persisted to
+  `~/Library/Application Support/gmic-affinity/settings.json`.
 - **Ad-hoc signing only.** Sufficient for local use; redistribution will
   require an Apple Developer ID and notarisation.
 - **External binary dependency.** The plugin shells out to a Homebrew-
@@ -133,7 +137,7 @@ Homebrew `gmic` present:
 
 | Item                              | Notes |
 |-----------------------------------|-------|
-| Parameter UI                      | Either a native sheet via `filterSelectorParameters`, or launching `gmic_qt` standalone for filter picking. |
+| ~~Parameter UI~~                  | ~~Either a native sheet via `filterSelectorParameters`, or launching `gmic_qt` standalone for filter picking.~~ Shipped in v2 via native Cocoa picker + dynamic parameter form. |
 | 16/32-bit support                 | Promote `tiff_io` to those depths, update PiPL `EnableInfo`. |
 | Tiled processing                  | Required to handle gigapixel images without OOM. |
 | Notarised distribution            | `.dmg` with a Developer-ID-signed bundle, run through `notarytool`. |

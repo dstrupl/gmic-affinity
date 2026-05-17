@@ -34,6 +34,21 @@ live = []
 libc     = "0.2"
 tiff     = "0.9"
 tempfile = "3"
+objc2            = "0.5"
+objc2-foundation = { version = "0.2", features = ["NSGeometry", "NSNotification", "NSObject", "NSRunLoop", "NSString", "NSThread"] }
+objc2-app-kit = { version = "0.2", features = ["NSAlert", "NSApplication", "NSBox", "NSButton", "NSButtonCell", "NSCell", "NSClipView", "NSColor", "NSColorWell", "NSControl", "NSEvent", "NSGraphics", "NSMenu", "NSMenuItem", "NSOutlineView", "NSPanel", "NSPopUpButton", "NSResponder", "NSRunningApplication", "NSScrollView", "NSSearchField", "NSSlider", "NSSplitView", "NSTableColumn", "NSTableHeaderView", "NSTableView", "NSTextField", "NSUserInterfaceItemIdentification", "NSView", "NSWindow", "NSWorkspace"] }
+serde            = { version = "1", features = ["derive"] }
+serde_json       = "1"
+flate2           = { version = "1", default-features = false, features = ["rust_backend"] }
+
+# `examples/picker.rs` builds against the live AppKit picker and only
+# makes sense with `--features live`. Declaring `required-features`
+# here means `cargo build` / `cargo build --examples` (without `live`)
+# silently skip it instead of failing with a cfg-stripped empty
+# `main`, which matches what cargo expects of a stand-alone example.
+[[example]]
+name              = "picker"
+required-features = ["live"]
 
 [profile.release]
 opt-level     = 3

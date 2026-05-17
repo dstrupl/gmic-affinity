@@ -40,23 +40,14 @@ fn log_path() -> Option<PathBuf> {
 /// errors. Safe to call from `PluginMain` and from `Drop` paths.
 pub fn log(msg: &str) {
     let _ = (|| -> std::io::Result<()> {
-        let path = log_path().ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::NotFound, "HOME not set")
-        })?;
+        let path = log_path()
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "HOME not set"))?;
         if let Some(parent) = path.parent() {
             // Best-effort directory creation; usually exists already.
             let _ = std::fs::create_dir_all(parent);
         }
-        let mut f = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)?;
-        let line = format!(
-            "{} pid={} {}\n",
-            iso8601_now(),
-            std::process::id(),
-            msg
-        );
+        let mut f = OpenOptions::new().create(true).append(true).open(&path)?;
+        let line = format!("{} pid={} {}\n", iso8601_now(), std::process::id(), msg);
         f.write_all(line.as_bytes())?;
         Ok(())
     })();
@@ -66,8 +57,14 @@ pub fn log(msg: &str) {
 /// We don't pull `chrono` in just for this; the standard library gives us
 /// seconds since the epoch and we do the calendar math inline. The output
 /// is grep-friendly and sortable.
-fn iso8601_now() -> String {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+///
+/// Exposed publicly so `PluginMain`'s settings-recording path (T11)
+/// can timestamp the user's pick with the same format used in log
+/// lines, keeping the file format and log file trivially correlatable.
+pub fn iso8601_now() -> String {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
     let secs = now.as_secs() as i64;
     let millis = now.subsec_millis();
     let (year, month, day, hour, minute, second) = civil_from_unix(secs);
@@ -93,7 +90,11 @@ fn civil_from_unix(secs: i64) -> (i32, u32, u32, u32, u32, u32) {
 
     // Howard Hinnant's algorithm, days since 1970-01-01.
     let z = days + 719_468;
-    let era = if z >= 0 { z / 146_097 } else { (z - 146_096) / 146_097 };
+    let era = if z >= 0 {
+        z / 146_097
+    } else {
+        (z - 146_096) / 146_097
+    };
     let doe = (z - era * 146_097) as u64;
     let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
     let y = yoe as i64 + era * 400;
@@ -116,11 +117,11 @@ mod tests {
         //   `date -u -j -f '%Y-%m-%dT%H:%M:%SZ' '<iso>' +%s`
         // so we don't trust ourselves on the arithmetic.
         for &(secs, expected) in &[
-            (1_704_067_200_i64, (2024, 1, 1, 0, 0, 0)),    // 2024-01-01
-            (1_735_689_600_i64, (2025, 1, 1, 0, 0, 0)),    // 2025-01-01
-            (1_709_251_200_i64, (2024, 3, 1, 0, 0, 0)),    // day after leap
-            (1_767_225_600_i64, (2026, 1, 1, 0, 0, 0)),    // 2026-01-01
-            (0_i64, (1970, 1, 1, 0, 0, 0)),                // epoch
+            (1_704_067_200_i64, (2024, 1, 1, 0, 0, 0)), // 2024-01-01
+            (1_735_689_600_i64, (2025, 1, 1, 0, 0, 0)), // 2025-01-01
+            (1_709_251_200_i64, (2024, 3, 1, 0, 0, 0)), // day after leap
+            (1_767_225_600_i64, (2026, 1, 1, 0, 0, 0)), // 2026-01-01
+            (0_i64, (1970, 1, 1, 0, 0, 0)),             // epoch
             (1_577_836_799_i64, (2019, 12, 31, 23, 59, 59)),
         ] {
             assert_eq!(civil_from_unix(secs), expected, "secs={secs}");
