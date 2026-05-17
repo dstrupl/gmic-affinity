@@ -304,6 +304,34 @@ impl CatalogueDataSource {
         ProtocolObject::from_ref(self)
     }
 
+    /// Resolve an AppKit-provided outline-view item back to the
+    /// `&Filter` it represents, if any. Returns `None` when the item
+    /// is a folder or the `Recent` pseudo-folder, or when the item
+    /// does not originate from this data source.
+    ///
+    /// Used by the right-pane form controller (T9) to repopulate the
+    /// form whenever the selection changes.
+    ///
+    /// The returned reference is valid for the lifetime of the
+    /// catalogue (`&'static`), so callers can store it across modal
+    /// pumps without worrying about dangling pointers.
+    pub(crate) fn resolve_filter(&self, item: &AnyObject) -> Option<&'static Filter> {
+        let node = unsafe { self.lookup(Some(item)) };
+        match node {
+            TreeNode::Filter(p) => Some(unsafe { &*p }),
+            TreeNode::RecentEntry(idx) => {
+                // A Recent entry stores the gmic command; look it up
+                // by command in the catalogue. Folder/Filter traversal
+                // is O(filters) — fine for a one-shot selection
+                // change, and we cache nothing because Recent is a
+                // small list (<= Settings::RECENT_MAX).
+                let recent = self.ivars().recent.get(idx)?;
+                find_filter_by_command(&self.ivars().catalogue.root, &recent.command)
+            }
+            TreeNode::Root | TreeNode::Recent | TreeNode::Folder(_) => None,
+        }
+    }
+
     fn intern(&self, node: TreeNode) -> i64 {
         let mut by = self.ivars().by_node.borrow_mut();
         if let Some(&i) = by.get(&node) {
@@ -590,6 +618,24 @@ fn walk_show_all(folder: &Folder, visible: &mut HashMap<TreeNode, Vec<usize>>) {
             walk_show_all(sub, visible);
         }
     }
+}
+
+/// Depth-first scan for a filter whose `command` matches `cmd`.
+/// Returns the catalogue's static reference; callers extend their own
+/// lifetimes to it.
+fn find_filter_by_command<'a>(folder: &'a Folder, cmd: &str) -> Option<&'a Filter> {
+    for child in &folder.children {
+        match child {
+            Node::Filter(f) if f.command == cmd => return Some(f),
+            Node::Folder(sub) => {
+                if let Some(found) = find_filter_by_command(sub, cmd) {
+                    return Some(found);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 #[cfg(test)]

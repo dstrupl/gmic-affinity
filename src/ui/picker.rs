@@ -15,14 +15,15 @@ use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2_app_kit::{
     NSAutoresizingMaskOptions, NSBackingStoreType, NSOutlineView, NSPanel, NSScrollElasticity,
-    NSScrollView, NSSearchField, NSTableColumn, NSView, NSWindow, NSWindowStyleMask,
+    NSScrollView, NSSearchField, NSSplitView, NSTableColumn, NSView, NSWindow, NSWindowStyleMask,
 };
-use objc2_foundation::{CGPoint, CGRect, CGSize, MainThreadMarker, NSSize, NSString};
+use objc2_foundation::{CGFloat, CGPoint, CGRect, CGSize, MainThreadMarker, NSSize, NSString};
 
 use crate::catalogue;
 use crate::settings::Settings;
 use crate::ui::modal_close_delegate::ModalCloseDelegate;
 use crate::ui::picker_catalogue_data_source::CatalogueDataSource;
+use crate::ui::picker_form::{build_form_pane, FormPane};
 use crate::ui::runloop::run_modal_window;
 
 /// Height reserved at the top of the panel for the search field.
@@ -31,6 +32,18 @@ const SEARCH_BAR_HEIGHT: f64 = 28.0;
 const SEARCH_BAR_GAP: f64 = 4.0;
 /// Margin around the search field horizontally.
 const SEARCH_BAR_HMARGIN: f64 = 8.0;
+/// Initial fraction of the split-view width allocated to the tree
+/// pane on the left. The form pane gets the rest. The user can drag
+/// the divider after the panel opens; we restore the resulting
+/// position from the window's autosave name via `setAutosaveName:` on
+/// the split view itself.
+const TREE_PANE_WIDTH_FRACTION: CGFloat = 0.55;
+/// Minimum tree-pane width in points so the user can't accidentally
+/// drag the divider so far right that the tree disappears.
+const TREE_PANE_MIN_WIDTH: CGFloat = 200.0;
+/// Minimum form-pane width — keeps slider + label rows readable even
+/// when the divider is dragged hard against the right edge.
+const FORM_PANE_MIN_WIDTH: CGFloat = 220.0;
 
 /// Open the picker panel and run it modally until the user dismisses
 /// it. The data source is populated from
@@ -123,18 +136,25 @@ pub fn show_empty() -> Option<()> {
     unsafe {
         search.setDelegate(Some(data_source.as_search_field_delegate()));
     }
-    let sf = search.frame();
-    crate::log(&format!(
-        "picker: search frame = {}x{} at ({}, {})",
-        sf.size.width, sf.size.height, sf.origin.x, sf.origin.y
-    ));
 
-    let scroll = build_scroll_view(mtm, content_bounds, &outline);
-    let scf = scroll.frame();
-    crate::log(&format!(
-        "picker: scroll frame = {}x{} at ({}, {})",
-        scf.size.width, scf.size.height, scf.origin.x, scf.origin.y
-    ));
+    // Tree (left pane) — same scroll view we have shipped since T8,
+    // just smaller because the split view now owns its frame.
+    let tree_scroll = build_scroll_view(mtm, content_bounds, &outline);
+    // Form (right pane). Builds its own scroll view + stack view and
+    // attaches the form controller to the outline view's delegate
+    // slot so every selection change repopulates the form.
+    let FormPane {
+        controller: form_controller,
+        root_view: form_scroll,
+    } = build_form_pane(mtm, data_source.clone());
+    unsafe {
+        outline.setDelegate(Some(form_controller.as_outline_view_delegate()));
+    }
+
+    // Split view sits below the search bar, hosts the two panes
+    // side-by-side.
+    let split = build_split_view(mtm, content_bounds, &tree_scroll, &form_scroll);
+
     unsafe {
         // NOTE: do NOT set `wantsLayer` on the contentView here. It
         // breaks AppKit's autoresizing of immediate subviews (search
@@ -143,28 +163,86 @@ pub fn show_empty() -> Option<()> {
         // Layer-backing the scroll view directly (see
         // `build_scroll_view`) is both safe and sufficient.
         content_view.addSubview(&search);
-        content_view.addSubview(&scroll);
+        content_view.addSubview(&split);
     }
-    // Log post-add frames in case AppKit auto-adjusts.
     let sf2 = search.frame();
-    let scf2 = scroll.frame();
+    let spf = split.frame();
     crate::log(&format!(
-        "picker: after addSubview, search={}x{}@({},{}), scroll={}x{}@({},{})",
+        "picker: after addSubview, search={}x{}@({},{}), split={}x{}@({},{})",
         sf2.size.width, sf2.size.height, sf2.origin.x, sf2.origin.y,
-        scf2.size.width, scf2.size.height, scf2.origin.x, scf2.origin.y,
+        spf.size.width, spf.size.height, spf.origin.x, spf.origin.y,
     ));
 
     let _response = run_modal_window(&window);
 
-    // Keep the data source alive for the life of the modal session.
-    // `NSOutlineView::setDataSource:` and `NSTextField::setDelegate:`
-    // both store WEAK references. If we let `data_source` drop while
-    // the panel is still up AppKit would crash. Dropping it here is
-    // correct because by the time we get past `run_modal_window` the
-    // panel has been ordered out and AppKit will not call back into
-    // it again.
+    // Keep both the data source and the form controller alive for the
+    // life of the modal session. `NSOutlineView::setDataSource:`,
+    // `NSOutlineView::setDelegate:`, and `NSTextField::setDelegate:`
+    // all store WEAK references. If we let them drop while the panel
+    // is still up AppKit would crash. Dropping them here is correct
+    // because by the time we get past `run_modal_window` the panel has
+    // been ordered out and AppKit will not call back into them.
+    drop(form_controller);
     drop(data_source);
     Some(())
+}
+
+/// Build the side-by-side split view that hosts the tree on the left
+/// and the parameter form on the right. The frame slots beneath the
+/// search bar and grows with the window.
+fn build_split_view(
+    mtm: MainThreadMarker,
+    content_bounds: CGRect,
+    tree: &Retained<NSScrollView>,
+    form: &Retained<NSScrollView>,
+) -> Retained<NSSplitView> {
+    let split_height =
+        content_bounds.size.height - SEARCH_BAR_HEIGHT - SEARCH_BAR_GAP * 2.0;
+    let frame = CGRect {
+        origin: CGPoint { x: 0.0, y: 0.0 },
+        size: CGSize {
+            width: content_bounds.size.width,
+            height: split_height,
+        },
+    };
+    let split: Retained<NSSplitView> =
+        unsafe { NSSplitView::initWithFrame(mtm.alloc(), frame) };
+    unsafe {
+        // Vertical = left/right layout (the divider is a vertical
+        // line). AppKit's vocabulary here is the opposite of CSS:
+        // `setVertical(true)` puts panes side-by-side, not stacked.
+        split.setVertical(true);
+        split.setDividerStyle(objc2_app_kit::NSSplitViewDividerStyle::Thin);
+        split.setAutoresizingMask(
+            NSAutoresizingMaskOptions::NSViewWidthSizable
+                | NSAutoresizingMaskOptions::NSViewHeightSizable,
+        );
+        // Subviews go in left-to-right order. The split view sizes
+        // them according to its own layout pass once we add them.
+        let tree_view: &NSView = tree;
+        let form_view: &NSView = form;
+        split.addSubview(tree_view);
+        split.addSubview(form_view);
+        // NSSplitView only lays out its subviews when explicitly
+        // told to. Without this call AppKit leaves both panes at
+        // their initial untouched 0×height frames and the panel
+        // looks completely empty.
+        split.adjustSubviews();
+
+        // Initial divider position: TREE_PANE_WIDTH_FRACTION of the
+        // split view's width, clamped so neither pane falls below its
+        // minimum.
+        let total_width = frame.size.width;
+        let mut tree_width = total_width * TREE_PANE_WIDTH_FRACTION;
+        if tree_width < TREE_PANE_MIN_WIDTH {
+            tree_width = TREE_PANE_MIN_WIDTH;
+        }
+        if total_width - tree_width < FORM_PANE_MIN_WIDTH {
+            tree_width = total_width - FORM_PANE_MIN_WIDTH;
+        }
+        split.setPosition_ofDividerAtIndex(tree_width, 0);
+    }
+    split
 }
 
 fn build_outline_view(mtm: MainThreadMarker) -> Retained<NSOutlineView> {
