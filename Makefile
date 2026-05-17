@@ -44,9 +44,30 @@ PHOTOSHOP_SDK            ?= $(HOME)/SDKs/photoshop-sdk
 PHOTOSHOP_SDK_RESOURCES  ?= $(PHOTOSHOP_SDK)/photoshopapi/resources
 PHOTOSHOP_SDK_HEADERS    ?= $(PHOTOSHOP_SDK)/photoshopapi/photoshop
 
-.PHONY: all bundle universal pipl install uninstall clean test fmt clippy
+.PHONY: all bundle universal universal-install pipl install uninstall clean test fmt clippy help
 
 all: bundle
+
+help:
+	@echo "Targets:"
+	@echo "  make bundle             Build ARM-only GmicFilter.plugin (no-op PluginMain)."
+	@echo "  make universal          Build universal (arm64 + x86_64) GmicFilter.plugin."
+	@echo "  make install            Install GmicFilter.plugin into Affinity Photo 2."
+	@echo "  make universal-install  Convenience: 'make universal' then 'make install'."
+	@echo "  make uninstall          Remove the installed plugin."
+	@echo "  make pipl               Build GmicFilter.rsrc from GmicFilter.r (needs SDK)."
+	@echo "  make test               Run cargo test under both default and --features live."
+	@echo "  make clippy             Run cargo clippy --all-targets --all-features -D warnings."
+	@echo "  make fmt                Run cargo fmt."
+	@echo "  make clean              Remove build artefacts."
+	@echo ""
+	@echo "Feature flag:"
+	@echo "  FEATURES=live           Real M3/M4 PluginMain (only after layout reconciled)."
+	@echo "                          Example: make universal FEATURES=live"
+	@echo ""
+	@echo "Environment:"
+	@echo "  PHOTOSHOP_SDK             SDK root (default: \$$HOME/SDKs/photoshop-sdk)"
+	@echo "  AFFINITY_PLUGINS_DIR      install dest (default: Affinity Photo 2 Plugins)"
 
 # Fast iteration: ARM-only build assembled into the plugin bundle.
 bundle: $(ARM_LIB)
@@ -97,6 +118,13 @@ install: bundle
 	rm -rf "$(AFFINITY_PLUGINS_DIR)/$(BUNDLE)"
 	cp -R "$(BUNDLE)" "$(AFFINITY_PLUGINS_DIR)/"
 	@echo "Installed to $(AFFINITY_PLUGINS_DIR)/$(BUNDLE)"
+	@echo "Restart Affinity Photo 2 to pick up the change."
+
+universal-install: universal
+	@mkdir -p "$(AFFINITY_PLUGINS_DIR)"
+	rm -rf "$(AFFINITY_PLUGINS_DIR)/$(BUNDLE)"
+	cp -R "$(BUNDLE)" "$(AFFINITY_PLUGINS_DIR)/"
+	@echo "Installed (universal) to $(AFFINITY_PLUGINS_DIR)/$(BUNDLE)"
 	@echo "Restart Affinity Photo 2 to pick up the change."
 
 uninstall:
