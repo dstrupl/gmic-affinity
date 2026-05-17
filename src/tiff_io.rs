@@ -154,12 +154,6 @@ pub fn read_tiff(
     if w > MAX_EDGE as u32 || h > MAX_EDGE as u32 {
         return Err(TiffError::DimensionTooLarge(w.max(h)));
     }
-    if (w, h) != (width, height) {
-        return Err(TiffError::UnexpectedDimensions {
-            got: (w, h),
-            want: (width, height),
-        });
-    }
 
     // gmic promotes images to its internal `float` type for almost any
     // non-trivial operation (blur, convolution, fft, colour-space
@@ -170,9 +164,7 @@ pub fn read_tiff(
     // crate can decode and quantise it back to 8-bit ourselves. We
     // assume the host gave us an 8-bit buffer (validated in
     // `validate_filter_record`) so 0..255 is the target range.
-    let row_len = (width as usize) * (planes as usize);
-    let want = row_len * height as usize;
-    let pixels: Vec<u8> = match dec.read_image()? {
+    let mut pixels: Vec<u8> = match dec.read_image()? {
         DecodingResult::U8(v) => v,
         DecodingResult::U16(v) => quantize_u16_to_u8(&v),
         DecodingResult::U32(v) => quantize_u32_to_u8(&v),
@@ -180,6 +172,24 @@ pub fn read_tiff(
         DecodingResult::F64(v) => quantize_f64_to_u8(&v),
         _ => return Err(TiffError::UnsupportedBitDepth),
     };
+
+    // Dimension-mismatch handling (T12-C): many gmic filters change
+    // image dimensions (crop, rotate, scale, multi-frame output).
+    // Today's pipeline assumes `output_dims == input_dims` because
+    // we don't negotiate a new size with the host via the
+    // `imageSize` selector yet (v2 will). For v1, resize the gmic
+    // output back to the input dims with nearest-neighbour and log a
+    // one-line warning so the user knows the result was rescaled.
+    if (w, h) != (width, height) {
+        crate::logging::log(&format!(
+            "tiff: gmic returned {}x{}, expected {}x{}; resampling nearest-neighbour",
+            w, h, width, height,
+        ));
+        pixels = resample_nearest_to_u8(&pixels, w, h, width, height, planes);
+    }
+
+    let row_len = (width as usize) * (planes as usize);
+    let want = row_len * height as usize;
     if pixels.len() != want {
         return Err(TiffError::SizeMismatch {
             got: pixels.len(),
@@ -227,6 +237,44 @@ fn quantize_f64_to_u8(v: &[f64]) -> Vec<u8> {
     v.iter()
         .map(|&p| p.clamp(0.0, 255.0).round() as u8)
         .collect()
+}
+
+/// Nearest-neighbour resample of an interleaved 8-bit `src` image
+/// from `src_w x src_h` to `dst_w x dst_h` with `planes` interleaved
+/// channels. Used to fold a gmic output whose dimensions changed (e.g.
+/// `-rotate`, `-crop`) back to the host's filter rect so the existing
+/// FilterRecord pipeline can copy it into place without crashing. v2
+/// of the plugin will negotiate a new image size with Affinity using
+/// the `imageSize` selector instead and drop this helper.
+fn resample_nearest_to_u8(
+    src: &[u8],
+    src_w: u32,
+    src_h: u32,
+    dst_w: u32,
+    dst_h: u32,
+    planes: u32,
+) -> Vec<u8> {
+    let pl = planes as usize;
+    let src_w_us = src_w as usize;
+    let dst_w_us = dst_w as usize;
+    let dst_h_us = dst_h as usize;
+    let mut out = vec![0u8; dst_w_us * dst_h_us * pl];
+    if src_w == 0 || src_h == 0 || dst_w == 0 || dst_h == 0 {
+        return out;
+    }
+    for y in 0..dst_h_us {
+        // floor(y * src_h / dst_h) using u64 to avoid overflow on big
+        // images (a 30k x 30k MAX_EDGE image multiplied by another
+        // 30k dimension already exceeds u32).
+        let sy = (y as u64 * src_h as u64 / dst_h as u64) as usize;
+        for x in 0..dst_w_us {
+            let sx = (x as u64 * src_w as u64 / dst_w as u64) as usize;
+            let src_idx = (sy * src_w_us + sx) * pl;
+            let dst_idx = (y * dst_w_us + x) * pl;
+            out[dst_idx..dst_idx + pl].copy_from_slice(&src[src_idx..src_idx + pl]);
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -326,17 +374,65 @@ mod tests {
     }
 
     #[test]
-    fn rejects_dimension_mismatch_on_read() {
+    fn dimension_mismatch_resamples_to_target_size() {
+        // Pre-T12-C this case returned `TiffError::UnexpectedDimensions`.
+        // After T12-C we silently nearest-neighbour resample back to
+        // the host's expected dims so gmic filters that change size
+        // (rotate / crop / spread / …) don't crash the plugin.
         let dir = tempdir().unwrap();
         let path = dir.path().join("mismatch.tif");
         let buf = make_padded_buffer(4, 4, 3, 12);
         write_tiff(&path, &buf, 4, 4, 3, 12).unwrap();
 
-        let mut out = vec![0u8; 8 * 8 * 3];
-        let err = read_tiff(&path, &mut out, 8, 8, 3, 24).unwrap_err();
+        let mut out = vec![0xCC_u8; 8 * 8 * 3];
+        // Reading a 4x4 source into an 8x8 destination must succeed
+        // and produce *some* RGB pixel content (not the 0xCC sentinel).
+        read_tiff(&path, &mut out, 8, 8, 3, 8 * 3).unwrap();
         assert!(
-            matches!(err, TiffError::UnexpectedDimensions { .. }),
-            "got {err}"
+            out.iter().any(|&b| b != 0xCC),
+            "resampled output must overwrite the sentinel"
         );
+    }
+}
+
+#[cfg(test)]
+mod resample_tests {
+    use super::*;
+
+    #[test]
+    fn identity_passthrough() {
+        let src = vec![1u8, 2, 3, 4];
+        let out = resample_nearest_to_u8(&src, 2, 2, 2, 2, 1);
+        assert_eq!(out, src);
+    }
+
+    #[test]
+    fn shrink_by_half() {
+        // 4x1 → 2x1, single channel, nearest picks indices 0,2
+        let src = vec![10, 20, 30, 40];
+        let out = resample_nearest_to_u8(&src, 4, 1, 2, 1, 1);
+        assert_eq!(out, vec![10, 30]);
+    }
+
+    #[test]
+    fn upsample_doubles() {
+        let src = vec![5, 9];
+        let out = resample_nearest_to_u8(&src, 2, 1, 4, 1, 1);
+        assert_eq!(out, vec![5, 5, 9, 9]);
+    }
+
+    #[test]
+    fn rgb_planes_are_preserved() {
+        // 2x1 rgb, shrink to 1x1, expected first pixel
+        let src = vec![1, 2, 3, 4, 5, 6];
+        let out = resample_nearest_to_u8(&src, 2, 1, 1, 1, 3);
+        assert_eq!(out, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn zero_dimension_returns_empty() {
+        let src = vec![1u8, 2, 3, 4];
+        let out = resample_nearest_to_u8(&src, 0, 0, 2, 2, 1);
+        assert_eq!(out, vec![0, 0, 0, 0]); // dst-sized but unwritten
     }
 }

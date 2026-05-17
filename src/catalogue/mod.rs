@@ -42,15 +42,35 @@ pub struct Param {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParamKind {
-    Int { default: i64, min: i64, max: i64 },
-    Float { default: f64, min: f64, max: f64 },
-    Bool { default: bool },
-    Choice { choices: Vec<String>, default: usize },
-    Color { default_rgb: [u8; 3] },
-    Text { default: String },
+    Int {
+        default: i64,
+        min: i64,
+        max: i64,
+    },
+    Float {
+        default: f64,
+        min: f64,
+        max: f64,
+    },
+    Bool {
+        default: bool,
+    },
+    Choice {
+        choices: Vec<String>,
+        default: usize,
+    },
+    Color {
+        default_rgb: [u8; 3],
+    },
+    Text {
+        default: String,
+    },
     Note(String),
     Separator,
-    Link { label: String, url: String },
+    Link {
+        label: String,
+        url: String,
+    },
     Unknown(String),
 }
 
@@ -79,4 +99,94 @@ pub fn builtin() -> &'static Catalogue {
             .expect("bundled gmic-catalogue.gmic.gz must decompress");
         parser::parse(&text).expect("bundled gmic-catalogue.gmic.gz must parse")
     })
+}
+
+/// Return a "Folder / Sub / Filter" display path for the filter whose
+/// `command` matches, or `None` if no filter has that command. Used
+/// by `PluginMain` when recording a user pick into `Settings`: the
+/// recent list shows the human-readable path, not the gmic command.
+pub fn lookup_display_path(cat: &Catalogue, command: &str) -> Option<String> {
+    fn walk(folder: &Folder, command: &str, path: &mut Vec<String>) -> Option<String> {
+        for child in &folder.children {
+            match child {
+                Node::Folder(f) => {
+                    path.push(f.name.clone());
+                    if let Some(found) = walk(f, command, path) {
+                        return Some(found);
+                    }
+                    path.pop();
+                }
+                Node::Filter(f) if f.command == command => {
+                    return Some(if path.is_empty() {
+                        f.display_name.clone()
+                    } else {
+                        format!("{} / {}", path.join(" / "), f.display_name)
+                    });
+                }
+                Node::Filter(_) => {}
+            }
+        }
+        None
+    }
+    walk(&cat.root, command, &mut Vec::new())
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+
+    fn fixture() -> Catalogue {
+        Catalogue {
+            root: Folder {
+                name: String::new(),
+                children: vec![
+                    Node::Folder(Folder {
+                        name: "Artistic".to_string(),
+                        children: vec![Node::Filter(Filter {
+                            display_name: "Paint Brush".to_string(),
+                            command: "fx_painting".to_string(),
+                            description: None,
+                            params: vec![],
+                        })],
+                    }),
+                    Node::Folder(Folder {
+                        name: "Effects".to_string(),
+                        children: vec![Node::Folder(Folder {
+                            name: "Blur".to_string(),
+                            children: vec![Node::Filter(Filter {
+                                display_name: "Bokeh".to_string(),
+                                command: "fx_bokeh".to_string(),
+                                description: None,
+                                params: vec![],
+                            })],
+                        })],
+                    }),
+                ],
+            },
+        }
+    }
+
+    #[test]
+    fn finds_top_level_filter() {
+        let cat = fixture();
+        assert_eq!(
+            lookup_display_path(&cat, "fx_painting"),
+            Some("Artistic / Paint Brush".to_string()),
+        );
+    }
+
+    #[test]
+    fn finds_nested_filter() {
+        let cat = fixture();
+        assert_eq!(
+            lookup_display_path(&cat, "fx_bokeh"),
+            Some("Effects / Blur / Bokeh".to_string()),
+        );
+    }
+
+    #[test]
+    fn missing_command_returns_none() {
+        let cat = fixture();
+        assert_eq!(lookup_display_path(&cat, "fx_does_not_exist"), None);
+    }
 }

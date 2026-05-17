@@ -68,7 +68,7 @@ unsafe fn dispatch(_selector: i16, _filter_record: *mut c_void, _data: *mut isiz
 }
 
 #[cfg(feature = "live")]
-unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize) -> i16 {
+unsafe fn dispatch(selector: i16, filter_record: *mut c_void, data: *mut isize) -> i16 {
     if filter_record.is_null() {
         log("null FilterRecord pointer; refusing");
         return USER_CANCEL;
@@ -77,13 +77,7 @@ unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize)
 
     match selector {
         SELECTOR_ABOUT => NO_ERR,
-        SELECTOR_PARAMETERS => {
-            log("PARAMETERS: opening picker");
-            match ui::picker::show_empty() {
-                Some(()) => NO_ERR,
-                None => USER_CANCEL,
-            }
-        }
+        SELECTOR_PARAMETERS => parameters_selector(data),
         SELECTOR_PREPARE => {
             fr.buffer_space = 0;
             fr.max_space = 0;
@@ -117,7 +111,9 @@ unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize)
                         "advance_state -> rc={} in_data={:p} in_row_bytes={} out_data={:p} out_row_bytes={}",
                         rc, fr.in_data, fr.in_row_bytes, fr.out_data, fr.out_row_bytes
                     ));
-                    if rc != NO_ERR { return rc; }
+                    if rc != NO_ERR {
+                        return rc;
+                    }
                     NO_ERR
                 }
                 None => {
@@ -126,41 +122,190 @@ unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize)
                 }
             }
         }
-        SELECTOR_CONTINUE => {
-            // M4: real gmic round-trip. The M3 pass-through is still
-            // available via `filter::run_passthrough` for debugging the
-            // pointer path in isolation; we don't expose a runtime switch
-            // in v1 because Affinity has no parameter UI yet.
-            log(&format!(
-                "CONTINUE: invoking gmic::run_filter (in_data={:p} in_row_bytes={} out_data={:p} out_row_bytes={})",
-                fr.in_data, fr.in_row_bytes, fr.out_data, fr.out_row_bytes
-            ));
-            match gmic::run_filter(fr) {
-                Ok(()) => {
-                    log("CONTINUE: gmic::run_filter returned OK");
-                    // Signal "done, no more tiles" by zeroing the rects.
-                    fr.in_rect = VRect {
-                        top: 0,
-                        left: 0,
-                        bottom: 0,
-                        right: 0,
-                    };
-                    fr.out_rect = VRect {
-                        top: 0,
-                        left: 0,
-                        bottom: 0,
-                        right: 0,
-                    };
-                    NO_ERR
-                }
-                Err(e) => {
-                    log(&format!("CONTINUE: filter failed: {e}"));
-                    USER_CANCEL
+        SELECTOR_CONTINUE => continue_selector(fr, data),
+        SELECTOR_FINISH => {
+            // Drop the Boxed ChosenFilter from *data (T13). If
+            // PARAMETERS never ran (Last-Filter path: *data is null),
+            // `take_and_drop` is a no-op.
+            crate::ps_data::take_and_drop::<crate::catalogue::ChosenFilter>(data);
+            log("FINISH: *data reclaimed");
+            NO_ERR
+        }
+        _ => NO_ERR,
+    }
+}
+
+/// Handle `SELECTOR_PARAMETERS`: open the picker, persist the user's
+/// pick to `settings.json`, and stash the [`ChosenFilter`] on the
+/// plugin-private `*data` slot so `SELECTOR_CONTINUE` can recover it.
+///
+/// Panics inside the AppKit code path are isolated via
+/// `catch_unwind` (T14) so a UI crash translates to "user cancel"
+/// plus an alert, never a host-killing unwind across the FFI
+/// boundary.
+#[cfg(feature = "live")]
+unsafe fn parameters_selector(data: *mut isize) -> i16 {
+    use crate::catalogue::{self, ChosenFilter};
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    log("PARAMETERS: opening picker");
+
+    // Catalogue lookup can panic only if the bundled snapshot is
+    // corrupt — extremely unlikely in shipped builds because LFS
+    // hydration is required to even produce the bundle.
+    let cat: &'static catalogue::Catalogue = match catch_unwind(catalogue::builtin) {
+        Ok(c) => c,
+        Err(_) => {
+            log("PARAMETERS: catalogue::builtin panicked");
+            crate::ui::alert::alert_error(
+                &crate::ui::alert::NsAlertSink,
+                "G'MIC",
+                "G'MIC filter list is unreadable — this build of the plugin may be corrupted.",
+                true,
+            );
+            return USER_CANCEL;
+        }
+    };
+
+    let mut settings = crate::settings::Settings::load();
+    let chosen = match catch_unwind(AssertUnwindSafe(|| {
+        crate::ui::picker::show_picker(cat, settings.last.as_ref())
+    })) {
+        Ok(opt) => opt,
+        Err(_) => {
+            log("PARAMETERS: picker panicked");
+            crate::ui::alert::alert_error(
+                &crate::ui::alert::NsAlertSink,
+                "G'MIC",
+                "Couldn't open the G'MIC dialog.",
+                true,
+            );
+            return USER_CANCEL;
+        }
+    };
+
+    match chosen {
+        Some(chosen) => {
+            let ts = crate::logging::iso8601_now();
+            let display_path = catalogue::lookup_display_path(cat, &chosen.command)
+                .unwrap_or_else(|| chosen.command.clone());
+            settings.record_pick(&chosen.command, chosen.args.clone(), &display_path, &ts);
+            settings.save();
+            crate::ps_data::leak::<ChosenFilter>(chosen, data);
+            log("PARAMETERS: ChosenFilter leaked into *data, settings saved");
+            NO_ERR
+        }
+        None => {
+            log("PARAMETERS: user cancelled");
+            USER_CANCEL
+        }
+    }
+}
+
+/// Handle `SELECTOR_CONTINUE`: recover the [`ChosenFilter`] stashed
+/// by PARAMETERS (or fall back to `settings.last` for the Last-Filter
+/// menu item) and run the gmic pipeline against it.
+#[cfg(feature = "live")]
+unsafe fn continue_selector(fr: &mut FilterRecord, data: *mut isize) -> i16 {
+    use crate::catalogue::ChosenFilter;
+
+    let chosen_owned: Option<ChosenFilter> = crate::ps_data::borrow::<ChosenFilter>(data).cloned();
+
+    let chosen = match chosen_owned {
+        Some(c) => c,
+        None => {
+            let settings = crate::settings::Settings::load();
+            match settings.last {
+                Some(last) => ChosenFilter {
+                    command: last.command,
+                    args: last.args,
+                },
+                None => {
+                    crate::ui::alert::alert_error(
+                        &crate::ui::alert::NsAlertSink,
+                        "G'MIC",
+                        "No previous G'MIC filter to repeat. Pick one from Filters > Plugins > G'MIC > G'MIC….",
+                        false,
+                    );
+                    log("CONTINUE: no *data, no settings.last — USER_CANCEL");
+                    return USER_CANCEL;
                 }
             }
         }
-        SELECTOR_FINISH => NO_ERR,
-        _ => NO_ERR,
+    };
+
+    log(&format!(
+        "CONTINUE: invoking gmic::run_filter_with (cmd={} argc={}) in_data={:p} out_data={:p}",
+        chosen.command,
+        chosen.args.len(),
+        fr.in_data,
+        fr.out_data,
+    ));
+    match gmic::run_filter_with(fr, &chosen) {
+        Ok(()) => {
+            log("CONTINUE: gmic::run_filter_with returned OK");
+            fr.in_rect = VRect {
+                top: 0,
+                left: 0,
+                bottom: 0,
+                right: 0,
+            };
+            fr.out_rect = VRect {
+                top: 0,
+                left: 0,
+                bottom: 0,
+                right: 0,
+            };
+            NO_ERR
+        }
+        Err(e) => {
+            // T14 NSAlert matrix — translate the GmicError variant
+            // into a user-actionable message. Everything also goes to
+            // the log for support diagnosis.
+            let sink = &crate::ui::alert::NsAlertSink;
+            match &e {
+                gmic::GmicError::NotFound => {
+                    crate::ui::alert::alert_error(
+                        sink,
+                        "G'MIC",
+                        "G'MIC isn't installed. Install it with: brew install gmic and try again.",
+                        false,
+                    );
+                }
+                gmic::GmicError::Failed { status } => {
+                    let status_str = status
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| "signal".into());
+                    crate::ui::alert::alert_error(
+                        sink,
+                        "G'MIC",
+                        &format!(
+                            "G'MIC reported an error running `{}` (exit {}).",
+                            chosen.command, status_str,
+                        ),
+                        true,
+                    );
+                }
+                gmic::GmicError::Tiff(_) => {
+                    crate::ui::alert::alert_error(
+                        sink,
+                        "G'MIC",
+                        "G'MIC produced an image we couldn't read back.",
+                        true,
+                    );
+                }
+                _ => {
+                    crate::ui::alert::alert_error(
+                        sink,
+                        "G'MIC",
+                        &format!("G'MIC pipeline failed: {e}"),
+                        true,
+                    );
+                }
+            }
+            log(&format!("CONTINUE: gmic failed: {e}"));
+            USER_CANCEL
+        }
     }
 }
 
