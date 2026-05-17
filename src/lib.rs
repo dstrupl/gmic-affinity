@@ -21,9 +21,11 @@
 
 pub mod filter;
 pub mod gmic;
+pub mod logging;
 pub mod ps_types;
 pub mod tiff_io;
 
+use logging::log;
 use ps_types::{
     NO_ERR, SELECTOR_ABOUT, SELECTOR_CONTINUE, SELECTOR_FINISH, SELECTOR_PARAMETERS,
     SELECTOR_PREPARE, SELECTOR_START,
@@ -63,7 +65,7 @@ unsafe fn dispatch(_selector: i16, _filter_record: *mut c_void, _data: *mut isiz
 #[cfg(feature = "live")]
 unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize) -> i16 {
     if filter_record.is_null() {
-        eprintln!("[gmic-affinity] null FilterRecord pointer; refusing");
+        log("null FilterRecord pointer; refusing");
         return USER_CANCEL;
     }
     let fr = &mut *(filter_record as *mut FilterRecord);
@@ -77,22 +79,54 @@ unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize)
             NO_ERR
         }
         SELECTOR_START => {
-            // Tell the host we want the whole filter rect, all planes.
+            // Tell the host we want the whole filter rect, all planes,
+            // then call back into the host's `advanceState` so it
+            // populates `in_data` / `in_row_bytes` and allocates
+            // `out_data` matching the rects. Without this call Affinity
+            // leaves both at zero and CONTINUE has no pixels to work
+            // with (this is exactly what bit us on first install).
             fr.in_rect = fr.filter_rect;
             fr.in_lo_plane = 0;
             fr.in_hi_plane = fr.planes - 1;
             fr.out_rect = fr.filter_rect;
             fr.out_lo_plane = 0;
             fr.out_hi_plane = fr.planes - 1;
-            NO_ERR
+            log(&format!(
+                "START rect=({},{})-({},{}) planes={}",
+                fr.filter_rect.left,
+                fr.filter_rect.top,
+                fr.filter_rect.right,
+                fr.filter_rect.bottom,
+                fr.planes,
+            ));
+            match fr.advance_state {
+                Some(advance) => {
+                    let rc = advance();
+                    log(&format!(
+                        "advance_state -> rc={} in_data={:p} in_row_bytes={} out_data={:p} out_row_bytes={}",
+                        rc, fr.in_data, fr.in_row_bytes, fr.out_data, fr.out_row_bytes
+                    ));
+                    if rc != NO_ERR { return rc; }
+                    NO_ERR
+                }
+                None => {
+                    log("advance_state pointer is NULL; host did not provide it");
+                    NO_ERR
+                }
+            }
         }
         SELECTOR_CONTINUE => {
             // M4: real gmic round-trip. The M3 pass-through is still
             // available via `filter::run_passthrough` for debugging the
             // pointer path in isolation; we don't expose a runtime switch
             // in v1 because Affinity has no parameter UI yet.
+            log(&format!(
+                "CONTINUE: invoking gmic::run_filter (in_data={:p} in_row_bytes={} out_data={:p} out_row_bytes={})",
+                fr.in_data, fr.in_row_bytes, fr.out_data, fr.out_row_bytes
+            ));
             match gmic::run_filter(fr) {
                 Ok(()) => {
+                    log("CONTINUE: gmic::run_filter returned OK");
                     // Signal "done, no more tiles" by zeroing the rects.
                     fr.in_rect = VRect {
                         top: 0,
@@ -109,7 +143,7 @@ unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize)
                     NO_ERR
                 }
                 Err(e) => {
-                    eprintln!("[gmic-affinity] filter failed: {e}");
+                    log(&format!("CONTINUE: filter failed: {e}"));
                     USER_CANCEL
                 }
             }
@@ -120,9 +154,8 @@ unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize)
 }
 
 fn log_selector(selector: i16) {
-    // M1 instrumentation: anything we log to stderr lands in Console.app when
-    // Affinity loads the plugin. Replace with `os_log` later if we want
-    // structured logging.
+    // Side-channel log (Affinity drops stderr, so eprintln! is invisible).
+    // See src/logging.rs for the rationale and file location.
     let name = match selector {
         SELECTOR_ABOUT => "About",
         SELECTOR_PARAMETERS => "Parameters",
@@ -132,8 +165,5 @@ fn log_selector(selector: i16) {
         SELECTOR_FINISH => "Finish",
         _ => "Unknown",
     };
-    eprintln!(
-        "[gmic-affinity] PluginMain selector={} ({})",
-        selector, name
-    );
+    log(&format!("PluginMain selector={} ({})", selector, name));
 }

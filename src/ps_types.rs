@@ -38,8 +38,9 @@ pub struct Point {
 /// `sizeof(PSRGBColor) == 6`.
 pub type PSRGBColor = [u8; 6];
 
-pub type TestAbortProc = Option<unsafe extern "C" fn() -> i16>;
-pub type ProgressProc  = Option<unsafe extern "C" fn(i32, i32)>;
+pub type TestAbortProc    = Option<unsafe extern "C" fn() -> i16>;
+pub type ProgressProc     = Option<unsafe extern "C" fn(i32, i32)>;
+pub type AdvanceStateProc = Option<unsafe extern "C" fn() -> i16>;
 
 /// Partial `FilterRecord`. Field order and names match `PIFilter.h` exactly
 /// up through `outRowBytes`; everything from there to `sizeof(FilterRecord)
@@ -72,12 +73,22 @@ pub struct FilterRecord {
     // 4 bytes of padding for 8-byte pointer alignment.
     pub out_data:      *mut u8,       // offset 112
     pub out_row_bytes: i32,           // offset 120
-    // Remaining ~524 bytes: isFloating/haveMask/autoMask, maskRect/maskData,
-    // backColor/foreColor (32-bit), hostSig/hostProc, imageMode and the
-    // rest of the post-3.0 additions. We don't access these yet, but the
-    // struct must remain the correct total size so the host's pointer
-    // arithmetic into FilterRecord lands inside our allocation.
-    pub _pad: [u8; 648 - 124],
+    // Bytes 124..296 cover isFloating/haveMask/autoMask, maskRect/maskData,
+    // imageMode, imageHRes/VRes, floatCoord, wholeSize and the other
+    // 3.0-era fields. We don't read them; the host's pointer arithmetic
+    // still needs them to be sized correctly though.
+    pub _pad1:         [u8; 296 - 124],
+    /// Function the plugin calls *inside* `SELECTOR_START` (and again
+    /// from `SELECTOR_CONTINUE` if tiling) to ask the host to fill
+    /// `in_data` / `in_row_bytes` and allocate `out_data` matching the
+    /// rects we set. Without this call Affinity (and Adobe Photoshop)
+    /// leaves both at zero and our `validate_filter_record` rejects the
+    /// run with "in_data row stride 0". Offset is from the SDK
+    /// `offsetof` probe in tests/layout.rs.
+    pub advance_state: AdvanceStateProc, // offset 296
+    // Remaining post-advanceState fields (supportsAbsolute, padding,
+    // inputPadding, outputPadding, etc.). Still opaque to us.
+    pub _pad2:         [u8; 648 - 304],
 }
 
 // Selector codes from PIFilter.h (verified via `offsetof` probe against

@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::filter::{validate_filter_record, FilterError};
+use crate::logging::log;
 use crate::ps_types::FilterRecord;
 use crate::tiff_io::{read_tiff, write_tiff, TiffError};
 
@@ -158,6 +159,15 @@ fn validate_filter_string(s: &str) -> Result<(), GmicError> {
 
 /// Build the full argv to hand to `Command::new(gmic_path).args(...)`.
 /// Format: `[<input.tif>, <filter tokens...>, -output, <output.tif>]`.
+///
+/// We deliberately *don't* try to force the output pixel type via the
+/// `,uchar` (or any other) suffix on `-output`. The set of accepted
+/// type names in `output_tiff` is undocumented across gmic versions
+/// (3.7.6 verbose-logs the value back but then rejects 'uchar' at
+/// write time, for instance), so the only portable choice is to let
+/// gmic write whatever it wants and convert in `tiff_io::read_tiff`.
+/// That also means our pipeline transparently works with any future
+/// gmic filter, not just the ones that happen to stay in 8-bit.
 pub fn build_argv(
     input: &Path,
     output: &Path,
@@ -187,17 +197,46 @@ pub fn build_argv(
 /// don't pollute Console.app on success. On failure we surface the exit
 /// status so the caller can log it.
 pub fn run_subprocess(gmic: &Path, args: &[OsString], tmpdir: &Path) -> Result<(), GmicError> {
-    let status = Command::new(gmic)
+    log(&format!(
+        "spawn {} (argc={}) tmpdir={}",
+        gmic.display(),
+        args.len(),
+        tmpdir.display()
+    ));
+    let output = Command::new(gmic)
         .args(args)
         .env_clear()
         .env("PATH", "/usr/bin:/bin")
         .env("HOME", tmpdir)
         .env("TMPDIR", tmpdir)
         .env("LANG", "C")
-        .status()?;
-    if !status.success() {
+        .output()?;
+    log(&format!(
+        "gmic exit status={:?} stdout={}B stderr={}B",
+        output.status.code(),
+        output.stdout.len(),
+        output.stderr.len()
+    ));
+    // Spill stderr (and stdout) so the user can see *why* gmic complained
+    // even when it nominally succeeds. Cap at 8 KiB to avoid blowing up
+    // the log when a filter prints a per-pixel warning.
+    if !output.stderr.is_empty() {
+        let trimmed: String = String::from_utf8_lossy(&output.stderr)
+            .chars()
+            .take(8 * 1024)
+            .collect();
+        log(&format!("gmic stderr: {trimmed}"));
+    }
+    if !output.stdout.is_empty() {
+        let trimmed: String = String::from_utf8_lossy(&output.stdout)
+            .chars()
+            .take(8 * 1024)
+            .collect();
+        log(&format!("gmic stdout: {trimmed}"));
+    }
+    if !output.status.success() {
         return Err(GmicError::Failed {
-            status: status.code(),
+            status: output.status.code(),
         });
     }
     Ok(())
@@ -209,9 +248,15 @@ pub fn run_subprocess(gmic: &Path, args: &[OsString], tmpdir: &Path) -> Result<(
 /// `tempdir()`); both TIFFs live inside it and are auto-removed on drop.
 pub fn run_filter(fr: &mut FilterRecord) -> Result<(), GmicError> {
     let buf = validate_filter_record(fr)?;
+    log(&format!(
+        "run_filter: width={} height={} planes={} in_row_bytes={} out_row_bytes={}",
+        buf.width, buf.height, buf.planes, buf.in_row_bytes, buf.out_row_bytes
+    ));
 
     let gmic = locate_gmic()?;
+    log(&format!("located gmic at {}", gmic.display()));
     let cmd = read_filter_config()?;
+    log(&format!("filter config: {cmd:?}"));
 
     let dir = tempfile::Builder::new()
         .prefix("gmic-affinity-")
@@ -299,7 +344,7 @@ mod tests {
                 "-sharpen",
                 "2",
                 "-output",
-                "/tmp/a/out.tif"
+                "/tmp/a/out.tif",
             ]
         );
     }

@@ -3,15 +3,25 @@
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <!-- Use the legacy "English" form rather than the ISO "en" code: the
+       Adobe Photoshop SDK template Info.plist still uses "English", and
+       Affinity Photo 2's plugin pre-filter appears to probe for
+       en.lproj / Base.lproj as part of a localized-string lookup that
+       returns empty if the development region is "en" with no matching
+       lproj directory. See trace + analysis in this file's history. -->
   <key>CFBundleDevelopmentRegion</key>
-  <string>en</string>
+  <string>English</string>
   <key>CFBundleExecutable</key>
   <string>GmicFilter</string>
+  <key>CFBundleGetInfoString</key>
+  <string>0.1.0 (C) 2026 dstrupl. MIT-licensed.</string>
   <key>CFBundleIdentifier</key>
   <string>com.dstrupl.gmic-affinity</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
+  <string>G'MIC</string>
+  <key>CFBundleDisplayName</key>
   <string>G'MIC</string>
   <key>CFBundlePackageType</key>
   <string>8BFM</string>
@@ -21,9 +31,17 @@
   <string>8BIM</string>
   <key>CFBundleVersion</key>
   <string>1</string>
+  <!-- Legacy Carbon flag telling the Resource Manager to memory-map the
+       .rsrc fork instead of copying it. We ship our pipl as
+       Contents/Resources/GmicFilter.rsrc, and Affinity Photo 2 (which
+       still uses the Carbon resource-fork APIs to read it) honours this
+       hint. Every other Affinity-compatible plugin we surveyed sets it
+       too (AKVIS, etc.). -->
+  <key>CSResourcesFileMapped</key>
+  <string>yes</string>
   <key>LSMinimumSystemVersion</key>
   <string>11.0</string>
   <key>NSHumanReadableCopyright</key>
-  <string>Copyright (c) 2026 dstrupl. MIT-licensed.</string>
+  <string>(C) 2026 dstrupl. MIT-licensed.</string>
 </dict>
 </plist>

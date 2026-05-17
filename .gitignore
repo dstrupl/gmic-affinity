@@ -7,8 +7,11 @@ Cargo.lock.bak
 
 # Build artifacts
 *.plugin/
-*.rsrc
 /dist/
+# NB: GmicFilter.rsrc is NOT in this list. We commit it intentionally
+# so CI (which has no Adobe Photoshop SDK) can still build the bundle.
+# The Makefile re-runs Rez whenever the SDK is available; otherwise it
+# falls back to the committed copy. See Makefile: `pipl` target.
 
 # Editor / IDE
 .vscode/

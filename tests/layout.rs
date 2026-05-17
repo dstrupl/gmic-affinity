@@ -49,4 +49,5 @@ fn filter_record_field_offsets_match_sdk() {
     assert_eq!(offset_of!(FilterRecord, in_row_bytes),  104,   "in_row_bytes");
     assert_eq!(offset_of!(FilterRecord, out_data),      112,   "out_data");
     assert_eq!(offset_of!(FilterRecord, out_row_bytes), 120,   "out_row_bytes");
+    assert_eq!(offset_of!(FilterRecord, advance_state), 296,   "advance_state");
 }

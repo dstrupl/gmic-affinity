@@ -8,10 +8,26 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use tiff::decoder::{Decoder, DecodingResult};
+use tiff::decoder::{Decoder, DecodingResult, Limits};
 use tiff::encoder::{colortype, TiffEncoder};
 
 use crate::filter::MAX_EDGE;
+
+/// Decoder limits sized for the images Affinity actually hands us.
+///
+/// The `tiff` crate's defaults cap an intermediate decoding buffer
+/// (`decoding_buffer_size`) at ~256 MiB and `ifd_value_size` at ~1 MiB,
+/// which is fine for thumbnails but rejects normal 24 MP+ photographs.
+/// `validate_filter_record` already enforces our `MAX_EDGE = 30_000`
+/// limit, so the largest legal buffer we'd ever decode is bounded above
+/// by `MAX_EDGE * MAX_EDGE * 4 = ~3.6 GB` — way above any reasonable
+/// crate default, and the host wouldn't have asked us to filter it in
+/// the first place. Use the crate's documented `Limits::unlimited()`
+/// (which still validates internal arithmetic for overflow) and rely on
+/// our own up-front dimension/buffer-size checks for safety.
+fn decoder_limits() -> Limits {
+    Limits::unlimited()
+}
 
 #[derive(Debug)]
 pub enum TiffError {
@@ -133,7 +149,7 @@ pub fn read_tiff(
     }
 
     let file = File::open(path)?;
-    let mut dec = Decoder::new(BufReader::new(file))?;
+    let mut dec = Decoder::new(BufReader::new(file))?.with_limits(decoder_limits());
     let (w, h) = dec.dimensions()?;
     if w > MAX_EDGE as u32 || h > MAX_EDGE as u32 {
         return Err(TiffError::DimensionTooLarge(w.max(h)));
@@ -145,13 +161,25 @@ pub fn read_tiff(
         });
     }
 
-    let pixels: Vec<u8> = match dec.read_image()? {
-        DecodingResult::U8(v) => v,
-        _ => return Err(TiffError::UnsupportedBitDepth),
-    };
-
+    // gmic promotes images to its internal `float` type for almost any
+    // non-trivial operation (blur, convolution, fft, colour-space
+    // conversions, …) and then writes the result back in whatever
+    // pixel type matches that internal representation. The set of
+    // accepted `,type` strings on `-output` is undocumented across
+    // gmic versions, so the safe path is to accept anything the tiff
+    // crate can decode and quantise it back to 8-bit ourselves. We
+    // assume the host gave us an 8-bit buffer (validated in
+    // `validate_filter_record`) so 0..255 is the target range.
     let row_len = (width as usize) * (planes as usize);
     let want = row_len * height as usize;
+    let pixels: Vec<u8> = match dec.read_image()? {
+        DecodingResult::U8(v) => v,
+        DecodingResult::U16(v) => quantize_u16_to_u8(&v),
+        DecodingResult::U32(v) => quantize_u32_to_u8(&v),
+        DecodingResult::F32(v) => quantize_f32_to_u8(&v),
+        DecodingResult::F64(v) => quantize_f64_to_u8(&v),
+        _ => return Err(TiffError::UnsupportedBitDepth),
+    };
     if pixels.len() != want {
         return Err(TiffError::SizeMismatch {
             got: pixels.len(),
@@ -174,10 +202,49 @@ pub fn read_tiff(
     Ok(())
 }
 
+/// Quantise a 16-bit unsigned channel buffer to 8-bit by right-shifting 8.
+/// This is the standard "high byte" mapping (preserves perceived range
+/// without scaling artefacts) and is what every image library does for
+/// 16->8 downconversion.
+fn quantize_u16_to_u8(v: &[u16]) -> Vec<u8> {
+    v.iter().map(|&p| (p >> 8) as u8).collect()
+}
+
+fn quantize_u32_to_u8(v: &[u32]) -> Vec<u8> {
+    v.iter().map(|&p| (p >> 24) as u8).collect()
+}
+
+/// Quantise a float channel buffer to 8-bit by clamping to `[0,255]`
+/// and rounding. gmic's float representation of an 8-bit-source image
+/// stays in `[0,255]`, so no rescaling is needed.
+fn quantize_f32_to_u8(v: &[f32]) -> Vec<u8> {
+    v.iter()
+        .map(|&p| p.clamp(0.0, 255.0).round() as u8)
+        .collect()
+}
+
+fn quantize_f64_to_u8(v: &[f64]) -> Vec<u8> {
+    v.iter()
+        .map(|&p| p.clamp(0.0, 255.0).round() as u8)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn quantize_f32_clamps_and_rounds() {
+        let v = quantize_f32_to_u8(&[-5.0, 0.4, 0.6, 127.5, 254.9, 1000.0]);
+        assert_eq!(v, vec![0, 0, 1, 128, 255, 255]);
+    }
+
+    #[test]
+    fn quantize_u16_takes_high_byte() {
+        let v = quantize_u16_to_u8(&[0, 0x00FF, 0x0100, 0x8000, 0xFFFF]);
+        assert_eq!(v, vec![0, 0, 1, 0x80, 0xFF]);
+    }
 
     fn make_padded_buffer(width: u32, height: u32, planes: u32, row_bytes: u32) -> Vec<u8> {
         let stride = row_bytes as usize;

@@ -1,0 +1,11 @@
+/* Localized strings for Info.plist keys. Affinity Photo 2's plugin
+   pre-filter probes Contents/Resources/en.lproj (and Base.lproj) right
+   after reading Info.plist; a plugin whose CFBundleDevelopmentRegion is
+   "English" but which has no en.lproj seems to be silently rejected.
+   Mirrors the CFBundle keys from Info.plist so CFBundleCopyLocalized-
+   String returns something for any host that asks. */
+
+CFBundleDisplayName    = "G'MIC";
+CFBundleName           = "G'MIC";
+CFBundleGetInfoString  = "0.1.0 (C) 2026 dstrupl. MIT-licensed.";
+NSHumanReadableCopyright = "(C) 2026 dstrupl. MIT-licensed.";
