@@ -27,18 +27,41 @@ fn vrect_is_8_bytes() {
 fn report_actual_filter_record_layout() {
     // Always-running informational test: prints the offsets our struct
     // currently produces. `cargo test -- --nocapture` to see the output.
-    eprintln!("FilterRecord size           = {}",  size_of::<FilterRecord>());
-    eprintln!("offset_of!(in_data)         = {}",  offset_of!(FilterRecord, in_data));
-    eprintln!("offset_of!(in_row_bytes)    = {}",  offset_of!(FilterRecord, in_row_bytes));
-    eprintln!("offset_of!(out_data)        = {}",  offset_of!(FilterRecord, out_data));
-    eprintln!("offset_of!(out_row_bytes)   = {}",  offset_of!(FilterRecord, out_row_bytes));
+    eprintln!(
+        "FilterRecord size           = {}",
+        size_of::<FilterRecord>()
+    );
+    eprintln!(
+        "offset_of!(in_data)         = {}",
+        offset_of!(FilterRecord, in_data)
+    );
+    eprintln!(
+        "offset_of!(in_row_bytes)    = {}",
+        offset_of!(FilterRecord, in_row_bytes)
+    );
+    eprintln!(
+        "offset_of!(out_data)        = {}",
+        offset_of!(FilterRecord, out_data)
+    );
+    eprintln!(
+        "offset_of!(out_row_bytes)   = {}",
+        offset_of!(FilterRecord, out_row_bytes)
+    );
 }
 
 #[test]
 #[ignore = "PRD §8 expected offsets; enable once reconciled against PIFilter.h"]
 fn filter_record_matches_prd_section_8() {
-    assert_eq!(offset_of!(FilterRecord, in_data),       88, "in_data offset");
-    assert_eq!(offset_of!(FilterRecord, in_row_bytes),  96, "in_row_bytes offset");
-    assert_eq!(offset_of!(FilterRecord, out_data),     104, "out_data offset");
-    assert_eq!(offset_of!(FilterRecord, out_row_bytes),112, "out_row_bytes offset");
+    assert_eq!(offset_of!(FilterRecord, in_data), 88, "in_data offset");
+    assert_eq!(
+        offset_of!(FilterRecord, in_row_bytes),
+        96,
+        "in_row_bytes offset"
+    );
+    assert_eq!(offset_of!(FilterRecord, out_data), 104, "out_data offset");
+    assert_eq!(
+        offset_of!(FilterRecord, out_row_bytes),
+        112,
+        "out_row_bytes offset"
+    );
 }

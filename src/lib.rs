@@ -19,10 +19,10 @@
 //!   (M4+) shells out to gmic. Only install this once `cargo test --
 //!   --ignored` confirms `FilterRecord` offsets match `PIFilter.h`.
 
-pub mod ps_types;
 pub mod filter;
-pub mod tiff_io;
 pub mod gmic;
+pub mod ps_types;
+pub mod tiff_io;
 
 use ps_types::{
     NO_ERR, SELECTOR_ABOUT, SELECTOR_CONTINUE, SELECTOR_FINISH, SELECTOR_PARAMETERS,
@@ -31,7 +31,7 @@ use ps_types::{
 use std::ffi::c_void;
 
 #[cfg(feature = "live")]
-use ps_types::{FilterRecord, USER_CANCEL, VRect};
+use ps_types::{FilterRecord, VRect, USER_CANCEL};
 
 /// Photoshop-compatible filter entry point.
 ///
@@ -41,10 +41,10 @@ use ps_types::{FilterRecord, USER_CANCEL, VRect};
 /// caller (the host) has provided a valid pointer to a `FilterRecord`.
 #[no_mangle]
 pub unsafe extern "C" fn PluginMain(
-    selector:      i16,
+    selector: i16,
     filter_record: *mut c_void,
-    data:          *mut isize,
-    result:        *mut i16,
+    data: *mut isize,
+    result: *mut i16,
 ) {
     log_selector(selector);
 
@@ -69,19 +69,19 @@ unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize)
     let fr = &mut *(filter_record as *mut FilterRecord);
 
     match selector {
-        SELECTOR_ABOUT      => NO_ERR,
+        SELECTOR_ABOUT => NO_ERR,
         SELECTOR_PARAMETERS => NO_ERR,
         SELECTOR_PREPARE => {
             fr.buffer_space = 0;
-            fr.max_space    = 0;
+            fr.max_space = 0;
             NO_ERR
         }
         SELECTOR_START => {
             // Tell the host we want the whole filter rect, all planes.
-            fr.in_rect      = fr.filter_rect;
-            fr.in_lo_plane  = 0;
-            fr.in_hi_plane  = fr.planes - 1;
-            fr.out_rect     = fr.filter_rect;
+            fr.in_rect = fr.filter_rect;
+            fr.in_lo_plane = 0;
+            fr.in_hi_plane = fr.planes - 1;
+            fr.out_rect = fr.filter_rect;
             fr.out_lo_plane = 0;
             fr.out_hi_plane = fr.planes - 1;
             NO_ERR
@@ -94,8 +94,18 @@ unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize)
             match gmic::run_filter(fr) {
                 Ok(()) => {
                     // Signal "done, no more tiles" by zeroing the rects.
-                    fr.in_rect  = VRect { top: 0, left: 0, bottom: 0, right: 0 };
-                    fr.out_rect = VRect { top: 0, left: 0, bottom: 0, right: 0 };
+                    fr.in_rect = VRect {
+                        top: 0,
+                        left: 0,
+                        bottom: 0,
+                        right: 0,
+                    };
+                    fr.out_rect = VRect {
+                        top: 0,
+                        left: 0,
+                        bottom: 0,
+                        right: 0,
+                    };
                     NO_ERR
                 }
                 Err(e) => {
@@ -114,13 +124,16 @@ fn log_selector(selector: i16) {
     // Affinity loads the plugin. Replace with `os_log` later if we want
     // structured logging.
     let name = match selector {
-        SELECTOR_ABOUT      => "About",
+        SELECTOR_ABOUT => "About",
         SELECTOR_PARAMETERS => "Parameters",
-        SELECTOR_PREPARE    => "Prepare",
-        SELECTOR_START      => "Start",
-        SELECTOR_CONTINUE   => "Continue",
-        SELECTOR_FINISH     => "Finish",
-        _                    => "Unknown",
+        SELECTOR_PREPARE => "Prepare",
+        SELECTOR_START => "Start",
+        SELECTOR_CONTINUE => "Continue",
+        SELECTOR_FINISH => "Finish",
+        _ => "Unknown",
     };
-    eprintln!("[gmic-affinity] PluginMain selector={} ({})", selector, name);
+    eprintln!(
+        "[gmic-affinity] PluginMain selector={} ({})",
+        selector, name
+    );
 }

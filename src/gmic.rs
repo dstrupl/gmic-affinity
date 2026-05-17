@@ -31,8 +31,8 @@ pub const MAX_FILTER_CONFIG_BYTES: u64 = 4 * 1024;
 
 /// Cap argv length and per-argument length to keep the subprocess command
 /// line sane.
-pub const MAX_FILTER_ARGS:  usize = 64;
-pub const MAX_ARG_BYTES:    usize = 1024;
+pub const MAX_FILTER_ARGS: usize = 64;
+pub const MAX_ARG_BYTES: usize = 1024;
 
 #[derive(Debug)]
 pub enum GmicError {
@@ -50,17 +50,23 @@ pub enum GmicError {
 impl std::fmt::Display for GmicError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GmicError::Validation(e)   => write!(f, "{e}"),
-            GmicError::Tiff(e)         => write!(f, "{e}"),
-            GmicError::Io(e)           => write!(f, "I/O: {e}"),
-            GmicError::NotFound        => write!(f, "gmic binary not found in any known Homebrew location"),
-            GmicError::ConfigTooLarge(n) => write!(f, "filter.txt is {n} bytes (max {MAX_FILTER_CONFIG_BYTES})"),
-            GmicError::InvalidCharsInConfig => write!(f, "filter.txt contains NUL or control characters"),
-            GmicError::TooManyArgs(n)  => write!(f, "filter has {n} args (max {MAX_FILTER_ARGS})"),
-            GmicError::ArgTooLong(n)   => write!(f, "filter arg is {n} bytes (max {MAX_ARG_BYTES})"),
+            GmicError::Validation(e) => write!(f, "{e}"),
+            GmicError::Tiff(e) => write!(f, "{e}"),
+            GmicError::Io(e) => write!(f, "I/O: {e}"),
+            GmicError::NotFound => {
+                write!(f, "gmic binary not found in any known Homebrew location")
+            }
+            GmicError::ConfigTooLarge(n) => {
+                write!(f, "filter.txt is {n} bytes (max {MAX_FILTER_CONFIG_BYTES})")
+            }
+            GmicError::InvalidCharsInConfig => {
+                write!(f, "filter.txt contains NUL or control characters")
+            }
+            GmicError::TooManyArgs(n) => write!(f, "filter has {n} args (max {MAX_FILTER_ARGS})"),
+            GmicError::ArgTooLong(n) => write!(f, "filter arg is {n} bytes (max {MAX_ARG_BYTES})"),
             GmicError::Failed { status } => match status {
                 Some(c) => write!(f, "gmic exited with status {c}"),
-                None    => write!(f, "gmic terminated by signal"),
+                None => write!(f, "gmic terminated by signal"),
             },
         }
     }
@@ -68,9 +74,21 @@ impl std::fmt::Display for GmicError {
 
 impl std::error::Error for GmicError {}
 
-impl From<FilterError>     for GmicError { fn from(e: FilterError)     -> Self { GmicError::Validation(e) } }
-impl From<TiffError>       for GmicError { fn from(e: TiffError)       -> Self { GmicError::Tiff(e) } }
-impl From<std::io::Error>  for GmicError { fn from(e: std::io::Error)  -> Self { GmicError::Io(e) } }
+impl From<FilterError> for GmicError {
+    fn from(e: FilterError) -> Self {
+        GmicError::Validation(e)
+    }
+}
+impl From<TiffError> for GmicError {
+    fn from(e: TiffError) -> Self {
+        GmicError::Tiff(e)
+    }
+}
+impl From<std::io::Error> for GmicError {
+    fn from(e: std::io::Error) -> Self {
+        GmicError::Io(e)
+    }
+}
 
 /// Find the Homebrew-installed `gmic`, preferring Apple Silicon's
 /// `/opt/homebrew/bin/gmic` over Intel's `/usr/local/bin/gmic`. The path is
@@ -140,7 +158,11 @@ fn validate_filter_string(s: &str) -> Result<(), GmicError> {
 
 /// Build the full argv to hand to `Command::new(gmic_path).args(...)`.
 /// Format: `[<input.tif>, <filter tokens...>, -output, <output.tif>]`.
-pub fn build_argv(input: &Path, output: &Path, filter_cmd: &str) -> Result<Vec<OsString>, GmicError> {
+pub fn build_argv(
+    input: &Path,
+    output: &Path,
+    filter_cmd: &str,
+) -> Result<Vec<OsString>, GmicError> {
     let mut args: Vec<OsString> = Vec::with_capacity(8);
     args.push(input.as_os_str().to_owned());
 
@@ -168,13 +190,15 @@ pub fn run_subprocess(gmic: &Path, args: &[OsString], tmpdir: &Path) -> Result<(
     let status = Command::new(gmic)
         .args(args)
         .env_clear()
-        .env("PATH",   "/usr/bin:/bin")
-        .env("HOME",   tmpdir)
+        .env("PATH", "/usr/bin:/bin")
+        .env("HOME", tmpdir)
         .env("TMPDIR", tmpdir)
-        .env("LANG",   "C")
+        .env("LANG", "C")
         .status()?;
     if !status.success() {
-        return Err(GmicError::Failed { status: status.code() });
+        return Err(GmicError::Failed {
+            status: status.code(),
+        });
     }
     Ok(())
 }
@@ -187,33 +211,43 @@ pub fn run_filter(fr: &mut FilterRecord) -> Result<(), GmicError> {
     let buf = validate_filter_record(fr)?;
 
     let gmic = locate_gmic()?;
-    let cmd  = read_filter_config()?;
+    let cmd = read_filter_config()?;
 
-    let dir       = tempfile::Builder::new()
+    let dir = tempfile::Builder::new()
         .prefix("gmic-affinity-")
         .tempdir()?;
     // Belt-and-braces: tempfile already chmods to 0700 on Unix; assert that.
     let _ = fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700));
 
-    let in_path  = dir.path().join("in.tif");
+    let in_path = dir.path().join("in.tif");
     let out_path = dir.path().join("out.tif");
 
     // Re-construct slices from validated raw parts.
-    let in_total  = (buf.in_row_bytes  as usize) * (buf.height as usize);
+    let in_total = (buf.in_row_bytes as usize) * (buf.height as usize);
     let out_total = (buf.out_row_bytes as usize) * (buf.height as usize);
-    let in_slice = unsafe { std::slice::from_raw_parts    (buf.in_data,  in_total)  };
+    let in_slice = unsafe { std::slice::from_raw_parts(buf.in_data, in_total) };
     let out_slice = unsafe { std::slice::from_raw_parts_mut(buf.out_data, out_total) };
 
-    write_tiff(&in_path, in_slice,
-               buf.width  as u32, buf.height as u32,
-               buf.planes as u32, buf.in_row_bytes as u32)?;
+    write_tiff(
+        &in_path,
+        in_slice,
+        buf.width as u32,
+        buf.height as u32,
+        buf.planes as u32,
+        buf.in_row_bytes as u32,
+    )?;
 
     let argv = build_argv(&in_path, &out_path, &cmd)?;
     run_subprocess(&gmic, &argv, dir.path())?;
 
-    read_tiff(&out_path, out_slice,
-              buf.width  as u32, buf.height as u32,
-              buf.planes as u32, buf.out_row_bytes as u32)?;
+    read_tiff(
+        &out_path,
+        out_slice,
+        buf.width as u32,
+        buf.height as u32,
+        buf.planes as u32,
+        buf.out_row_bytes as u32,
+    )?;
 
     // `dir` drops here -> tempfile removes in.tif, out.tif and the dir.
     Ok(())
@@ -252,13 +286,21 @@ mod tests {
 
     #[test]
     fn argv_layout_is_input_filter_output() {
-        let in_p  = PathBuf::from("/tmp/a/in.tif");
+        let in_p = PathBuf::from("/tmp/a/in.tif");
         let out_p = PathBuf::from("/tmp/a/out.tif");
         let argv = build_argv(&in_p, &out_p, "-blur 3 -sharpen 2").unwrap();
         let strs: Vec<&str> = argv.iter().map(|s| s.to_str().unwrap()).collect();
         assert_eq!(
             strs,
-            vec!["/tmp/a/in.tif", "-blur", "3", "-sharpen", "2", "-output", "/tmp/a/out.tif"]
+            vec![
+                "/tmp/a/in.tif",
+                "-blur",
+                "3",
+                "-sharpen",
+                "2",
+                "-output",
+                "/tmp/a/out.tif"
+            ]
         );
     }
 
@@ -271,7 +313,10 @@ mod tests {
 
     #[test]
     fn argv_rejects_too_many_args() {
-        let many = (0..MAX_FILTER_ARGS + 5).map(|i| format!("-x{i}")).collect::<Vec<_>>().join(" ");
+        let many = (0..MAX_FILTER_ARGS + 5)
+            .map(|i| format!("-x{i}"))
+            .collect::<Vec<_>>()
+            .join(" ");
         assert!(matches!(
             build_argv(Path::new("a"), Path::new("b"), &many),
             Err(GmicError::TooManyArgs(_))
