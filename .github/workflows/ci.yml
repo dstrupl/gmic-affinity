@@ -27,6 +27,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          # The bundled catalogue snapshot (assets/gmic-catalogue.gmic.gz)
+          # is stored in Git LFS. Without lfs: true the working tree
+          # holds the LFS pointer text instead of the gzip stream;
+          # `include_bytes!` would then compile a fake "catalogue" that
+          # parses to zero filters, and the picker would be empty in
+          # the CI-built bundle. The Makefile's check-lfs guard would
+          # also trip and fail loudly here, but it's nicer to just
+          # hydrate the file up front.
+          lfs: true
 
       - name: Toolchain components
         run: |
