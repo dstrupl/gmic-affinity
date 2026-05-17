@@ -15,6 +15,8 @@ pub(crate) mod modal_close_delegate;
 #[cfg(feature = "live")]
 pub mod picker;
 #[cfg(feature = "live")]
+pub(crate) mod picker_actions;
+#[cfg(feature = "live")]
 pub(crate) mod picker_catalogue_data_source;
 #[cfg(feature = "live")]
 pub(crate) mod picker_form;

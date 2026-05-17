@@ -1,27 +1,41 @@
 //! The user-facing picker dialog.
 //!
-//! T8 milestone: the panel hosts a search field on top of an
-//! `NSOutlineView` (inside an `NSScrollView`), backed by
-//! [`super::picker_catalogue_data_source::CatalogueDataSource`]. The
-//! data source reads the bundled catalogue and the `Settings::recent`
-//! snapshot taken at panel-open time, and also serves as the search
-//! field's `NSTextFieldDelegate` so every keystroke filters the tree.
+//! T10 milestone: the panel is the production picker. Layout (top to
+//! bottom of the content view):
 //!
-//! The public entry point is still [`show_empty`] so T1's wiring
-//! through `lib.rs` keeps compiling; T10 renames it to `show_picker`
-//! and adds an `Option<ChosenFilter>` return value.
+//! - `NSSearchField` — types filter the tree in real time.
+//! - `NSSplitView`:
+//!   - left pane:  `NSScrollView` + `NSOutlineView` of catalogue folders / filters
+//!   - right pane: `NSScrollView` + flipped `NSView` form rebuilt on
+//!     every selection change by
+//!     [`crate::ui::picker_form::FormController`].
+//! - Button bar: `Reset Defaults` (left), `Cancel` and `OK` (right).
+//!   Keyboard shortcuts: Return → OK, Escape → Cancel, double-click
+//!   on a leaf row → OK.
+//!
+//! Public entry point [`show_picker`] returns:
+//! - `Some(ChosenFilter)` when the user clicks OK on a leaf row.
+//! - `None` when the user cancels (Esc / Cancel / window close) or
+//!   when called off the main thread (a contract violation in
+//!   `PluginMain`, defended against rather than handled).
 
 use objc2::rc::Retained;
-use objc2::runtime::ProtocolObject;
+use objc2::runtime::{AnyObject, ProtocolObject};
 use objc2_app_kit::{
-    NSAutoresizingMaskOptions, NSBackingStoreType, NSOutlineView, NSPanel, NSScrollElasticity,
-    NSScrollView, NSSearchField, NSSplitView, NSTableColumn, NSView, NSWindow, NSWindowStyleMask,
+    NSAutoresizingMaskOptions, NSBackingStoreType, NSBezelStyle, NSButton, NSButtonType,
+    NSModalResponseOK, NSOutlineView, NSPanel, NSScrollElasticity, NSScrollView, NSSearchField,
+    NSSplitView, NSTableColumn, NSView, NSWindow, NSWindowStyleMask,
 };
-use objc2_foundation::{CGFloat, CGPoint, CGRect, CGSize, MainThreadMarker, NSSize, NSString};
+use objc2_foundation::{
+    CGFloat, CGPoint, CGRect, CGSize, MainThreadMarker, NSIndexSet, NSSize, NSString,
+};
 
-use crate::catalogue;
-use crate::settings::Settings;
+use crate::catalogue::{self, Catalogue, ChosenFilter};
+use crate::settings::{LastChoice, Settings};
 use crate::ui::modal_close_delegate::ModalCloseDelegate;
+use crate::ui::picker_actions::{
+    sel_on_cancel, sel_on_double_click, sel_on_ok, sel_on_reset, PickerActions,
+};
 use crate::ui::picker_catalogue_data_source::CatalogueDataSource;
 use crate::ui::picker_form::{build_form_pane, FormPane};
 use crate::ui::runloop::run_modal_window;
@@ -32,12 +46,27 @@ const SEARCH_BAR_HEIGHT: f64 = 28.0;
 const SEARCH_BAR_GAP: f64 = 4.0;
 /// Margin around the search field horizontally.
 const SEARCH_BAR_HMARGIN: f64 = 8.0;
+/// Height of the bottom button bar (OK / Cancel / Reset).
+const BUTTON_BAR_HEIGHT: f64 = 36.0;
+/// Vertical margin between the button bar and the split view above it.
+const BUTTON_BAR_GAP: f64 = 6.0;
+/// Horizontal margin around the button bar.
+const BUTTON_BAR_HMARGIN: f64 = 12.0;
+/// Width of an individual action button (OK / Cancel / Reset).
+const BUTTON_WIDTH: f64 = 100.0;
+/// Height of an individual action button.
+const BUTTON_HEIGHT: f64 = 24.0;
+/// Horizontal gap between two adjacent buttons in the trailing group.
+const BUTTON_GAP: f64 = 8.0;
 /// Initial fraction of the split-view width allocated to the tree
 /// pane on the left. The form pane gets the rest. The user can drag
 /// the divider after the panel opens; we restore the resulting
 /// position from the window's autosave name via `setAutosaveName:` on
 /// the split view itself.
-const TREE_PANE_WIDTH_FRACTION: CGFloat = 0.55;
+// Tree column is a fixed list of filter names that rarely needs more
+// than ~280pt; give the rest to the form pane so parameter
+// descriptions have room to wrap without forcing the user to drag.
+const TREE_PANE_WIDTH_FRACTION: CGFloat = 0.38;
 /// Minimum tree-pane width in points so the user can't accidentally
 /// drag the divider so far right that the tree disappears.
 const TREE_PANE_MIN_WIDTH: CGFloat = 200.0;
@@ -45,27 +74,37 @@ const TREE_PANE_MIN_WIDTH: CGFloat = 200.0;
 /// when the divider is dragged hard against the right edge.
 const FORM_PANE_MIN_WIDTH: CGFloat = 220.0;
 
-/// Open the picker panel and run it modally until the user dismisses
-/// it. The data source is populated from
-/// [`crate::catalogue::builtin`] plus a snapshot of
-/// `Settings::recent`. There is still no OK / Cancel action — T10 adds
-/// that.
+/// Open the picker panel and run it modally until the user dismisses it.
 ///
-/// Returns `None` only when [`MainThreadMarker::new`] fails, meaning
-/// this was called off the main thread — a contract violation for
-/// `PluginMain`, not something the end user can trigger through the
-/// panel.
-pub fn show_empty() -> Option<()> {
+/// The data source is populated from `catalogue` plus a snapshot of
+/// `Settings::recent`. When `last_choice` is `Some`, the corresponding
+/// filter row is pre-selected, scrolled into view, and its parameter
+/// form pre-filled with the saved (reconciled) values.
+///
+/// Returns:
+/// - `Some(ChosenFilter)` when the user clicks OK on a leaf row
+///   (or double-clicks a leaf, or presses Return with a leaf
+///   selected).
+/// - `None` when the user cancels (Esc, the Cancel button, or the
+///   window's close control) or when called off the main thread (a
+///   contract violation for `PluginMain`, defended against here rather
+///   than handled).
+pub fn show_picker(
+    catalogue: &'static Catalogue,
+    last_choice: Option<&LastChoice>,
+) -> Option<ChosenFilter> {
     let mtm = MainThreadMarker::new()?;
 
     // Initial content rect used only if no autosaved frame exists.
     let initial_rect = CGRect {
         origin: CGPoint { x: 0.0, y: 0.0 },
-        size: CGSize { width: 720.0, height: 520.0 },
+        size: CGSize {
+            width: 720.0,
+            height: 520.0,
+        },
     };
-    let style = NSWindowStyleMask::Titled
-        | NSWindowStyleMask::Closable
-        | NSWindowStyleMask::Resizable;
+    let style =
+        NSWindowStyleMask::Titled | NSWindowStyleMask::Closable | NSWindowStyleMask::Resizable;
 
     let panel: Retained<NSPanel> = unsafe {
         NSPanel::initWithContentRect_styleMask_backing_defer(
@@ -103,13 +142,17 @@ pub fn show_empty() -> Option<()> {
     // Stop the user from dragging the panel down to nothing while
     // they're trying to resize it. ~520x360 still shows a useful
     // amount of the tree plus the search field.
-    window.setMinSize(NSSize { width: 520.0, height: 360.0 });
+    window.setMinSize(NSSize {
+        width: 520.0,
+        height: 360.0,
+    });
 
     let delegate = ModalCloseDelegate::new(mtm);
     window.setDelegate(Some(ProtocolObject::from_ref(&*delegate)));
 
-    let catalogue = catalogue::builtin();
-    let recent = Settings::load().recent;
+    let settings = Settings::load();
+    let recent = settings.recent.clone();
+    let remembered = settings.remembered_args.clone();
     let data_source = CatalogueDataSource::new(mtm, catalogue, recent);
 
     // Use the contentView's actual (post-autosave-restore) bounds as
@@ -140,20 +183,22 @@ pub fn show_empty() -> Option<()> {
     // Tree (left pane) — same scroll view we have shipped since T8,
     // just smaller because the split view now owns its frame.
     let tree_scroll = build_scroll_view(mtm, content_bounds, &outline);
-    // Form (right pane). Builds its own scroll view + stack view and
+    // Form (right pane). Builds its own scroll view + flipped view and
     // attaches the form controller to the outline view's delegate
     // slot so every selection change repopulates the form.
     let FormPane {
         controller: form_controller,
         root_view: form_scroll,
-    } = build_form_pane(mtm, data_source.clone());
+    } = build_form_pane(mtm, data_source.clone(), remembered);
     unsafe {
         outline.setDelegate(Some(form_controller.as_outline_view_delegate()));
     }
 
-    // Split view sits below the search bar, hosts the two panes
-    // side-by-side.
+    // Split view sits between the search bar and the button bar.
     let split = build_split_view(mtm, content_bounds, &tree_scroll, &form_scroll);
+
+    // Bottom button bar: Reset Defaults (leading) + Cancel/OK (trailing).
+    let buttons = build_button_bar(mtm, content_bounds);
 
     unsafe {
         // NOTE: do NOT set `wantsLayer` on the contentView here. It
@@ -164,27 +209,142 @@ pub fn show_empty() -> Option<()> {
         // `build_scroll_view`) is both safe and sufficient.
         content_view.addSubview(&search);
         content_view.addSubview(&split);
+        let reset_view: &NSView = &buttons.reset;
+        let cancel_view: &NSView = &buttons.cancel;
+        let ok_view: &NSView = &buttons.ok;
+        content_view.addSubview(reset_view);
+        content_view.addSubview(cancel_view);
+        content_view.addSubview(ok_view);
     }
+
+    // Wire keyboard equivalents directly on the buttons. AppKit
+    // dispatches both the keystroke and the click through the same
+    // target/action, so nothing else has to special-case them.
+    unsafe {
+        buttons.ok.setKeyEquivalent(&NSString::from_str("\r"));
+        // Escape: U+001B in Cocoa's "key equivalent" string.
+        buttons
+            .cancel
+            .setKeyEquivalent(&NSString::from_str("\u{1B}"));
+    }
+    // OK is disabled until a leaf row is selected. The action
+    // controller flips this every time the outline view's selection
+    // changes (see `FormController::outlineViewSelectionDidChange:` →
+    // `PickerActions::refresh_ok_enabled`).
+    buttons.ok.setEnabled(false);
+
+    // Build the action controller and wire targets / actions. The
+    // controller holds strong refs to the outline view, form
+    // controller, data source, and OK button so they all stay alive
+    // until we drop `actions` after the modal pump exits.
+    let actions = PickerActions::new(
+        mtm,
+        outline.clone(),
+        form_controller.clone(),
+        data_source.clone(),
+        buttons.ok.clone(),
+    );
+    form_controller.set_actions(actions.clone());
+    let actions_obj: &AnyObject = &actions;
+    unsafe {
+        let ok_ctrl: &objc2_app_kit::NSControl = &buttons.ok;
+        let cancel_ctrl: &objc2_app_kit::NSControl = &buttons.cancel;
+        let reset_ctrl: &objc2_app_kit::NSControl = &buttons.reset;
+        ok_ctrl.setTarget(Some(actions_obj));
+        ok_ctrl.setAction(Some(sel_on_ok()));
+        cancel_ctrl.setTarget(Some(actions_obj));
+        cancel_ctrl.setAction(Some(sel_on_cancel()));
+        reset_ctrl.setTarget(Some(actions_obj));
+        reset_ctrl.setAction(Some(sel_on_reset()));
+
+        let outline_ctrl: &objc2_app_kit::NSControl = &outline;
+        outline_ctrl.setTarget(Some(actions_obj));
+        outline.setDoubleAction(Some(sel_on_double_click()));
+    }
+
+    // The search field receives focus immediately so typing filters
+    // the tree without an extra click.
+    let search_view: &NSView = &search;
+    window.setInitialFirstResponder(Some(search_view));
+
+    // Pre-selection order: GMIC_PRESELECT (debug-only env var) wins
+    // over `last_choice` so developers can iterate on a specific
+    // filter from the command line.
+    let preselect_command: Option<String> = std::env::var("GMIC_PRESELECT")
+        .ok()
+        .or_else(|| last_choice.map(|l| l.command.clone()));
+
+    if let Some(cmd) = preselect_command.as_deref() {
+        if let Some(row) = data_source.expand_to_filter(&outline, cmd) {
+            unsafe {
+                let indexes = NSIndexSet::indexSetWithIndex(row as usize);
+                outline.selectRowIndexes_byExtendingSelection(&indexes, false);
+                outline.scrollRowToVisible(row);
+            }
+            // `selectRowIndexes:` posts an
+            // `NSOutlineViewSelectionDidChangeNotification`, so the
+            // form controller's delegate has already populated the
+            // right pane with the prefilled values.
+            crate::logging::log(&format!("picker: pre-selected '{cmd}' at row {row}",));
+        } else {
+            crate::logging::log(&format!(
+                "picker: pre-select '{cmd}' missing from catalogue, skipping"
+            ));
+        }
+    }
+
     let sf2 = search.frame();
     let spf = split.frame();
     crate::log(&format!(
         "picker: after addSubview, search={}x{}@({},{}), split={}x{}@({},{})",
-        sf2.size.width, sf2.size.height, sf2.origin.x, sf2.origin.y,
-        spf.size.width, spf.size.height, spf.origin.x, spf.origin.y,
+        sf2.size.width,
+        sf2.size.height,
+        sf2.origin.x,
+        sf2.origin.y,
+        spf.size.width,
+        spf.size.height,
+        spf.origin.x,
+        spf.origin.y,
     ));
 
-    let _response = run_modal_window(&window);
+    let response = run_modal_window(&window);
 
-    // Keep both the data source and the form controller alive for the
-    // life of the modal session. `NSOutlineView::setDataSource:`,
-    // `NSOutlineView::setDelegate:`, and `NSTextField::setDelegate:`
-    // all store WEAK references. If we let them drop while the panel
-    // is still up AppKit would crash. Dropping them here is correct
-    // because by the time we get past `run_modal_window` the panel has
-    // been ordered out and AppKit will not call back into them.
+    // Translate the modal response into the public return shape. The
+    // action controller has already captured the leaf + values it
+    // observed at the moment OK fired; we just move them out here.
+    let chosen = if response == NSModalResponseOK {
+        actions.take_chosen().map(|(filter, args)| ChosenFilter {
+            command: filter.command.clone(),
+            args,
+        })
+    } else {
+        None
+    };
+
+    // Keep delegates alive until after `run_modal_window` returns.
+    // `NSOutlineView::setDataSource:`, `setDelegate:`,
+    // `NSSearchField::setDelegate:`, `setTarget:`, `setAction:`,
+    // and the window-delegate slot all store WEAK references. We
+    // explicitly drop them here so the order is unambiguous: the
+    // modal pump has already exited and AppKit will not call back
+    // into them.
+    drop(actions);
     drop(form_controller);
     drop(data_source);
-    Some(())
+
+    let _ = settings; // moved-from token; silences any future warning
+    chosen
+}
+
+/// Wrapper around [`show_picker`] kept for the standalone
+/// `examples/picker` runner from earlier in the project, which still
+/// passes no arguments and ignores the return value. New callers
+/// should prefer [`show_picker`].
+///
+/// The default catalogue + no last-choice path means the panel opens
+/// with the form pane in its empty-selection placeholder state.
+pub fn show_empty() -> Option<()> {
+    show_picker(catalogue::builtin(), None).map(|_| ())
 }
 
 /// Build the side-by-side split view that hosts the tree on the left
@@ -196,17 +356,26 @@ fn build_split_view(
     tree: &Retained<NSScrollView>,
     form: &Retained<NSScrollView>,
 ) -> Retained<NSSplitView> {
-    let split_height =
-        content_bounds.size.height - SEARCH_BAR_HEIGHT - SEARCH_BAR_GAP * 2.0;
+    // The split view sits between the search bar (top) and the
+    // button bar (bottom). Cocoa's coordinate origin is bottom-left,
+    // so the split view's y origin is the height of the button bar
+    // and its height excludes both bars.
+    let split_height = content_bounds.size.height
+        - SEARCH_BAR_HEIGHT
+        - SEARCH_BAR_GAP * 2.0
+        - BUTTON_BAR_HEIGHT
+        - BUTTON_BAR_GAP;
     let frame = CGRect {
-        origin: CGPoint { x: 0.0, y: 0.0 },
+        origin: CGPoint {
+            x: 0.0,
+            y: BUTTON_BAR_HEIGHT + BUTTON_BAR_GAP,
+        },
         size: CGSize {
             width: content_bounds.size.width,
             height: split_height,
         },
     };
-    let split: Retained<NSSplitView> =
-        unsafe { NSSplitView::initWithFrame(mtm.alloc(), frame) };
+    let split: Retained<NSSplitView> = unsafe { NSSplitView::initWithFrame(mtm.alloc(), frame) };
     unsafe {
         // Vertical = left/right layout (the divider is a vertical
         // line). AppKit's vocabulary here is the opposite of CSS:
@@ -254,13 +423,15 @@ fn build_outline_view(mtm: MainThreadMarker) -> Retained<NSOutlineView> {
             mtm.alloc(),
             CGRect {
                 origin: CGPoint { x: 0.0, y: 0.0 },
-                size: CGSize { width: 0.0, height: 0.0 },
+                size: CGSize {
+                    width: 0.0,
+                    height: 0.0,
+                },
             },
         )
     };
-    let column: Retained<NSTableColumn> = unsafe {
-        NSTableColumn::initWithIdentifier(mtm.alloc(), &NSString::from_str("name"))
-    };
+    let column: Retained<NSTableColumn> =
+        unsafe { NSTableColumn::initWithIdentifier(mtm.alloc(), &NSString::from_str("name")) };
     unsafe {
         column.setTitle(&NSString::from_str("Filter"));
         // Generous default width so a typical screen shows the full
@@ -296,8 +467,7 @@ fn build_scroll_view(
     outline: &Retained<NSOutlineView>,
 ) -> Retained<NSScrollView> {
     // Outline view sits below the search bar.
-    let scroll_height =
-        content_bounds.size.height - SEARCH_BAR_HEIGHT - SEARCH_BAR_GAP * 2.0;
+    let scroll_height = content_bounds.size.height - SEARCH_BAR_HEIGHT - SEARCH_BAR_GAP * 2.0;
     let frame = CGRect {
         origin: CGPoint { x: 0.0, y: 0.0 },
         size: CGSize {
@@ -305,8 +475,7 @@ fn build_scroll_view(
             height: scroll_height,
         },
     };
-    let scroll: Retained<NSScrollView> =
-        unsafe { NSScrollView::initWithFrame(mtm.alloc(), frame) };
+    let scroll: Retained<NSScrollView> = unsafe { NSScrollView::initWithFrame(mtm.alloc(), frame) };
     unsafe {
         scroll.setHasVerticalScroller(true);
         // Grow with the window: width + height fully flexible so a
@@ -351,6 +520,97 @@ fn build_scroll_view(
         scroll.setDocumentView(Some(doc_view));
     }
     scroll
+}
+
+/// Bottom button bar: Reset Defaults (leading) + Cancel/OK (trailing).
+/// All three buttons are owned by [`PickerActions`] via target/action
+/// once the caller wires them in.
+struct ButtonBar {
+    reset: Retained<NSButton>,
+    cancel: Retained<NSButton>,
+    ok: Retained<NSButton>,
+}
+
+fn build_button_bar(mtm: MainThreadMarker, content_bounds: CGRect) -> ButtonBar {
+    // Y origin: the bottom row of the content view, minus a half-gap
+    // so the buttons sit visually above the panel chrome.
+    let y = (BUTTON_BAR_HEIGHT - BUTTON_HEIGHT) / 2.0;
+    let ok = make_text_button(mtm, "OK");
+    let cancel = make_text_button(mtm, "Cancel");
+    let reset = make_text_button(mtm, "Reset Defaults");
+    // OK on the right edge, Cancel left of OK. Reset on the left edge.
+    let total_w = content_bounds.size.width;
+    let ok_x = total_w - BUTTON_BAR_HMARGIN - BUTTON_WIDTH;
+    let cancel_x = ok_x - BUTTON_GAP - BUTTON_WIDTH;
+    let reset_x = BUTTON_BAR_HMARGIN;
+    unsafe {
+        // The leading button stays glued to the left, the trailing
+        // pair stays glued to the right. The combination is what
+        // gives the button bar its "Mac-native" behaviour on resize.
+        ok.setFrame(CGRect {
+            origin: CGPoint { x: ok_x, y },
+            size: CGSize {
+                width: BUTTON_WIDTH,
+                height: BUTTON_HEIGHT,
+            },
+        });
+        ok.setAutoresizingMask(
+            NSAutoresizingMaskOptions::NSViewMinXMargin
+                | NSAutoresizingMaskOptions::NSViewMaxYMargin,
+        );
+        cancel.setFrame(CGRect {
+            origin: CGPoint { x: cancel_x, y },
+            size: CGSize {
+                width: BUTTON_WIDTH,
+                height: BUTTON_HEIGHT,
+            },
+        });
+        cancel.setAutoresizingMask(
+            NSAutoresizingMaskOptions::NSViewMinXMargin
+                | NSAutoresizingMaskOptions::NSViewMaxYMargin,
+        );
+        reset.setFrame(CGRect {
+            origin: CGPoint { x: reset_x, y },
+            size: CGSize {
+                width: BUTTON_WIDTH + 30.0,
+                height: BUTTON_HEIGHT,
+            },
+        });
+        reset.setAutoresizingMask(
+            NSAutoresizingMaskOptions::NSViewMaxXMargin
+                | NSAutoresizingMaskOptions::NSViewMaxYMargin,
+        );
+    }
+    ButtonBar { reset, cancel, ok }
+}
+
+/// Build a plain rounded push button with the given title and the
+/// standard system control size. Used by [`build_button_bar`] for OK,
+/// Cancel, and Reset. The frame is irrelevant — the caller resets it
+/// with the final layout coordinates immediately after.
+fn make_text_button(mtm: MainThreadMarker, title: &str) -> Retained<NSButton> {
+    let btn: Retained<NSButton> = unsafe {
+        NSButton::initWithFrame(
+            mtm.alloc(),
+            CGRect {
+                origin: CGPoint { x: 0.0, y: 0.0 },
+                size: CGSize {
+                    width: BUTTON_WIDTH,
+                    height: BUTTON_HEIGHT,
+                },
+            },
+        )
+    };
+    unsafe {
+        btn.setButtonType(NSButtonType::MomentaryLight);
+        // `NSBezelStyle::Rounded` is the documented "default Mac
+        // push button" look; the symbol is an alias for `Push` in
+        // modern AppKit and the `Rounded` form has been marked
+        // deprecated in `objc2-app-kit` to mirror the SDK headers.
+        btn.setBezelStyle(NSBezelStyle::Push);
+        btn.setTitle(&NSString::from_str(title));
+    }
+    btn
 }
 
 fn build_search_field(mtm: MainThreadMarker, content_bounds: CGRect) -> Retained<NSSearchField> {

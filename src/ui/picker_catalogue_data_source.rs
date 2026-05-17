@@ -332,6 +332,40 @@ impl CatalogueDataSource {
         }
     }
 
+    /// Expand every ancestor folder of `command`, then return the
+    /// outline row index of the filter row itself (or `None` if no
+    /// filter in the catalogue has that command). Used by `show_picker`
+    /// to pre-select the last-picked filter when the panel opens.
+    ///
+    /// Expansion has the side effect of populating the intern table
+    /// for every folder + filter we walk into, which is exactly what
+    /// makes `rowForItem:` resolve them afterwards.
+    pub(crate) fn expand_to_filter(
+        &self,
+        outline: &NSOutlineView,
+        command: &str,
+    ) -> Option<NSInteger> {
+        let chain = find_filter_chain(&self.ivars().catalogue.root, command)?;
+        // Expand each ancestor folder in order so AppKit hands us
+        // intern slots for its children. We never expand the leaf
+        // itself.
+        for folder in &chain.ancestors {
+            let slot = self.intern(TreeNode::Folder(*folder));
+            let number = NSNumber::new_i64(slot);
+            let item: &AnyObject = unsafe { &*(Retained::as_ptr(&number) as *const AnyObject) };
+            unsafe { outline.expandItem(Some(item)) };
+        }
+        let leaf_slot = self.intern(TreeNode::Filter(chain.filter));
+        let number = NSNumber::new_i64(leaf_slot);
+        let item: &AnyObject = unsafe { &*(Retained::as_ptr(&number) as *const AnyObject) };
+        let row = unsafe { outline.rowForItem(Some(item)) };
+        if row < 0 {
+            None
+        } else {
+            Some(row)
+        }
+    }
+
     fn intern(&self, node: TreeNode) -> i64 {
         let mut by = self.ivars().by_node.borrow_mut();
         if let Some(&i) = by.get(&node) {
@@ -502,10 +536,7 @@ impl CatalogueDataSource {
         }
         let label = self.label(node);
         let s: Retained<NSString> = NSString::from_str(&label);
-        self.ivars()
-            .labels
-            .borrow_mut()
-            .insert(node, s.clone());
+        self.ivars().labels.borrow_mut().insert(node, s.clone());
         s
     }
 
@@ -561,8 +592,7 @@ fn build_pruned(cat: &Catalogue, recent: &[RecentEntry], q: &str) -> PrunedTree 
         .iter()
         .enumerate()
         .filter(|(_, r)| {
-            r.display_path.to_lowercase().contains(q)
-                || r.command.to_lowercase().contains(q)
+            r.display_path.to_lowercase().contains(q) || r.command.to_lowercase().contains(q)
         })
         .map(|(i, _)| i)
         .collect();
@@ -592,9 +622,7 @@ fn walk(folder: &Folder, q: &str, visible: &mut HashMap<TreeNode, Vec<usize>>) -
                     walk(sub, q, visible)
                 }
             }
-            Node::Filter(f) => {
-                folder_matches || f.display_name.to_lowercase().contains(q)
-            }
+            Node::Filter(f) => folder_matches || f.display_name.to_lowercase().contains(q),
         };
         if child_keep {
             my_visible.push(idx);
@@ -618,6 +646,47 @@ fn walk_show_all(folder: &Folder, visible: &mut HashMap<TreeNode, Vec<usize>>) {
             walk_show_all(sub, visible);
         }
     }
+}
+
+/// Result of [`find_filter_chain`]: the leaf filter pointer plus the
+/// `*const Folder` chain of every ancestor folder we walked through to
+/// reach it, in root-to-leaf order. Both pointer sets are pinned by
+/// the `'static Catalogue` rooted in `BUILTIN`.
+struct FilterChain {
+    ancestors: Vec<*const Folder>,
+    filter: *const Filter,
+}
+
+/// Depth-first scan for a filter whose `command` matches `cmd`,
+/// recording the folder pointers traversed along the way. Returns
+/// `None` if the catalogue does not contain that command.
+///
+/// `root` is the catalogue's static root folder; every pointer
+/// returned in the [`FilterChain`] is also static because the
+/// catalogue itself is rooted in an `OnceLock` for the life of the
+/// process.
+fn find_filter_chain(root: &Folder, cmd: &str) -> Option<FilterChain> {
+    fn walk(folder: &Folder, cmd: &str, acc: &mut Vec<*const Folder>) -> Option<*const Filter> {
+        for child in &folder.children {
+            match child {
+                Node::Filter(f) if f.command == cmd => {
+                    return Some(f as *const Filter);
+                }
+                Node::Folder(sub) => {
+                    acc.push(sub as *const Folder);
+                    if let Some(found) = walk(sub, cmd, acc) {
+                        return Some(found);
+                    }
+                    acc.pop();
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+    let mut ancestors = Vec::new();
+    let filter = walk(root, cmd, &mut ancestors)?;
+    Some(FilterChain { ancestors, filter })
 }
 
 /// Depth-first scan for a filter whose `command` matches `cmd`.
@@ -708,7 +777,11 @@ mod tests {
     fn filter_name_match_promotes_only_ancestor_chain() {
         let cat = fixture();
         let pruned = build_pruned(&cat, &[], "glow");
-        assert_eq!(pruned.visible_root, vec![1], "only Lights & Shadows visible");
+        assert_eq!(
+            pruned.visible_root,
+            vec![1],
+            "only Lights & Shadows visible"
+        );
         let ls_ptr = match &cat.root.children[1] {
             Node::Folder(f) => f as *const Folder,
             _ => unreachable!(),
@@ -769,6 +842,9 @@ mod tests {
             Node::Folder(f) => f as *const Folder,
             _ => return,
         };
-        assert_eq!(first, again, "addresses inside &'static Catalogue must be stable");
+        assert_eq!(
+            first, again,
+            "addresses inside &'static Catalogue must be stable"
+        );
     }
 }
