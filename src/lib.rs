@@ -25,6 +25,9 @@ pub mod logging;
 pub mod ps_types;
 pub mod tiff_io;
 
+#[cfg(feature = "live")]
+pub mod ui;
+
 use logging::log;
 use ps_types::{
     NO_ERR, SELECTOR_ABOUT, SELECTOR_CONTINUE, SELECTOR_FINISH, SELECTOR_PARAMETERS,
@@ -72,7 +75,13 @@ unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize)
 
     match selector {
         SELECTOR_ABOUT => NO_ERR,
-        SELECTOR_PARAMETERS => NO_ERR,
+        SELECTOR_PARAMETERS => {
+            log("PARAMETERS: opening picker (stub)");
+            match ui::picker::show_empty() {
+                Some(()) => NO_ERR,
+                None => USER_CANCEL,
+            }
+        }
         SELECTOR_PREPARE => {
             fr.buffer_space = 0;
             fr.max_space = 0;

@@ -59,11 +59,14 @@ MACOSX_DEPLOYMENT_TARGET ?= 11.0
 #                           symbol table; everything else is internal.
 #   -dead_strip             drop unreachable code/data; harmless for a
 #                           single-entry bundle and shrinks the binary.
+#   -lobjc                   Objective-C runtime (required for objc2 /
+#                           AppKit UI code in the `live` feature).
 BUNDLE_LDFLAGS := \
   -bundle \
   -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET) \
   -Wl,-exported_symbol,_PluginMain \
-  -Wl,-dead_strip
+  -Wl,-dead_strip \
+  -lobjc
 
 # Cargo features. The default build is a safe no-op PluginMain; set
 # `make ... FEATURES=live` to enable the real pixel pipeline (M3 + M4).
