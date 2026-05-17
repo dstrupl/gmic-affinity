@@ -291,21 +291,70 @@ pub fn run_filter_with(
             return Err(GmicError::InvalidCharsInConfig);
         }
     }
-    // gmic-qt-style invocation: the command, then each parameter as
-    // its own argv entry. `build_argv` (legacy) joined tokens with
-    // whitespace, which is not what the picker produces; here we
-    // bypass that path entirely.
-    let mut tokens: Vec<String> = Vec::with_capacity(chosen.args.len() + 1);
+    // gmic's CLI is `cmd a,b,c` — every parameter for a single
+    // filter invocation is one comma-joined token, NOT one process
+    // argv per parameter. Earlier we pushed each arg as its own
+    // token; gmic then saw the parameters as separate top-level
+    // commands and the filter's internal `${1-N}` substitution had
+    // nothing to grab, producing
+    //   *** Error in ./fx_paint_with_brush/*substitute/ ***
+    //   Unknown command or filename '1-35'.
+    // (The literal '1-35' is fx_paint_with_brush asking for "args
+    // 1 through 35" of its declared parameter list.)
     let command = if chosen.command.starts_with('-') {
         chosen.command.clone()
     } else {
         format!("-{}", chosen.command)
     };
+    let mut tokens: Vec<String> = Vec::with_capacity(2);
     tokens.push(command);
-    for arg in &chosen.args {
-        tokens.push(arg.clone());
+    if !chosen.args.is_empty() {
+        let joined = chosen
+            .args
+            .iter()
+            .map(|a| quote_gmic_arg(a))
+            .collect::<Vec<_>>()
+            .join(",");
+        tokens.push(joined);
     }
     run_with_tokens(fr, &tokens)
+}
+
+/// Quote a single parameter value according to gmic CLI rules so it
+/// survives being pasted into a comma-separated parameter list.
+///
+/// gmic accepts the bare form for any value that contains none of:
+///   - a comma  (would split the parameter list)
+///   - leading or trailing whitespace (gmic trims those)
+///   - an embedded double quote (would close the quoted form)
+///
+/// Anything else gets wrapped in `"..."` with internal `"` escaped
+/// to `\"`. Embedded newlines / tabs are allowed both bare and
+/// quoted; gmic treats them as ordinary characters once the
+/// parameter boundary is established.
+///
+/// This matters for, among others, our `point(...)` parser which
+/// stores the picker default as the Text value `"x,y"` — without
+/// quoting, the embedded comma would silently split a 35-arg filter
+/// into a 36-arg one and shift every subsequent positional value.
+fn quote_gmic_arg(value: &str) -> String {
+    let needs_quoting = value.contains(',')
+        || value.contains('"')
+        || value.starts_with(|c: char| c.is_whitespace())
+        || value.ends_with(|c: char| c.is_whitespace());
+    if !needs_quoting {
+        return value.to_string();
+    }
+    let mut out = String::with_capacity(value.len() + 2);
+    out.push('"');
+    for ch in value.chars() {
+        if ch == '"' {
+            out.push('\\');
+        }
+        out.push(ch);
+    }
+    out.push('"');
+    out
 }
 
 /// Shared body of [`run_filter`] and [`run_filter_with`]: validate
@@ -560,6 +609,92 @@ mod tests_chosen {
         let mut fr = unsafe { std::mem::zeroed() };
         let err = run_filter_with(&mut fr, &chosen).err();
         assert!(matches!(err, Some(GmicError::InvalidCharsInConfig)));
+    }
+
+    /// Reproduces the Sunday-evening Affinity round-trip failure:
+    /// every parameter value was sent as its own process argv,
+    /// causing fx_paint_with_brush to fail with
+    ///   Unknown command or filename '1-35'.
+    /// because gmic could not find its declared parameter list.
+    /// `build_argv_for_chosen_unit` simulates the inner joining
+    /// step so we can assert the exact argv shape without exec'ing
+    /// gmic from a unit test.
+    #[test]
+    fn chosen_args_collapse_into_one_comma_joined_token() {
+        let tokens = build_tokens_for_test(&ChosenFilter {
+            command: "fx_paint_with_brush".into(),
+            args: (1..=35).map(|i| i.to_string()).collect(),
+        });
+        assert_eq!(tokens.len(), 2, "got {tokens:?}");
+        assert_eq!(tokens[0], "-fx_paint_with_brush");
+        assert_eq!(
+            tokens[1],
+            "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,\
+             21,22,23,24,25,26,27,28,29,30,31,32,33,34,35"
+        );
+    }
+
+    #[test]
+    fn chosen_command_with_leading_dash_is_preserved() {
+        let tokens = build_tokens_for_test(&ChosenFilter {
+            command: "-blur".into(),
+            args: vec!["3".into()],
+        });
+        assert_eq!(tokens[0], "-blur");
+    }
+
+    #[test]
+    fn chosen_text_value_with_comma_is_quoted() {
+        // Our `point(...)` parser stores the default as "x,y" — the
+        // join step has to quote it so the embedded comma doesn't
+        // become a parameter separator.
+        let tokens = build_tokens_for_test(&ChosenFilter {
+            command: "iain_auto_wb".into(),
+            args: vec!["5,5".into(), "95,95".into(), "1".into(), "0".into()],
+        });
+        assert_eq!(tokens[1], "\"5,5\",\"95,95\",1,0");
+    }
+
+    #[test]
+    fn chosen_text_value_with_embedded_quote_is_escaped() {
+        let tokens = build_tokens_for_test(&ChosenFilter {
+            command: "fx".into(),
+            args: vec!["he said \"hi\"".into()],
+        });
+        // Quoted because of the embedded ", with the " escaped.
+        assert_eq!(tokens[1], "\"he said \\\"hi\\\"\"");
+    }
+
+    #[test]
+    fn chosen_no_args_emits_only_command_token() {
+        let tokens = build_tokens_for_test(&ChosenFilter {
+            command: "fx_drama".into(),
+            args: vec![],
+        });
+        assert_eq!(tokens, vec!["-fx_drama"]);
+    }
+
+    /// Helper that runs the same join+quote logic as
+    /// `run_filter_with` but without touching FilterRecord or
+    /// spawning gmic, so we can unit-test the argv shape headlessly.
+    fn build_tokens_for_test(chosen: &ChosenFilter) -> Vec<String> {
+        let command = if chosen.command.starts_with('-') {
+            chosen.command.clone()
+        } else {
+            format!("-{}", chosen.command)
+        };
+        let mut tokens = vec![command];
+        if !chosen.args.is_empty() {
+            tokens.push(
+                chosen
+                    .args
+                    .iter()
+                    .map(|a| super::quote_gmic_arg(a))
+                    .collect::<Vec<_>>()
+                    .join(","),
+            );
+        }
+        tokens
     }
 
     #[test]
