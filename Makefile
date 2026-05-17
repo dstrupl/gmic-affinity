@@ -121,7 +121,7 @@ REZ_FLAGS := \
   -d "PRAGMA_ONCE=0" \
   -useDF
 
-.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy help pipl
+.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy help pipl check-lfs refresh-catalogue picker-example
 
 all: bundle
 
@@ -132,6 +132,8 @@ help:
 	@echo "  make install            Install GmicFilter.plugin into Affinity Photo 2."
 	@echo "  make universal-install  Convenience: 'make universal' then 'make install'."
 	@echo "  make uninstall          Remove the installed plugin."
+	@echo "  make picker-example     Open the picker standalone (no Affinity install needed)."
+	@echo "  make refresh-catalogue  Regenerate assets/gmic-catalogue.* from local gmic."
 	@echo "  make test               Run cargo test under both default and --features live."
 	@echo "  make clippy             Run cargo clippy --all-targets --all-features -D warnings."
 	@echo "  make fmt                Run cargo fmt."
@@ -145,8 +147,27 @@ help:
 	@echo "  AFFINITY_PLUGINS_DIR    install dest (default: Affinity Photo 2 Plugins)"
 	@echo "  PHOTOSHOP_SDK           SDK root, optional (default: \$$HOME/SDKs/photoshop-sdk)"
 
+# Fail fast if the LFS-tracked catalogue snapshot is still a pointer
+# file. Without this guard `include_bytes!("../assets/gmic-catalogue.gmic.gz")`
+# would compile against the LFS pointer text ("version
+# https://git-lfs.github.com/spec/v1\noid sha256:…") instead of a real
+# gzip stream, the catalogue would parse to zero filters at runtime,
+# and the picker would open empty with no obvious explanation. A real
+# gzip file always starts with the two magic bytes 0x1f 0x8b.
+check-lfs:
+	@head -c 2 assets/gmic-catalogue.gmic.gz 2>/dev/null | od -An -tx1 | tr -d ' \n' | \
+	  grep -q '^1f8b' || { \
+	    echo ""; \
+	    echo "ERROR: assets/gmic-catalogue.gmic.gz is not a real gzip file."; \
+	    echo "       Looks like Git LFS hasn't pulled it. Run:"; \
+	    echo ""; \
+	    echo "           git lfs install   # one-time per machine"; \
+	    echo "           git lfs pull"; \
+	    echo ""; \
+	    exit 1; }
+
 # Fast iteration: ARM-only build assembled into the plugin bundle.
-bundle: $(ARM_BUNDLE_BIN) $(PIPL_RSRC_OUT)
+bundle: check-lfs $(ARM_BUNDLE_BIN) $(PIPL_RSRC_OUT)
 	@mkdir -p "$(BUNDLE)/Contents/MacOS" "$(BUNDLE)/Contents/Resources"
 	cp "$(ARM_BUNDLE_BIN)" "$(BUNDLE_BIN)"
 	chmod +x "$(BUNDLE_BIN)"
@@ -158,7 +179,7 @@ bundle: $(ARM_BUNDLE_BIN) $(PIPL_RSRC_OUT)
 	codesign --force --deep --sign - "$(BUNDLE)"
 	@$(MAKE) --no-print-directory verify-bundle
 
-universal: $(ARM_BUNDLE_BIN) $(X86_BUNDLE_BIN) $(PIPL_RSRC_OUT)
+universal: check-lfs $(ARM_BUNDLE_BIN) $(X86_BUNDLE_BIN) $(PIPL_RSRC_OUT)
 	@mkdir -p "$(BUNDLE)/Contents/MacOS" "$(BUNDLE)/Contents/Resources"
 	lipo -create "$(ARM_BUNDLE_BIN)" "$(X86_BUNDLE_BIN)" -output "$(BUNDLE_BIN)"
 	chmod +x "$(BUNDLE_BIN)"
@@ -265,3 +286,40 @@ clippy:
 clean:
 	cargo clean
 	rm -rf "$(BUNDLE)" "$(PIPL_RSRC_OUT)"
+
+# Regenerate the bundled catalogue snapshot from the locally installed
+# gmic. Pipeline:
+#   1. `gmic update` refreshes `~/.config/gmic/update<ver>.gmic`, which
+#      is the canonical source for #@gui annotations driving the picker.
+#   2. gzip -9 it into `assets/gmic-catalogue.gmic.gz` (the file we
+#      `include_bytes!` and the file LFS tracks).
+#   3. Re-dump the catalogue TOC so reviewers can diff it textually.
+#   4. Record the source gmic version + timestamp so we can detect
+#      when the snapshot has drifted out of sync.
+#   5. Run the catalogue snapshot smoke test to make sure parsing the
+#      regenerated snapshot still yields the expected anchor filters.
+# Always commit changes from this target as a separate, machine-only
+# patch — never bundle them with feature work.
+refresh-catalogue:
+	git lfs install
+	gmic update >/dev/null 2>&1
+	@UPDATE_FILE=$$(ls -t $$HOME/.config/gmic/update*.gmic 2>/dev/null | head -n1); \
+	 if [ -z "$$UPDATE_FILE" ]; then \
+	   echo "ERROR: no update*.gmic in ~/.config/gmic — is gmic installed?"; exit 1; \
+	 fi; \
+	 gzip -9 -c "$$UPDATE_FILE" > assets/gmic-catalogue.gmic.gz
+	cargo run --bin dump-toc > assets/gmic-catalogue.toc.txt
+	printf '%s\n%s\n' \
+	  "$$(gmic --version 2>&1 | head -n1)" \
+	  "$$(date -u +%FT%TZ)" \
+	  > assets/gmic-catalogue.version.txt
+	cargo test --test catalogue_snapshot
+	@echo ""; echo "refresh-catalogue: changes in assets/:"; \
+	 git status -- assets/
+
+# Run the standalone Cocoa picker without installing the plugin. Forces
+# `--release` because the picker's manual modal-session pump trips an
+# objc2 debug-mode type-encoding panic on `beginModalSessionForWindow:`
+# (see examples/picker.rs header).
+picker-example: check-lfs
+	cargo run --release --example picker --features live
