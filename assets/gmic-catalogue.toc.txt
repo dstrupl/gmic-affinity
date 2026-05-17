@@ -1,0 +1,1208 @@
+<b>Animals< / b> / Dragonfly  ->  mc_dragonfly
+<b>Animals< / b> / Kookaburra  ->  mc_kookaburra
+<b>Animals< / b> / Paw  ->  mc_paw
+<b>Animals< / b> / Rooster  ->  mc_rooster
+<i>Arrays & Tiles< / i> / Annular Steiner Chain Round Tile  ->  Annular_Steiner_Chain_Round_Tile
+<i>Arrays & Tiles< / i> / Bulles Colorees  ->  samj_Bulles_Colorees
+<i>Arrays & Tiles< / i> / Carres Noirs  ->  samj_Carres_Noirs
+<i>Arrays & Tiles< / i> / Cercles Concentriques  ->  Cercles_Concentriques_A
+<i>Arrays & Tiles< / i> / Coeurs Hearts 002  ->  samj_Coeurs_Hearts_002
+<i>Arrays & Tiles< / i> / Deconstruction  ->  samj_Tiles_Deconstruction
+<i>Arrays & Tiles< / i> / Ellipses Colorees  ->  samj_Ellipses_Colorees
+<i>Arrays & Tiles< / i> / Filters On Tiles  ->  samj_Filtres_Sur_Tuiles
+<i>Arrays & Tiles< / i> / Filters On Tiles V2  ->  samj_Filtres_Sur_Tuiles_V2
+<i>Arrays & Tiles< / i> / Floutage Blurring  ->  samj_Flouter
+<i>Arrays & Tiles< / i> / Losanges Colores  ->  samj_Losanges_Colores
+<i>Arrays & Tiles< / i> / Moirage Spline  ->  samj_Moirage_Spline
+<i>Arrays & Tiles< / i> / Moirage Spline XY  ->  samj_Moirage_Spline_XY
+<i>Arrays & Tiles< / i> / Montage 1 Page  ->  samj_dt_montage_sur_une_page
+<i>Arrays & Tiles< / i> / Montage Annular Steiner Chain  ->  samj_Montage_Annular_Steiner_Chain
+<i>Arrays & Tiles< / i> / Montage Cercle Spirale  ->  samj_Montage_Cercle_Spirale
+<i>Arrays & Tiles< / i> / Montage Geometric Figures  ->  samj_Montage_Figures_Geometriques
+<i>Arrays & Tiles< / i> / Montage Multi Rows  ->  samj_montage_multi_rows_GUI
+<i>Arrays & Tiles< / i> / Montage Pappus Chain  ->  samj_Montage_Pappus_Chain
+<i>Arrays & Tiles< / i> / Montage Row  ->  samj_montage_row_GUI
+<i>Arrays & Tiles< / i> / Montage Zigzag  ->  samj_Montage_Zigzag
+<i>Arrays & Tiles< / i> / Pixelisation Contours  ->  samj_Pixelisation_Contours
+<i>Arrays & Tiles< / i> / Pointes De Diamants Colorees  ->  samj_Pointes_De_Diamants_Colorees
+<i>Arrays & Tiles< / i> / Scintillements Colores  ->  samj_Scintillements_Colores
+<i>Artistic< / i> / Charred Plastic  ->  fx_charred_plastic
+<i>Artistic< / i> / Color Edges Engrave  ->  samj_Color_EdgesO_Engrave
+<i>Artistic< / i> / Contour Drawings  ->  samj_Contour_Drawings_en
+<i>Artistic< / i> / Contour Epais  ->  samj_Contour_Epais
+<i>Artistic< / i> / Couleurs Rayees  ->  samj_Couleurs_Rayees
+<i>Artistic< / i> / Couleurs Rayees 2  ->  samj_Couleurs_Rayees_2
+<i>Artistic< / i> / Cubisme A  ->  samj_Test_Cubisme_A
+<i>Artistic< / i> / Cubisme B  ->  samj_Test_Cubisme_B
+<i>Artistic< / i> / Diff Tensors Blend  ->  samj_Diff_Tensors_Blend
+<i>Artistic< / i> / Dreamy Abstraction  ->  fx_dreamy_abstraction
+<i>Artistic< / i> / Edges And LIC  ->  samj_Edges_And_LIC
+<i>Artistic< / i> / Flamboyance Test  ->  samj_Flamboyance_Test
+<i>Artistic< / i> / Fond Broderie  ->  samj_fond_broderie
+<i>Artistic< / i> / Fond Brosse  ->  samj_Fond_Brosse
+<i>Artistic< / i> / Fx Sketchbw Modifie  ->  samj_fx_sketchbw_modifie
+<i>Artistic< / i> / Granular Texture  ->  samj_Texture_Granuleuse
+<i>Artistic< / i> / Gris Raye  ->  samj_Gris_Raye
+<i>Artistic< / i> / Hallucinogen  ->  samj_Hallucinogen
+<i>Artistic< / i> / Hallucinogen 2  ->  samj_Hallucinogen_b
+<i>Artistic< / i> / Hard Painting  ->  fx_hard_painting
+<i>Artistic< / i> / Impressions  ->  samj_Impressions
+<i>Artistic< / i> / Isophotes Vers Aquarelle  ->  samj_Isophotes_Vers_Aquarelle
+<i>Artistic< / i> / Make Squiggly  ->  fx_Squiggly
+<i>Artistic< / i> / Morphology Painting  ->  fx_MorphoPaint
+<i>Artistic< / i> / Neon  ->  fx_neon
+<i>Artistic< / i> / Neon Alpha  ->  fx_neon_alpha
+<i>Artistic< / i> / Otsu-Hessian Blend  ->  fx_otsu_hessian_blend
+<i>Artistic< / i> / Plasmic  ->  samj_Plasmic
+<i>Artistic< / i> / Plasmic V2  ->  samj_Plasmic_V2
+<i>Artistic< / i> / Pointillisme  ->  samj_Pointillisme
+<i>Artistic< / i> / Pointillisme B  ->  samj_Pointillisme_B
+<i>Artistic< / i> / Posterize B  ->  samj_Posterize_B
+<i>Artistic< / i> / Samj Ripple Houghsketchbw  ->  samj_ripple_houghsketchbw
+<i>Artistic< / i> / Simple Noise Canvas  ->  fx_SimpleNoiseCanvas
+<i>Artistic< / i> / Tensor Test  ->  samj_TensorTest
+<i>Artistic< / i> / Texture Coloree  ->  samj_texture_coloree
+<i>Artistic< / i> / Variations on a Single Color  ->  samj_texture_coloree_en
+<i>Colors< / i> / Brightness  ->  afre_brightness
+<i>Colors< / i> / Colour Space Swap  ->  csswap
+<i>Colors< / i> / Contrast  ->  afre_contrast
+<i>Colors< / i> / CubeHelix  ->  fx_cubehelix
+<i>Colors< / i> / Dark Sky  ->  afre_darksky
+<i>Colors< / i> / Frequency Representation  ->  fx_frequency_representation
+<i>Colors< / i> / Hue Lighten-Darken  ->  iain_hue_light_dark_p
+<i>Colors< / i> / Local Contrast  ->  afre_localcontrast
+<i>Colors< / i> / Quick Desaturate  ->  jr_desaturate
+<i>Colors< / i> / Satellite  ->  fx_satellite
+<i>Colors< / i> / Softlight  ->  afre_softlight
+<i>Curves [Lab]< / i> / A-Color  ->  fx_apply_Labcurve
+<i>Curves [Lab]< / i> / B-Color  ->  fx_apply_Labcurve
+<i>Curves [Lab]< / i> / Lightness  ->  fx_apply_Labcurve
+<i>Deformations< / i> / Buffer Error  ->  fx_buffer_error
+<i>Deformations< / i> / Random Deformations (JR's Mod)  ->  fx_jr_deform
+<i>Deformations< / i> / Rays from Image  ->  fx_rays_from_image
+<i>Deformations< / i> / Spiral Matrix Transformation  ->  fx_jr_spiral_transform
+<i>Deformations< / i> / UltraWarp 2  ->  fx_ultrawarptwo
+<i>Degradations< / i> / Bomb Blend  ->  fx_blend_bomb
+<i>Degradations< / i> / Broken Texture Afre  ->  fx_texture_afre_broken
+<i>Degradations< / i> / Butterworth Bandpass  ->  fx_butterworth_bp
+<i>Degradations< / i> / Cascading Self Glitching  ->  fx_self_glitching_cascade
+<i>Degradations< / i> / DCT FSU  ->  fx_dct_fsu
+<i>Degradations< / i> / Fake JFIF (JPEG) Encoder  ->  fx_jfif_fake
+<i>Degradations< / i> / JFIF Effects  ->  fx_jfif
+<i>Degradations< / i> / JFIF Effects Extended  ->  fx_jfif_xt
+<i>Degradations< / i> / JFIF [JPEG] Self-Bomb  ->  fx_jfif_bomb
+<i>Degradations< / i> / JPEG Encoder  ->  fx_jpeg_preview
+<i>Degradations< / i> / Pseudo-ECB (Electronic Code Book Algorithm)  ->  pseudo_ecb
+<i>Degradations< / i> / Row Shifter  ->  fx_row_shift
+<i>Degradations< / i> / Sawtoother [CMY(-K)]  ->  sawtoother_cmy_k
+<i>Degradations< / i> / Sawtoother [HSX]  ->  sawtoother_hsx
+<i>Degradations< / i> / Sawtoother [LCH8]  ->  sawtoother_lch8
+<i>Degradations< / i> / Sawtoother [Lab8]  ->  sawtoother_lab8
+<i>Degradations< / i> / Sawtoother [RGB]  ->  sawtoother_rgb
+<i>Degradations< / i> / Sawtoother [XYZ8]  ->  sawtoother_xyz8
+<i>Degradations< / i> / Sawtoother [YCbCr-(-GLIC-JPEG)]  ->  sawtoother_ycbcr
+<i>Degradations< / i> / Sawtoother [YIQ8]  ->  sawtoother_yiq8
+<i>Degradations< / i> / Sawtoother [YUV8]  ->  sawtoother_yuv8
+<i>Degradations< / i> / Sawtoother [sRGB]  ->  sawtoother_srgb
+<i>Degradations< / i> / Smooth EQ  ->  fx_jr_smooth_eq
+<i>Degradations< / i> / Superstreak  ->  fx_superstreak
+<i>Degradations< / i> / UltraWarp 3  ->  fx_ultrawarp3_preview
+<i>Details< / i> / Constrained Sharpen  ->  iain_constrained_sharpen
+<i>Details< / i> / Make Up  ->  make_up
+<i>Details< / i> / Pyramid Processing  ->  iain_pyramid_processing
+<i>Details< / i> / Texture  ->  afre_texture
+<i>Details< / i> / YAG Effect  ->  fx_yag_soften
+<i>Garagecoder< / i> / Blend [Feather]  ->  gcd_blend_feather
+<i>Garagecoder< / i> / Blend [Multiscale]  ->  fx_gcd_blend_multiscale
+<i>Garagecoder< / i> / CRMT Tiles  ->  fx_gcd_crmt_tile
+<i>Garagecoder< / i> / Canny Edge Detection  ->  fx_gcd_canny
+<i>Garagecoder< / i> / Colored Signum  ->  fx_gcd_signum_color
+<i>Garagecoder< / i> / Cumulative Math  ->  fx_gcd_cumul_math
+<i>Garagecoder< / i> / Deblur Texture  ->  fx_gcd_blur_deblur_texture
+<i>Garagecoder< / i> / Depth Blur  ->  gcd_depth_blur
+<i>Garagecoder< / i> / Despeckle [test]  ->  gcd_despeckle_test
+<i>Garagecoder< / i> / Dither SRGB  ->  fx_gcd_dither_srgb
+<i>Garagecoder< / i> / Geometric Color Balance  ->  gcd_geometric_balance
+<i>Garagecoder< / i> / Gradient Exponent  ->  fx_gcd_gradient_exponent
+<i>Garagecoder< / i> / Image InfoMap  ->  gcd_infomap
+<i>Garagecoder< / i> / Inpaint [Clone]  ->  fx_gcd_clone_inpaint
+<i>Garagecoder< / i> / Layer Manipulation  ->  gcd_layers
+<i>Garagecoder< / i> / Local F-Mean  ->  gcd_fx_local_fmean
+<i>Garagecoder< / i> / PQCT Example  ->  gcd_pqct
+<i>Garagecoder< / i> / Recolor  ->  gcd_recol
+<i>Garagecoder< / i> / Simple Tone Curve  ->  gcd_simple_tonecurve
+<i>Garagecoder< / i> / Smart Rotate  ->  gcd_srotate
+<i>Garagecoder< / i> / Split Objects  ->  gcd_splitobj
+<i>Garagecoder< / i> / Stereo Video  ->  gcd_stereo_vid
+<i>Garagecoder< / i> / Target Color Spot  ->  fx_gcd_color_target
+<i>Garagecoder< / i> / Transfer Colors [Curves]  ->  fx_gcd_color_spot_matching
+<i>Garagecoder< / i> / Undo Unsharp Mask  ->  fx_gcd_undo_unsharp
+<i>Garagecoder< / i> / Upscale [Patch2x]  ->  fx_gcd_upscale_patch2x
+<i>Garagecoder< / i> / Warp Map  ->  gcd_warpmap
+<i>Garagecoder< / i> / Weighted Boxfilter  ->  fx_gcd_weighted_boxfilter
+<i>Garagecoder< / i> / Xbr2x  ->  gcd_xbr2x
+<i>Gentlemanbeggar< / i> / Ping Pong  ->  fx_gb_pp
+<i>Gmic Tutorials< / i> / Blur by Color  ->  gtutor_blur_img
+<i>Iain Fergusson< / i> / 2D Scopes  ->  iain_2d_scopes
+<i>Iain Fergusson< / i> / Anisotropic Tutorial  ->  iain_smooth_tutorial
+<i>Iain Fergusson< / i> / Auto WB by Hue Variance  ->  iain_auto_wb
+<i>Iain Fergusson< / i> / Automixer  ->  automixer
+<i>Iain Fergusson< / i> / Brown Spot Clean  ->  iain_brown_spot_clean
+<i>Iain Fergusson< / i> / CA Correction  ->  iain_CA_correction
+<i>Iain Fergusson< / i> / Exfuse  ->  exfuse
+<i>Iain Fergusson< / i> / Exfusion  ->  exfusion
+<i>Iain Fergusson< / i> / Exfusion3  ->  exfusion3
+<i>Iain Fergusson< / i> / Exfusion5  ->  exfusion5
+<i>Iain Fergusson< / i> / FFT Tile  ->  fft_tile
+<i>Iain Fergusson< / i> / Fast Formula  ->  iain_fast_formula
+<i>Iain Fergusson< / i> / Fast Median Stack  ->  iain_fast_median_stack
+<i>Iain Fergusson< / i> / Fill Holes  ->  fill_holes
+<i>Iain Fergusson< / i> / Grey Descreen  ->  iain_descreen2
+<i>Iain Fergusson< / i> / Heart Tone  ->  iain_hearttone
+<i>Iain Fergusson< / i> / IID Demosaic  ->  iain_iid_demosaic
+<i>Iain Fergusson< / i> / Iain 2x  ->  iain_2x
+<i>Iain Fergusson< / i> / Iain Demosaic  ->  iain_demosiac
+<i>Iain Fergusson< / i> / Iain Denoise 2019 Beta3  ->  iain_denoise_2019_beta3
+<i>Iain Fergusson< / i> / Iain Highlight Synthesis  ->  iain_highlight_synthesis
+<i>Iain Fergusson< / i> / Iain Remove Pattern  ->  iain_remove_pattern
+<i>Iain Fergusson< / i> / Iain Star Burst  ->  iain_star_burst
+<i>Iain Fergusson< / i> / Iain Unindex  ->  iain_unindex
+<i>Iain Fergusson< / i> / Iain Weightmap  ->  iain_weightmap
+<i>Iain Fergusson< / i> / Iain's Noise Reduction Old  ->  iain_iains_nr
+<i>Iain Fergusson< / i> / Luminance NR2  ->  luminance_nr_two
+<i>Iain Fergusson< / i> / MS NL-Means C Noise2  ->  ms_nlmeans_c_noise2_p
+<i>Iain Fergusson< / i> / MS Patch Chroma  ->  ms_patch_c
+<i>Iain Fergusson< / i> / MS Patch NR  ->  MS_Patch_NR
+<i>Iain Fergusson< / i> / MS Patch NR3  ->  MS_Patch_NR3
+<i>Iain Fergusson< / i> / Minimum Chroma Demosaic  ->  iain_minimum_chroma_demosaic
+<i>Iain Fergusson< / i> / Moire Removal Not Parallel  ->  iain_moire_removal_NP
+<i>Iain Fergusson< / i> / Multi Scale Patch Smoothing  ->  ms_patch_smooth
+<i>Iain Fergusson< / i> / Multi Scale Smoothing  ->  ms_smooth
+<i>Iain Fergusson< / i> / Noise Reduction 5  ->  nr5
+<i>Iain Fergusson< / i> / PNG Processing  ->  iain_png_processing
+<i>Iain Fergusson< / i> / Skin Mask  ->  iain_fx_skin_mask
+<i>Iain Fergusson< / i> / Smart Demosaic  ->  iain_smartdemos
+<i>Iain Fergusson< / i> / Split Detials [Orientation]  ->  iain_split_orientation
+<i>Iain Fergusson< / i> / Star Tone  ->  star_tone
+<i>Iain Fergusson< / i> / Subtract Cast  ->  iain_sub_cast
+<i>J&#233;J&#233;< / i> / 3D Rendering  ->  jeje_render3d
+<i>J&#233;J&#233;< / i> / Deconvolve  ->  jeje_deconvolve
+<i>J&#233;J&#233;< / i> / Zernike  ->  jeje_zernike_preview
+<i>Naggobot< / i> / Composition Analysis  ->  fx_CompositionAnalysis
+<i>Patterns< / i> / EPPE Transform  ->  samj_EPPE_Transform
+<i>Patterns< / i> / Formes Couleurs Variees Dans Image  ->  samj_Formes_Couleurs_Variees_Dans_Image
+<i>Patterns< / i> / Lignes H Ou V Colorees  ->  samj_Lignes_H_ou_V_Colorees
+<i>Patterns< / i> / Marbre Marble  ->  samj_Marbre
+<i>Patterns< / i> / Mosaic A  ->  samj_Mosaic_A
+<i>Patterns< / i> / Mosaic B  ->  samj_Mosaic_B
+<i>Patterns< / i> / Motif Plasma  ->  samj_Motif_Plasma
+<i>Patterns< / i> / Motifs 7200  ->  samj_Motifs_7200
+<i>Patterns< / i> / Motifs 7200 Variante A  ->  samj_Motifs_7200_VarianteA
+<i>Patterns< / i> / Motifs 7200 VarianteB  ->  samj_Motifs_7200_VarianteB
+<i>Patterns< / i> / Motifs 7200 VarianteC  ->  samj_Motifs_7200_VarianteC
+<i>Patterns< / i> / Motifs Aleatoires Symetriques Degrades  ->  samj_Motifs_Aleatoires_Symetriques_Degrades
+<i>Patterns< / i> / Motifs Degrades CIE  ->  samj_Degrades_XYZ_CIE
+<i>Patterns< / i> / Perpendicular Lines  ->  samj_Lignes_Perpendiculaires
+<i>Patterns< / i> / Points Aleatoires 001  ->  samj_Points_Aleatoires_001
+<i>Patterns< / i> / Pouring  ->  samj_pouring
+<i>Patterns< / i> / Pseudo Vitrail  ->  samj_Pseudo_Vitrail
+<i>Patterns< / i> / Quickly Create Colorful Patterns  ->  samj_Motifs_Rapides
+<i>Patterns< / i> / Quickly Create Colorful Patterns B  ->  samj_Motifs_Rapides_B
+<i>Patterns< / i> / Random Pattern Courtepointe  ->  samj_Courtepointe
+<i>Patterns< / i> / Rays Of Colors  ->  samj_Rays_Of_Colors
+<i>Patterns< / i> / Seamless Deco  ->  fx_mad_rorscharchp
+<i>Patterns< / i> / Steps V2  ->  samj_Steps_V2
+<i>Patterns< / i> / Tissu Fond Flou  ->  samj_Tissu_Fond_Flou
+<i>Patterns< / i> / Variation Stained Glass  ->  samj_Variation_Stained_Glass
+<i>PhotoComix< / i> / B&W Steampunk Pencil  ->  fx_steampen
+<i>PhotoComix< / i> / Black Crayon Graffiti  ->  fx_crayongraffiti2
+<i>PhotoComix< / i> / Boost Screen  ->  fx_compose_boostscreen
+<i>PhotoComix< / i> / Color Doping  ->  fx_compose_colordoping
+<i>PhotoComix< / i> / Color Sketch  ->  fx_colorsketchbw
+<i>PhotoComix< / i> / Color Stamp  ->  fx_colorstamp
+<i>PhotoComix< / i> / Comix Colors  ->  fx_compose_comix_color
+<i>PhotoComix< / i> / Contrast Swiss Mask  ->  fx_contrast_swm
+<i>PhotoComix< / i> / Dark Edges  ->  fx_compose_darkedges
+<i>PhotoComix< / i> / Dark Screen  ->  fx_compose_darkscreen
+<i>PhotoComix< / i> / GraphiX Colors  ->  fx_compose_graphixcolor
+<i>PhotoComix< / i> / Graphic Boost-Old  ->  fx_graphic_boost
+<i>PhotoComix< / i> / Graphic Colors  ->  fx_compose_graphicolor
+<i>PhotoComix< / i> / Graphic Novel-Old  ->  fx_novelfx
+<i>PhotoComix< / i> / Heavy Screen  ->  fx_compose_heavyscreen
+<i>PhotoComix< / i> / Metallic Grain  ->  fx_metalgrain
+<i>PhotoComix< / i> / Metallic Stencils  ->  fx_metallicstencils
+<i>PhotoComix< / i> / Vivid Colors  ->  fx_compose_vivid_color
+<i>PhotoComix< / i> / Vivid Edges  ->  fx_compose_vividedges
+<i>PhotoComix< / i> / Vivid Screen  ->  fx_compose_vividscreen
+<i>PhotoComix< / i> / Wild Cartoonizer  ->  fx_m_l_unsharp2
+<i>Prawnsushi< / i> / Gimp Random Layer Modes  ->  pr_laymod
+<i>Prawnsushi< / i> / Kaleido Patterns  ->  pr_kalpat
+<i>Prawnsushi< / i> / Line Spam  ->  pr_linespam
+<i>Prawnsushi< / i> / Paper Cuts  ->  pr_papercuts
+<i>Prawnsushi< / i> / Prawn Canvas  ->  pr_canvas
+<i>Prawnsushi< / i> / Seamless Chaotic Pattern  ->  pr_scpat
+<i>Prawnsushi< / i> / Sick Painter  ->  pr_sickpaint
+<i>Prawnsushi< / i> / Sketchy Ellipses  ->  pr_sketchy_ellipses
+<i>Prawnsushi< / i> / Slice Stretch-Squeeze  ->  pr_streeze
+<i>Prawnsushi< / i> / Smoothelate  ->  pr_smoothelate
+<i>Prawnsushi< / i> / Stringify Mod  ->  pr_stringify
+<i>Prawnsushi< / i> / Uglify  ->  uglify
+<i>Rendering< / i> / Crazy Texture  ->  fx_crazy_texture
+<i>Rendering< / i> / Rectexture  ->  fx_rectexture
+<i>Rendering< / i> / Rosace Triangles Sierpinski  ->  samj_Rosace_Triangles_Sierpinski
+<i>Rendering< / i> / Rotating Circles  ->  samj_Cercles_Qui_Tournent
+<i>Rendering< / i> / Rows Columns  ->  samj_Lignes_Colonnes
+<i>Rendering< / i> / Simple Geometric Shapes  ->  samj_Formes_Geometriques_Simples
+<i>Rendering< / i> / Spirographe  ->  Spirographe_samj
+<i>Rendering< / i> / Splines Test  ->  samj_Splines_Test
+<i>Rendering< / i> / Straight Lines  ->  samj_Des_Lignes_002
+<i>Rendering< / i> / Superposition Triangles Sierpinski  ->  samj_Superposition_Triangles_Sierpinski
+<i>Rendering< / i> / Tangential Circles  ->  cl_tangentialCircle
+<i>Rendering< / i> / Test Visu 3D  ->  samj_Test_Visu_3D
+<i>Rendering< / i> / Traits Strokes  ->  Traits_Strokes_samj
+<i>Rendering< / i> / Triangles Shades Adjacents  ->  Triangles_Shades_Adjacents
+<i>Repair< / i> / CorLine  ->  samj_CorLine
+<i>Repair< / i> / CorLine B  ->  samj_CorLine_B
+<i>Repair< / i> / Denoise Smooth  ->  afre_denoisesmooth
+<i>Repair< / i> / Denoise Smooth Alt  ->  afre_denoisesmooth_alt
+<i>Repair< / i> / Local Similarity Mask  ->  local_similarity_mask
+<i>Repair< / i> / Pixel Denoise  ->  iain_pixel_denoise_p
+<i>Repair< / i> / Recursive Median  ->  iain_recursive_median_p
+<i>Reptorian< / i> / Bit-Plane Shuffler  ->  fx_rep_bitplane_shuffle
+<i>Reptorian< / i> / Bricks  ->  gui_rep_shape_brick
+<i>Reptorian< / i> / Channel Blur-Sharpen-Overblur-Overline  ->  fx_rep_cbsoo
+<i>Reptorian< / i> / Chirikov-Taylor  ->  fx_rep_cstdmap
+<i>Reptorian< / i> / Color Existence Distribution [RGB-8]  ->  rep_color_existence_distribution_rgb8
+<i>Reptorian< / i> / Color Modulo Texture  ->  gui_rep_colmt
+<i>Reptorian< / i> / Color Region  ->  fx_rep_color_region
+<i>Reptorian< / i> / Complexion Burst  ->  fx_rep_compb
+<i>Reptorian< / i> / Diffusion Limited Aggregation  ->  fx_rep_dla
+<i>Reptorian< / i> / Dungeon Floor (Super Slow!)  ->  fx_rep_dungeon_floor
+<i>Reptorian< / i> / Dynamic Contrast  ->  rep_dynamic_contrast
+<i>Reptorian< / i> / Edge Fade  ->  fx_rep_edgefade
+<i>Reptorian< / i> / Ellsworth Kelly Board  ->  fx_rep_ekb
+<i>Reptorian< / i> / Fibonacci  ->  fx_rep_fibonacci
+<i>Reptorian< / i> / Gaussian Blur By Color Space  ->  fx_rep_blur_cs
+<i>Reptorian< / i> / Glass Vignette  ->  gui_rep_gv
+<i>Reptorian< / i> / Graduated Filter  ->  fx_rep_graduated_filter
+<i>Reptorian< / i> / Grouped Pixel Axis-Based Shift  ->  fx_rep_sptbwgp
+<i>Reptorian< / i> / HSX Posterize-Index  ->  fx_rep_p_i
+<i>Reptorian< / i> / Henon Phase Diagram  ->  fx_rep_henon_phase_diagram
+<i>Reptorian< / i> / Lavander Binary Map  ->  fx_rep_lavander_binary_map
+<i>Reptorian< / i> / Majority  ->  gui_rep_majority
+<i>Reptorian< / i> / Majority [Threshold]  ->  gui_rep_majority_threshold
+<i>Reptorian< / i> / Markus-Lyapunov Fractal  ->  fx_rep_mlfrac
+<i>Reptorian< / i> / Mitchell Concatenation  ->  fx_rep_mitchell_concatenation
+<i>Reptorian< / i> / Newton Fractal [MadJik Style]  ->  rep_mj_newf
+<i>Reptorian< / i> / Non-Convolution Edge Extraction  ->  fx_ncee
+<i>Reptorian< / i> / Non-Isometric RPG Tiler (Interactive)  ->  fx_rep_rpgtiler_noniso
+<i>Reptorian< / i> / Ordered Dithering  ->  fx_rep_loupasc_ordered_dither
+<i>Reptorian< / i> / Panel Image  ->  rep_fx_shift
+<i>Reptorian< / i> / Perspective Streak  ->  gui_rep_perspective_streak
+<i>Reptorian< / i> / Popcorn Fractal [Transformative]  ->  fx_rep_pfrac_t_rs
+<i>Reptorian< / i> / Premade Palette  ->  fx_rep_premade_palette
+<i>Reptorian< / i> / Prime Surface  ->  gui_rep_prime_surface
+<i>Reptorian< / i> / RGB-Gray Linear Interpolation  ->  fx_rep_lerp_rgb_gray
+<i>Reptorian< / i> / Rainbowify  ->  fx_rep_rainbowify
+<i>Reptorian< / i> / Random Gradient Bars  ->  fx_rep_randgradbar
+<i>Reptorian< / i> / Random Rectangle Division  ->  fx_rep_rrd
+<i>Reptorian< / i> / Rectangle-Square Fill  ->  fx_rep_rand_sqrrecfill
+<i>Reptorian< / i> / Reverse Digits  ->  fx_rep_rd
+<i>Reptorian< / i> / Reverse Engineer Color Curve  ->  gui_rep_recc
+<i>Reptorian< / i> / Reverse Engineer Gradient Map  ->  gui_rep_regm
+<i>Reptorian< / i> / Serendipitous Circle  ->  fx_rep_serendipitous_circle
+<i>Reptorian< / i> / Shear  ->  fx_rep_shear
+<i>Reptorian< / i> / Statistical Average  ->  fx_rep_bchstatfunc_average
+<i>Reptorian< / i> / Statistical Mode  ->  fx_rep_stat_mode
+<i>Reptorian< / i> / Strange Bulger  ->  rep_strbul
+<i>Reptorian< / i> / Strange Bulger Kaleidoscope  ->  rep_strbulkal_gui
+<i>Reptorian< / i> / TR's Intense Filtering  ->  gui_rep_trif
+<i>Reptorian< / i> / TR's Pixel Sharpener  ->  gui_rep_trps
+<i>Reptorian< / i> / Three-Coupled Oscillators  ->  fx_rep_tco
+<i>Reptorian< / i> / Tiled Form  ->  gui_rep_form_pixel
+<i>Reptorian< / i> / Tiled Zoom  ->  fx_rep_tz
+<i>Reptorian< / i> / Transfer Color [Reduced Colors]  ->  fx_rep_transfer_color_reduced
+<i>Reptorian< / i> / Trigonometry Mapping  ->  fx_rep_tg3
+<i>Reptorian< / i> / Tupper's Self-Referential Formula  ->  fx_rep_self_referential_formula
+<i>Reptorian< / i> / Vibrato  ->  fx_vibrato
+<i>Reptorian< / i> / Weighted RGB To Grayscale  ->  fx_rep_w_rgb82gray
+<i>Reptorian< / i> / Z-Time  ->  fx_rep_z_render : *
+<i>Telperion< / i> / Mc Flou  ->  mc_flou
+<i>Telperion< / i> / Mc Pendraw  ->  mc_pendraw
+<i>Zonderr< / i> / Demo Mathmap RA  ->  demo_ra
+<i>Zonderr< / i> / Demo Mathmap XY  ->  demo_xy
+<i>Zonderr< / i> / Fourier Picture Watermark  ->  fx_fourier_picture_watermark
+<i>Zonderr< / i> / Mathmap Flag  ->  mathmap_flag
+<i>Zonderr< / i> / Rel2ellv3  ->  mathmap_rel2ellv3
+_ / Black & White Film  ->  fx_bwfilmsimulate
+_ / Contrast FFT  ->  afre_contrastfft
+_ / Denoise [afre]  ->  afre_denoise
+_ / Details  ->  afre_details
+_ / Dodge Sketch  ->  fx_dodgesketch
+_ / Exposure Fusion Weight Map  ->  fx_ExposureWeightMap
+_ / For Littbarski  ->  fx_for_littbarski
+_ / Fourier Transform [Old]  ->  fx_fourier_old
+_ / Frame [Round] Old  ->  fx_frame_round_old
+_ / GMic Structure Tensors  ->  fx_StructureTensors
+_ / Gamify  ->  fx_gamify
+_ / Gleam  ->  afre_gleam
+_ / Graduated Color Accent  ->  fx_gca
+_ / Half & Half  ->  afre_halfhalf
+_ / Hessian Norm  ->  fx_hnorm
+_ / Import 16bits Image  ->  fx_import_image_16
+_ / Layer Info  ->  gui_layer_info
+_ / Luminance to Alpha  ->  fx_split_luminance
+_ / Make Old Squiggly  ->  fx_OldSquiggly
+_ / Mapped Smoothing  ->  fx_MappedSmooth
+_ / Mesh Blend  ->  fx_mesh_blend
+_ / Montage X  ->  afre_montagex
+_ / Night HDR Image Black Noise Correction  ->  fx_fix_HDR_black
+_ / Noise Painting  ->  fx_noisepainting
+_ / Pastell Art  ->  fx_pastell
+_ / Patrick RGB  ->  pat_rgb
+_ / Phoenix Steam-Pencil  ->  fx_phoenix
+_ / PhotoComiX Smoothing  ->  fx_smooth_anisotropic
+_ / Portrait Montage  ->  afre_portraitmontage
+_ / Posterized Dithering  ->  fx_pdithered
+_ / Psychedelic Glasswork Tiler  ->  fx_psyglass
+_ / Query Primary  ->  afre_queryprimary
+_ / Save Noise Print  ->  iain_savenoiseprint
+_ / Scale Down Neat  ->  fx_scaledown3
+_ / Shaded Segmentation  ->  dt_segment_shaded
+_ / Sharpen FFT  ->  afre_sharpenfft
+_ / Smooth Sketch  ->  fx_SmoothSketch
+_ / Stereo to Anaglyph  ->  fx_stereo_to_anaglyph
+_ / Vector Field Rotation Demo  ->  fx_DemoVecRot
+_ / Vigcirc  ->  afre_vigcirc
+_ / Vigrect  ->  afre_vigrect
+_ / Warp Test  ->  fx_WarpTest
+_<b>Arrays & Tiles< / b> / Array [Faded]  ->  fx_array_fade
+_<b>Arrays & Tiles< / b> / Array [Mirrored]  ->  fx_array_mirror
+_<b>Arrays & Tiles< / b> / Array [Random Colors]  ->  fx_array_color
+_<b>Arrays & Tiles< / b> / Array [Random]  ->  fx_array_random
+_<b>Arrays & Tiles< / b> / Array [Regular]  ->  fx_array
+_<b>Arrays & Tiles< / b> / Ascii Art  ->  fx_asciiart
+_<b>Arrays & Tiles< / b> / Chessboard  ->  fx_chessboard
+_<b>Arrays & Tiles< / b> / Dices  ->  fx_dices
+_<b>Arrays & Tiles< / b> / Drawn Montage  ->  fx_drawn_montage
+_<b>Arrays & Tiles< / b> / Extract Objects  ->  fx_extract_objects
+_<b>Arrays & Tiles< / b> / Grid [Cartesian]  ->  fx_imagegrid
+_<b>Arrays & Tiles< / b> / Grid [Hexagonal]  ->  fx_imagegrid_hexagonal
+_<b>Arrays & Tiles< / b> / Grid [Triangular]  ->  fx_imagegrid_triangular
+_<b>Arrays & Tiles< / b> / Loose Photos  ->  fx_loose_photos
+_<b>Arrays & Tiles< / b> / Make Seamless [Diffusion]  ->  fx_make_seamless
+_<b>Arrays & Tiles< / b> / Make Seamless [Patch-Based]  ->  fx_frame_seamless
+_<b>Arrays & Tiles< / b> / Ministeck  ->  fx_ministeck
+_<b>Arrays & Tiles< / b> / Montage  ->  fx_montage
+_<b>Arrays & Tiles< / b> / Puzzle  ->  fx_puzzle
+_<b>Arrays & Tiles< / b> / Shuffle Patches  ->  fx_shuffle_patches
+_<b>Arrays & Tiles< / b> / Taquin  ->  fx_taquin
+_<b>Arrays & Tiles< / b> / Tileable Rotation  ->  fx_rotate_tileable
+_<b>Arrays & Tiles< / b> / Tiled Isolation  ->  fx_isolate_tiles
+_<b>Arrays & Tiles< / b> / Tiled Normalization  ->  fx_normalize_tiles
+_<b>Arrays & Tiles< / b> / Tiled Parameterization  ->  fx_parameterize_tiles
+_<b>Arrays & Tiles< / b> / Tiled Random Shifts  ->  fx_shift_tiles
+_<b>Arrays & Tiles< / b> / Tiled Rotation  ->  fx_rotate_tiles
+_<b>Artistic< / b> / Aurora  ->  gcd_aurora
+_<b>Artistic< / b> / Bokeh  ->  fx_bokeh
+_<b>Artistic< / b> / Brushify  ->  fx_brushify
+_<b>Artistic< / b> / Cartoon  ->  cartoon
+_<b>Artistic< / b> / Circle Abstraction  ->  fx_circle_abstraction
+_<b>Artistic< / b> / Comicbook  ->  cl_comic
+_<b>Artistic< / b> / Cubism  ->  fx_cubism
+_<b>Artistic< / b> / Cutout  ->  fx_cutout
+_<b>Artistic< / b> / Diffusion Tensors  ->  fx_diffusiontensors
+_<b>Artistic< / b> / Doodle  ->  fx_doodle
+_<b>Artistic< / b> / Ellipsionism  ->  fx_ellipsionism
+_<b>Artistic< / b> / Felt Pen  ->  fx_feltpen
+_<b>Artistic< / b> / Fractalize  ->  fractalize
+_<b>Artistic< / b> / Ghost  ->  fx_ghost
+_<b>Artistic< / b> / Hard Sketch  ->  fx_hardsketchbw
+_<b>Artistic< / b> / Highlight Bloom  ->  fx_highlight_bloom
+_<b>Artistic< / b> / Hope Poster  ->  fx_poster_hope
+_<b>Artistic< / b> / Hough Sketch  ->  fx_houghsketchbw
+_<b>Artistic< / b> / Illustration Look  ->  fx_illustration_look
+_<b>Artistic< / b> / Kuwahara  ->  fx_kuwahara
+_<b>Artistic< / b> / Linify  ->  fx_linify
+_<b>Artistic< / b> / Lylejk's Painting  ->  fx_lylejk_painting
+_<b>Artistic< / b> / Marker Drawing  ->  fx_marker_drawing
+_<b>Artistic< / b> / Paint With Brush  ->  fx_paint_with_brush
+_<b>Artistic< / b> / Painting  ->  fx_painting
+_<b>Artistic< / b> / Polygonize [Delaunay]  ->  fx_polygonize_delaunay
+_<b>Artistic< / b> / Polygonize [Energy]  ->  fx_polygonize
+_<b>Artistic< / b> / Poster Edges  ->  fx_poster_edges
+_<b>Artistic< / b> / Posterize  ->  fx_posterize
+_<b>Artistic< / b> / Quadtree Variations  ->  fx_quadtree
+_<b>Artistic< / b> / Rodilius  ->  fx_rodilius
+_<b>Artistic< / b> / Shapeism  ->  fx_shapeism
+_<b>Artistic< / b> / Sharp Abstract  ->  fx_sharp_abstract
+_<b>Artistic< / b> / Sketch  ->  fx_sketchbw
+_<b>Artistic< / b> / Smooth Abstract  ->  fx_smooth_abstract
+_<b>Artistic< / b> / Stringify  ->  fx_stringify
+_<b>Artistic< / b> / Stylize  ->  fx_stylize
+_<b>Artistic< / b> / Vector Painting  ->  fx_vector_painting
+_<b>Artistic< / b> / Warhol  ->  warhol
+_<b>Black & White< / b> / B&W Stencil  ->  fx_stencilbw
+_<b>Black & White< / b> / Black & White  ->  fx_blackandwhite
+_<b>Black & White< / b> / Charcoal  ->  fx_charcoal
+_<b>Black & White< / b> / Colorize Lineart [Auto-Fill]  ->  fx_autofill_lineart
+_<b>Black & White< / b> / Colorize Lineart [Propagation]  ->  fx_colorize_lineart
+_<b>Black & White< / b> / Colorize Lineart [Smart Coloring]  ->  fx_colorize_lineart_smart
+_<b>Black & White< / b> / Colorize [Interactive]  ->  fx_colorize_interactive
+_<b>Black & White< / b> / Colorize [Photographs]  ->  fx_recolorize
+_<b>Black & White< / b> / Colorize [with Colormap]  ->  fx_bwrecolorize
+_<b>Black & White< / b> / Desaturate Norm  ->  fx_gcd_norm_eq
+_<b>Black & White< / b> / Dithering  ->  fx_ditheredbw
+_<b>Black & White< / b> / Engrave  ->  fx_engrave
+_<b>Black & White< / b> / Filaments  ->  fx_filaments
+_<b>Black & White< / b> / Freaky B&W  ->  fx_freaky_bw
+_<b>Black & White< / b> / Ink Wash  ->  fx_ink_wash
+_<b>Black & White< / b> / Lineart  ->  cl_lineart
+_<b>Black & White< / b> / Multi-Layer Etch  ->  fx_gcd_layeretch
+_<b>Black & White< / b> / Pencil  ->  fx_pencilbw
+_<b>Black & White< / b> / Pencil Portrait  ->  fx_pencil_portraitbw
+_<b>Black & White< / b> / Stamp  ->  fx_stamp
+_<b>Black & White< / b> / Threshold Etch  ->  fx_gcd_etch
+_<b>Colors< / b> / Abstraction  ->  fx_color_abstraction
+_<b>Colors< / b> / Apply External CLUT  ->  fx_apply_haldclut
+_<b>Colors< / b> / Apply From CLUT Set  ->  apply_from_clut_set
+_<b>Colors< / b> / Auto Balance  ->  gcd_auto_balance
+_<b>Colors< / b> / Basic Adjustments  ->  fx_adjust_colors
+_<b>Colors< / b> / Boost Chromaticity  ->  fx_boost_chroma
+_<b>Colors< / b> / Boost-Fade  ->  fx_boost_fade
+_<b>Colors< / b> / CLUT from After - Before Layers  ->  fx_clut_from_ab
+_<b>Colors< / b> / Channel Processing  ->  fx_channel_processing
+_<b>Colors< / b> / Channels to Layers  ->  fx_channels2layers
+_<b>Colors< / b> / Color Balance  ->  fx_balance_gamma
+_<b>Colors< / b> / Color Blindness  ->  colorblind
+_<b>Colors< / b> / Color Grading  ->  jl_colorgrading
+_<b>Colors< / b> / Color Mask [Interactive]  ->  fx_mask_color
+_<b>Colors< / b> / Color Presets  ->  fx_color_presets
+_<b>Colors< / b> / Color Temperature  ->  fx_tk_colortemp
+_<b>Colors< / b> / Colorful Blobs  ->  fx_colorful_blobs
+_<b>Colors< / b> / Colormap  ->  fx_colormap
+_<b>Colors< / b> / Curves  ->  fx_curves_interactive
+_<b>Colors< / b> / Customize CLUT  ->  fx_customize_clut
+_<b>Colors< / b> / Decompose Channels  ->  fx_decompose_channels
+_<b>Colors< / b> / Detect Skin  ->  fx_detect_skin
+_<b>Colors< / b> / Equalize HSI-HSL-HSV  ->  fx_equalize_hsv
+_<b>Colors< / b> / Equalize HSV  ->  fx_hsv_equalizer
+_<b>Colors< / b> / HSL Adjustment  ->  gcd_hsl
+_<b>Colors< / b> / HSV Select  ->  gcd_hsv_select
+_<b>Colors< / b> / Metallic Look  ->  fx_tk_metallic
+_<b>Colors< / b> / Mixer [CMYK]  ->  fx_mix_cmyk
+_<b>Colors< / b> / Mixer [Generic]  ->  fx_mixer_generic
+_<b>Colors< / b> / Mixer [HSV]  ->  fx_mix_hsv
+_<b>Colors< / b> / Mixer [Lab]  ->  fx_mix_lab
+_<b>Colors< / b> / Mixer [PCA]  ->  fx_mix_pca
+_<b>Colors< / b> / Mixer [RGB]  ->  fx_mix_rgb
+_<b>Colors< / b> / Mixer [YCbCr]  ->  fx_mix_ycbcr
+_<b>Colors< / b> / Random Color Transformation  ->  fx_random_color_transformation
+_<b>Colors< / b> / Retinex  ->  fx_retinex
+_<b>Colors< / b> / Retro Fade  ->  fx_retrofade
+_<b>Colors< / b> / Select-Replace Color  ->  fx_select_color
+_<b>Colors< / b> / Selective Desaturation  ->  fx_selective_desaturation
+_<b>Colors< / b> / Sepia  ->  fx_sepia
+_<b>Colors< / b> / Simulate Film  ->  fx_simulate_film
+_<b>Colors< / b> / Specific Saturation  ->  gcd_hio_levels
+_<b>Colors< / b> / Transfer Colors [Histogram]  ->  fx_transfer_histogram
+_<b>Colors< / b> / Transfer Colors [PCA]  ->  fx_transfer_pca
+_<b>Colors< / b> / Transfer Colors [Patch-Based]  ->  fx_gcd_transfer_colors_patch
+_<b>Colors< / b> / Transfer Colors [Variational]  ->  fx_transfer_rgb
+_<b>Colors< / b> / Tune HSV Colors  ->  fx_tune_hsv
+_<b>Colors< / b> / User-Defined  ->  fx_custom_transform
+_<b>Colors< / b> / Vibrance  ->  fx_vibrance
+_<b>Colors< / b> / Vintage Style  ->  fx_tk_vintage
+_<b>Colors< / b> / Zone System  ->  fx_zonesystem
+_<b>Contours< / b> / Convolve  ->  fx_convolve
+_<b>Contours< / b> / Curvature  ->  fx_curvature
+_<b>Contours< / b> / Difference of Gaussians  ->  fx_dog
+_<b>Contours< / b> / Distance Transform  ->  fx_distance
+_<b>Contours< / b> / Edges  ->  fx_edges
+_<b>Contours< / b> / Edges (Canny)  ->  fx_canny
+_<b>Contours< / b> / Edges Offsets  ->  fx_edge_offsets
+_<b>Contours< / b> / Extract Foreground [Interactive]  ->  fx_extract_foreground
+_<b>Contours< / b> / Gradient Norm  ->  fx_gradient_norm
+_<b>Contours< / b> / Gradient RGB  ->  fx_gradient2rgb
+_<b>Contours< / b> / Isophotes  ->  fx_isophotes
+_<b>Contours< / b> / Laplacian  ->  fx_laplacian
+_<b>Contours< / b> / Local Orientation  ->  fx_local_orientation
+_<b>Contours< / b> / Morphological Filter  ->  fx_morphological
+_<b>Contours< / b> / Segmentation  ->  fx_segment_watershed
+_<b>Contours< / b> / Skeleton  ->  fx_skeleton
+_<b>Contours< / b> / Super-Pixels  ->  fx_superpixels
+_<b>Contours< / b> / Thin Edges  ->  fx_thin_edges
+_<b>Deformations< / b> / Aspect Adjustment  ->  fx_gcd_adjust_aspect
+_<b>Deformations< / b> / Breaks  ->  fx_breaks
+_<b>Deformations< / b> / Cartesian Transform  ->  fx_custom_deformation
+_<b>Deformations< / b> / Circle Transform  ->  fx_circle_transform
+_<b>Deformations< / b> / Conformal Maps  ->  fx_conformal_maps
+_<b>Deformations< / b> / Continuous Droste  ->  souphead_droste10
+_<b>Deformations< / b> / Crease  ->  fx_crease
+_<b>Deformations< / b> / Distort Lens  ->  fx_distort_lens
+_<b>Deformations< / b> / Distort [RBF]  ->  fx_distort_rbf
+_<b>Deformations< / b> / Drop Water  ->  fx_drop_water
+_<b>Deformations< / b> / Equirectangular to Nadir-Zenith  ->  fx_equirectangular2nadirzenith
+_<b>Deformations< / b> / Euclidean - Polar  ->  fx_euclidean2polar
+_<b>Deformations< / b> / Fish-Eye  ->  fisheye
+_<b>Deformations< / b> / Flower  ->  fx_flower
+_<b>Deformations< / b> / Heightfield Warp  ->  fx_heightfield_warp
+_<b>Deformations< / b> / Kaleidoscope [Blended]  ->  fx_rotoidoscope
+_<b>Deformations< / b> / Kaleidoscope [Polar]  ->  fx_kaleidoscope
+_<b>Deformations< / b> / Kaleidoscope [Symmetry]  ->  fx_symmetrizoscope
+_<b>Deformations< / b> / Moon2panorama  ->  moon2panorama
+_<b>Deformations< / b> / Morph [Interactive]  ->  fx_morph_interactive
+_<b>Deformations< / b> / Perspective  ->  fx_warp_perspective
+_<b>Deformations< / b> / Poincaré Disk  ->  fx_poincare_disk
+_<b>Deformations< / b> / Polar Transform  ->  fx_transform_polar
+_<b>Deformations< / b> / Quadrangle  ->  fx_quadrangle
+_<b>Deformations< / b> / Raindrops  ->  raindrops
+_<b>Deformations< / b> / Random  ->  deform
+_<b>Deformations< / b> / Reflection  ->  fx_reflect
+_<b>Deformations< / b> / Ripple  ->  ripple
+_<b>Deformations< / b> / Seamcarve  ->  fx_seamcarve
+_<b>Deformations< / b> / Sphere  ->  fx_map_sphere
+_<b>Deformations< / b> / Spherize  ->  fx_spherize
+_<b>Deformations< / b> / Square to Circle  ->  fx_square_circle
+_<b>Deformations< / b> / Square to Circle [alt]  ->  fx_square_circle_alt
+_<b>Deformations< / b> / Stereographic Projection  ->  fx_project_stereographic
+_<b>Deformations< / b> / Symmetrize  ->  fx_symmetrize
+_<b>Deformations< / b> / Textured Glass  ->  fx_textured_glass
+_<b>Deformations< / b> / Twirl  ->  fx_twirl
+_<b>Deformations< / b> / Warp [Interactive]  ->  fx_warp_interactive
+_<b>Deformations< / b> / Warp [RBF]  ->  fx_warp_rbf
+_<b>Deformations< / b> / Water  ->  water
+_<b>Deformations< / b> / Wave  ->  wave
+_<b>Deformations< / b> / Wind  ->  fx_wind
+_<b>Deformations< / b> / Zoom  ->  fx_zoom_v2
+_<b>Degradations< / b> / Add Grain  ->  fx_simulate_grain
+_<b>Degradations< / b> / Blur [Angular]  ->  fx_blur_angular
+_<b>Degradations< / b> / Blur [Bloom]  ->  fx_blur_bloom
+_<b>Degradations< / b> / Blur [Depth-Of-Field]  ->  fx_blur_dof
+_<b>Degradations< / b> / Blur [Gaussian]  ->  fx_blur_gaussian
+_<b>Degradations< / b> / Blur [Glow]  ->  fx_glow
+_<b>Degradations< / b> / Blur [Linear]  ->  fx_blur_linear
+_<b>Degradations< / b> / Blur [Motion]  ->  fx_blur_motion
+_<b>Degradations< / b> / Blur [Multidirectional]  ->  fx_blur_multidirectional
+_<b>Degradations< / b> / Blur [Radial]  ->  fx_blur_radial
+_<b>Degradations< / b> / CRT Phosphors  ->  fx_crt_phosphors
+_<b>Degradations< / b> / CRT Scanlines  ->  fx_crt_scanlines
+_<b>Degradations< / b> / CRT Sub-Pixels  ->  fx_gcd_crt
+_<b>Degradations< / b> / Chromatic Aberrations  ->  fx_chromatic_aberrations
+_<b>Degradations< / b> / Dirty  ->  fx_dirty
+_<b>Degradations< / b> / Flip & Rotate Blocks  ->  fx_flip_blocks
+_<b>Degradations< / b> / Huffman Glitches  ->  fx_huffman_glitches
+_<b>Degradations< / b> / JPEG Artefacts  ->  fx_jpeg_artefacts
+_<b>Degradations< / b> / Lomo  ->  fx_lomo
+_<b>Degradations< / b> / Mess with Bits  ->  fx_mess_with_bits
+_<b>Degradations< / b> / Noise [Additive]  ->  fx_noise
+_<b>Degradations< / b> / Noise [Gradient]  ->  fx_noise_gradient
+_<b>Degradations< / b> / Noise [Perlin]  ->  fx_noise_perlin
+_<b>Degradations< / b> / Noise [Spread]  ->  fx_spread
+_<b>Degradations< / b> / Offset Stripes  ->  fx_offset_stripes
+_<b>Degradations< / b> / Old-Movie Stripes  ->  fx_stripes_y
+_<b>Degradations< / b> / Oldschool 8bits  ->  fx_8bits
+_<b>Degradations< / b> / Pixel Sort  ->  fx_pixelsort
+_<b>Degradations< / b> / Rain & Snow  ->  fx_rain
+_<b>Degradations< / b> / Random Shade Stripes  ->  fx_shade_stripes
+_<b>Degradations< / b> / Rebuild From Similar Blocks  ->  fx_rebuild_from_similar_blocks
+_<b>Degradations< / b> / Scanlines  ->  fx_scanlines
+_<b>Degradations< / b> / Self Glitching  ->  fx_self_glitching
+_<b>Degradations< / b> / Streak  ->  fx_streak
+_<b>Degradations< / b> / VHS Filter  ->  fx_vhs_filter
+_<b>Degradations< / b> / Visible Watermark  ->  fx_watermark_visible
+_<b>Degradations< / b> / Warp by Intensity  ->  fx_warp_by_intensity
+_<b>Details< / b> / DCP Dehaze  ->  jeje_dehaze
+_<b>Details< / b> / Details Equalizer  ->  fx_equalize_details
+_<b>Details< / b> / Dynamic Range Increase  ->  fx_tk_dri
+_<b>Details< / b> / Equalize Local Histograms  ->  fx_equalize_local_histograms
+_<b>Details< / b> / Freaky Details  ->  fx_freaky_details
+_<b>Details< / b> / High Pass  ->  fx_highpass
+_<b>Details< / b> / Local Normalization  ->  fx_normalize_local
+_<b>Details< / b> / Local Processing  ->  fx_local_processing
+_<b>Details< / b> / Local Variance Normalization  ->  jeje_normalize_local_variance
+_<b>Details< / b> / Magic Details  ->  fx_magic_details
+_<b>Details< / b> / Mask Creator  ->  fx_tk_mask
+_<b>Details< / b> / Mighty Details  ->  fx_mighty_details
+_<b>Details< / b> / Portrait Retouching  ->  fx_tk_portrait
+_<b>Details< / b> / Sharpen [Alpha]  ->  fx_sharpen_alpha
+_<b>Details< / b> / Sharpen [Deblur]  ->  fx_deblur
+_<b>Details< / b> / Sharpen [Gold-Meinel]  ->  fx_unsharp_goldmeinel
+_<b>Details< / b> / Sharpen [Hessian]  ->  jeje_hessian_sharpen
+_<b>Details< / b> / Sharpen [Inverse Diffusion]  ->  fx_sharpen_inversediff
+_<b>Details< / b> / Sharpen [Multiscale]  ->  fx_sharpen_multiscale
+_<b>Details< / b> / Sharpen [Octave Sharpening]  ->  fx_unsharp_octave
+_<b>Details< / b> / Sharpen [Richardson-Lucy]  ->  fx_unsharp_richardsonlucy
+_<b>Details< / b> / Sharpen [Shock Filters]  ->  fx_sharpen_shock
+_<b>Details< / b> / Sharpen [Texture]  ->  fx_sharpen_texture
+_<b>Details< / b> / Sharpen [Unsharp Mask]  ->  fx_unsharp
+_<b>Details< / b> / Sharpen [Whiten]  ->  jeje_whiten_frequency
+_<b>Details< / b> / Split Details [Alpha]  ->  fx_split_details_alpha
+_<b>Details< / b> / Split Details [Gaussian]  ->  fx_split_details_gaussian
+_<b>Details< / b> / Split Details [Wavelets]  ->  fx_split_details_wavelets
+_<b>Details< / b> / Spotify  ->  jeje_spotify
+_<b>Details< / b> / Tone Enhance  ->  gcd_tone_enhance
+_<b>Details< / b> / Tone Mapping  ->  fx_map_tones
+_<b>Details< / b> / Tone Mapping [Fast]  ->  fx_map_tones_fast
+_<b>Frames< / b> / Droste  ->  fx_droste
+_<b>Frames< / b> / Frame [Blur]  ->  fx_frame_blur
+_<b>Frames< / b> / Frame [Cube]  ->  fx_frame_cube
+_<b>Frames< / b> / Frame [Fuzzy]  ->  fx_frame_fuzzy
+_<b>Frames< / b> / Frame [Mirror]  ->  fx_frame_mirror
+_<b>Frames< / b> / Frame [Painting]  ->  fx_frame_painting
+_<b>Frames< / b> / Frame [Pattern]  ->  fx_frame_pattern
+_<b>Frames< / b> / Frame [Regular]  ->  fx_frame
+_<b>Frames< / b> / Frame [Relief]  ->  cl_reliefFrame
+_<b>Frames< / b> / Frame [Round]  ->  fx_frame_round
+_<b>Frames< / b> / Frame [Smooth]  ->  fx_frame_smooth
+_<b>Frames< / b> / Old Photograph  ->  fx_old_photo
+_<b>Frames< / b> / Polaroid  ->  fx_polaroid
+_<b>Frames< / b> / Tunnel  ->  fx_tunnel
+_<b>Frames< / b> / Vignette  ->  fx_vignette
+_<b>Frequencies< / b> / Bandpass  ->  fx_bandpass
+_<b>Frequencies< / b> / Fourier Analysis  ->  fx_display_fft
+_<b>Frequencies< / b> / Fourier Transform  ->  fx_fourier_transform
+_<b>Frequencies< / b> / Fourier Watermark  ->  fx_watermark_fourier
+_<b>Icons< / b> / Flip  ->  mc_flip
+_<b>Icons< / b> / Information  ->  mc_information
+_<b>Icons< / b> / Mail  ->  mc_mail
+_<b>Icons< / b> / Phone  ->  mc_phone
+_<b>Icons< / b> / Shopping Cart  ->  mc_shopping_cart
+_<b>Layers< / b> / Align Layers  ->  fx_align_layers
+_<b>Layers< / b> / Blend [Average All]  ->  fx_blend_average_all
+_<b>Layers< / b> / Blend [Edges]  ->  fx_blend_edges
+_<b>Layers< / b> / Blend [Fade]  ->  fx_blend_fade
+_<b>Layers< / b> / Blend [Median]  ->  fx_blend_median
+_<b>Layers< / b> / Blend [Seamless]  ->  fx_blend_seamless
+_<b>Layers< / b> / Blend [Standard]  ->  fx_blend
+_<b>Layers< / b> / Colors to Layers  ->  fx_split_colors
+_<b>Layers< / b> / Fade Layers  ->  fx_fade_layers
+_<b>Layers< / b> / Layers to Tiles  ->  append_tiles
+_<b>Layers< / b> / Morph Layers  ->  fx_morph_layers
+_<b>Layers< / b> / Multiscale Operator  ->  fx_apply_multiscale
+_<b>Layers< / b> / Pack  ->  fx_pack
+_<b>Layers< / b> / Spatial Blend Multi-Layers  ->  fx_smbl
+_<b>Layers< / b> / Stroke  ->  fx_stroke
+_<b>Layers< / b> / Tiles to Layers  ->  fx_tiles2layers
+_<b>Layers< / b> / Tones to Layers  ->  fx_tones2layers
+_<b>Lights & Shadows< / b> / Burn  ->  fx_burn
+_<b>Lights & Shadows< / b> / Dodge and Burn  ->  fx_dodgeburn
+_<b>Lights & Shadows< / b> / Drop Shadow  ->  fx_drop_shadow
+_<b>Lights & Shadows< / b> / Drop Shadow 3D  ->  fx_drop_shadow3d
+_<b>Lights & Shadows< / b> / Equalize Light  ->  fx_equalize_light
+_<b>Lights & Shadows< / b> / Equalize Shadow  ->  fx_equalize_shadow
+_<b>Lights & Shadows< / b> / Guided Light Rays  ->  fx_guided_lightrays
+_<b>Lights & Shadows< / b> / Illuminate 2D Shape  ->  fx_illuminate_shape2d
+_<b>Lights & Shadows< / b> / Light Glow  ->  fx_lightglow
+_<b>Lights & Shadows< / b> / Light Leaks  ->  fx_light_leaks
+_<b>Lights & Shadows< / b> / Light Patch  ->  fx_light_patch
+_<b>Lights & Shadows< / b> / Light Rays  ->  fx_lightrays
+_<b>Lights & Shadows< / b> / Pop Shadows  ->  fx_pop_shadows
+_<b>Lights & Shadows< / b> / Relief Light  ->  fx_light_relief
+_<b>Lights & Shadows< / b> / Shadow Patch  ->  fx_shadow_patch
+_<b>Lights & Shadows< / b> / Slice Luminosity  ->  fx_slice_luminosity
+_<b>Map Projection< / b> / Albers Equal Area Conic  ->  albers_projection
+_<b>Map Projection< / b> / Azimuthal Equidistant  ->  azimuthal_equidistant_projection
+_<b>Map Projection< / b> / Conic Equidistant  ->  conic_equidistant_projection
+_<b>Map Projection< / b> / Cylindrical Equal-Area Projection  ->  cylindrical_equal_area
+_<b>Map Projection< / b> / Eckert IV  ->  eckert_iv_projection
+_<b>Map Projection< / b> / Eckert VI  ->  eckert_vi_projection
+_<b>Map Projection< / b> / Lambert Azimuthal Equal-Area  ->  lambert_azimuthal_projection
+_<b>Map Projection< / b> / Lambert Conformal Conic  ->  lambert_conformal_conic_projection
+_<b>Map Projection< / b> / Mercator Projection  ->  mercator
+_<b>Map Projection< / b> / Mollweide  ->  mollweide_projection
+_<b>Map Projection< / b> / Orthographic  ->  orthographic_projection
+_<b>Map Projection< / b> / Rotate Equirectangular Map  ->  rotate_equirectangular_map
+_<b>Map Projection< / b> / Sinusoidal Map  ->  sinusoidal_map
+_<b>Map Projection< / b> / Triangular Projection  ->  triangular_projection
+_<b>Misc< / b> / Barbed Wire  ->  mc_barbed_wire
+_<b>Misc< / b> / Crosshair  ->  mc_crosshair
+_<b>Misc< / b> / Cupid  ->  fx_cupid
+_<b>Misc< / b> / Gear  ->  fx_gear
+_<b>Misc< / b> / Heart  ->  fx_heart
+_<b>Misc< / b> / Paint Splat  ->  mc_paint_splat
+_<b>Misc< / b> / Sierpinski Triangle  ->  fx_sierpinski
+_<b>Nature< / b> / Australia  ->  mc_australia
+_<b>Nature< / b> / Barnsley Fern  ->  fx_barnsley_fern
+_<b>Nature< / b> / Gum Leaf  ->  mc_gum_leaf
+_<b>Nature< / b> / Japanese Maple Leaf  ->  mc_maple_leaf
+_<b>Nature< / b> / Snowflake  ->  fx_snowflake
+_<b>Others< / b> / Dragon Curve  ->  fx_dragoncurve
+_<b>Patterns< / b> / Bayer Filter  ->  rgb2bayer
+_<b>Patterns< / b> / Box Fitting  ->  fx_boxfitting
+_<b>Patterns< / b> / Camouflage  ->  fx_camouflage
+_<b>Patterns< / b> / Canvas  ->  fx_canvas
+_<b>Patterns< / b> / Canvas Texture  ->  texturize_canvas
+_<b>Patterns< / b> / Clouds  ->  jeje_clouds
+_<b>Patterns< / b> / Cracks  ->  fx_cracks
+_<b>Patterns< / b> / Crystal  ->  fx_crystal
+_<b>Patterns< / b> / Crystal Background  ->  fx_crystal_background
+_<b>Patterns< / b> / Fibers  ->  jeje_fibers
+_<b>Patterns< / b> / Freqy Pattern  ->  jeje_freqy_pattern
+_<b>Patterns< / b> / Halftone  ->  fx_halftone
+_<b>Patterns< / b> / Halftone [Generic]  ->  fx_generic_halftone
+_<b>Patterns< / b> / Hearts  ->  fx_hearts
+_<b>Patterns< / b> / Lava  ->  fx_lava
+_<b>Patterns< / b> / Marble  ->  fx_marble
+_<b>Patterns< / b> / Maze  ->  fx_maze
+_<b>Patterns< / b> / Mineral Mosaic  ->  fx_mineral_mosaic
+_<b>Patterns< / b> / Mosaic  ->  fx_mosaic
+_<b>Patterns< / b> / Op Art  ->  fx_shapes
+_<b>Patterns< / b> / Organic Fibers  ->  fx_organic_fibers
+_<b>Patterns< / b> / Pack Ellipses  ->  fx_pack_ellipses
+_<b>Patterns< / b> / Pack Sprites  ->  fx_pack_sprites
+_<b>Patterns< / b> / Paper Texture  ->  fx_paper
+_<b>Patterns< / b> / Periodic Dots  ->  jeje_periodic_dots
+_<b>Patterns< / b> / Pills  ->  fx_pills
+_<b>Patterns< / b> / Plaid  ->  fx_plaid_texture
+_<b>Patterns< / b> / Polka Dots  ->  fx_polka_dots
+_<b>Patterns< / b> / Random Color Ellipses  ->  fx_color_ellipses
+_<b>Patterns< / b> / Random Pattern  ->  fx_random_pattern
+_<b>Patterns< / b> / Random Rectangles  ->  fx_random_rectangles
+_<b>Patterns< / b> / Rays  ->  jeje_rays
+_<b>Patterns< / b> / Reaction-Diffusion  ->  fx_reaction_diffusion
+_<b>Patterns< / b> / Resynthetize Texture [FFT]  ->  syntexturize
+_<b>Patterns< / b> / Resynthetize Texture [Patch-Based]  ->  syntexturize_matchpatch
+_<b>Patterns< / b> / Rorschach  ->  fx_rorschach
+_<b>Patterns< / b> / Satin  ->  fx_satin
+_<b>Patterns< / b> / Seamless Turbulence  ->  fx_seamless_turbulence
+_<b>Patterns< / b> / Shock Waves  ->  fx_shockwaves
+_<b>Patterns< / b> / Sponge  ->  fx_sponge
+_<b>Patterns< / b> / Stained Glass  ->  fx_stained_glass
+_<b>Patterns< / b> / Stars  ->  fx_stars
+_<b>Patterns< / b> / Stencil  ->  fx_stencil
+_<b>Patterns< / b> / Strip  ->  jeje_strip
+_<b>Patterns< / b> / Stripes  ->  fx_stripes
+_<b>Patterns< / b> / Tetris  ->  fx_tetris
+_<b>Patterns< / b> / Triangular Pattern  ->  fx_triangular_pattern
+_<b>Patterns< / b> / Truchet  ->  fx_truchet
+_<b>Patterns< / b> / Turing  ->  jeje_turing_pattern
+_<b>Patterns< / b> / Voronoi  ->  fx_voronoi
+_<b>Patterns< / b> / Weave  ->  weave
+_<b>Patterns< / b> / Whirl Drawing  ->  fx_draw_whirl
+_<b>Patterns< / b> / Whirls  ->  fx_whirls
+_<b>Rendering< / b> / 2.5D Extrusion  ->  fx_extrude25d
+_<b>Rendering< / b> / 3D Blocks  ->  fx_blocks3d
+_<b>Rendering< / b> / 3D Colored Object  ->  fx_coloredobject3d
+_<b>Rendering< / b> / 3D Elevation  ->  fx_elevation3d
+_<b>Rendering< / b> / 3D Extrusion  ->  fx_extrude3d
+_<b>Rendering< / b> / 3D Image Object  ->  fx_imageobject3d
+_<b>Rendering< / b> / 3D Lathing  ->  fx_lathing3d
+_<b>Rendering< / b> / 3D Mesh  ->  fx_mesh3d
+_<b>Rendering< / b> / 3D Random Objects  ->  fx_random3d
+_<b>Rendering< / b> / ABN Filigrees  ->  gtutor_abn
+_<b>Rendering< / b> / Algorithm A  ->  fx_memoakten_algorithm_a
+_<b>Rendering< / b> / Ball  ->  fx_ball
+_<b>Rendering< / b> / Circle Art  ->  fx_circle_art
+_<b>Rendering< / b> / Color Wheel  ->  cl_colorWheel
+_<b>Rendering< / b> / Equation Plot [Implicit]  ->  cl_implicitEqua
+_<b>Rendering< / b> / Equation Plot [Parametric]  ->  fx_equation_parametric
+_<b>Rendering< / b> / Equation Plot [Y=f(X)]  ->  fx_equation_plot
+_<b>Rendering< / b> / Fluffy Cloud  ->  pr_fluffcloud
+_<b>Rendering< / b> / Generate Random Portrait  ->  fx_generate_random_portrait
+_<b>Rendering< / b> / Gradient [Corners]  ->  fx_corner_gradient
+_<b>Rendering< / b> / Gradient [Custom Shape]  ->  fx_custom_gradient
+_<b>Rendering< / b> / Gradient [Linear]  ->  fx_linear_gradient
+_<b>Rendering< / b> / Gradient [Poles]  ->  fx_gradient_poles
+_<b>Rendering< / b> / Gradient [Radial]  ->  fx_radial_gradient
+_<b>Rendering< / b> / Gradient [Random]  ->  fx_random_gradient
+_<b>Rendering< / b> / Gradient [from Curve]  ->  fx_gradient_from_curve
+_<b>Rendering< / b> / Hair Locks  ->  gtutor_hairlock
+_<b>Rendering< / b> / Hypotrochoid  ->  fx_hypotrochoid
+_<b>Rendering< / b> / Lightning  ->  fx_lightning
+_<b>Rendering< / b> / Lissajous  ->  fx_lissajous
+_<b>Rendering< / b> / Mandelbrot - Julia Sets  ->  fx_mandelbrot
+_<b>Rendering< / b> / Neon Carpet  ->  cl_neonCarpet
+_<b>Rendering< / b> / Neon Lightning  ->  fx_neon_lightning
+_<b>Rendering< / b> / Newton Fractal  ->  fx_newton_fractal
+_<b>Rendering< / b> / Nonscape - Grass  ->  pr_nongrass
+_<b>Rendering< / b> / Nonscape - Woods  ->  pr_nonwoods
+_<b>Rendering< / b> / Plasma  ->  fx_plasma
+_<b>Rendering< / b> / Popcorn Fractal  ->  fx_rep_pfrac
+_<b>Rendering< / b> / Quick Copyright  ->  fx_quick_copyright
+_<b>Rendering< / b> / Rainbow  ->  fx_rainbow
+_<b>Rendering< / b> / Random Signature  ->  fx_random_signature
+_<b>Rendering< / b> / Rectangular Tiling  ->  fx_rec_tileit
+_<b>Rendering< / b> / Shade Bobs  ->  fx_shadebobs
+_<b>Rendering< / b> / Sine Curve  ->  fx_sine_curve
+_<b>Rendering< / b> / Speech Bubble  ->  fx_speech_bubble
+_<b>Rendering< / b> / Spiral RGB  ->  spiral_RGB
+_<b>Rendering< / b> / Spline Spirograph  ->  fx_spline_spirograph
+_<b>Rendering< / b> / Superformula  ->  fx_superformula
+_<b>Rendering< / b> / Symmetric 2D Shape  ->  fx_symmetric_shape2d
+_<b>Rendering< / b> / Tree  ->  fx_tree
+_<b>Rendering< / b> / Turbulence  ->  fx_turbulence
+_<b>Rendering< / b> / Twisted Rays  ->  fx_twisted_rays
+_<b>Repair< / b> / Bayer Reconstruction  ->  bayer2rgb
+_<b>Repair< / b> / Deinterlace  ->  deinterlace
+_<b>Repair< / b> / Deinterlace2x  ->  gcd_deinterlace2x
+_<b>Repair< / b> / Denoise [CNN]  ->  fx_denoise
+_<b>Repair< / b> / Despeckle  ->  gcd_despeckle
+_<b>Repair< / b> / Inpaint [Holes]  ->  fx_inpaint_holes
+_<b>Repair< / b> / Inpaint [Morphological]  ->  fx_inpaint_morpho
+_<b>Repair< / b> / Inpaint [Multi-Scale]  ->  fx_inpaint_matchpatch
+_<b>Repair< / b> / Inpaint [Patch-Based]  ->  fx_inpaint_patch
+_<b>Repair< / b> / Inpaint [Transport-Diffusion]  ->  fx_inpaint_pde
+_<b>Repair< / b> / JPEG Smooth  ->  gcd_jpeg_smooth
+_<b>Repair< / b> / Red-Eye Attenuation  ->  red_eye
+_<b>Repair< / b> / Remove Hot Pixels  ->  remove_hotpixels
+_<b>Repair< / b> / Repair Scanned Document  ->  jeje_scandoc
+_<b>Repair< / b> / Smooth [Anisotropic]  ->  fx_smooth_anisotropic
+_<b>Repair< / b> / Smooth [Antialias]  ->  fx_smooth_antialias
+_<b>Repair< / b> / Smooth [Bilateral]  ->  fx_smooth_bilateral
+_<b>Repair< / b> / Smooth [Block PCA]  ->  jeje_denoise_patch_dict
+_<b>Repair< / b> / Smooth [Diffusion]  ->  fx_smooth_diffusion
+_<b>Repair< / b> / Smooth [Guided]  ->  fx_smooth_guided
+_<b>Repair< / b> / Smooth [IUWT]  ->  jeje_denoise_iuwt
+_<b>Repair< / b> / Smooth [Mean-Curvature]  ->  fx_smooth_meancurvature
+_<b>Repair< / b> / Smooth [Median]  ->  fx_smooth_median
+_<b>Repair< / b> / Smooth [NL-Means]  ->  fx_smooth_nlmeans
+_<b>Repair< / b> / Smooth [Patch-Based]  ->  fx_smooth_patch
+_<b>Repair< / b> / Smooth [Patch-PCA]  ->  fx_smooth_patchpca
+_<b>Repair< / b> / Smooth [Perona-Malik]  ->  fx_smooth_peronamalik
+_<b>Repair< / b> / Smooth [Selective Gaussian]  ->  fx_smooth_selective
+_<b>Repair< / b> / Smooth [Skin]  ->  fx_smooth_skin
+_<b>Repair< / b> / Smooth [Thin Brush]  ->  fx_smooth_anisotropic
+_<b>Repair< / b> / Smooth [Total Variation]  ->  fx_smooth_tv
+_<b>Repair< / b> / Smooth [Wavelets]  ->  fx_smooth_haar
+_<b>Repair< / b> / Smooth [Wiener]  ->  jeje_local_wiener
+_<b>Repair< / b> / Solidify  ->  fx_solidify_td
+_<b>Repair< / b> / Unpurple  ->  unpurple
+_<b>Repair< / b> / Unstrip  ->  jeje_unstrip
+_<b>Repair< / b> / Upscale [CNN2x]  ->  fx_scale2x_cnn
+_<b>Repair< / b> / Upscale [DCCI2x]  ->  fx_scale_dcci2x
+_<b>Repair< / b> / Upscale [Diffusion]  ->  fx_upscale_smart
+_<b>Repair< / b> / Upscale [Scale2x]  ->  fx_scalenx
+_<b>Sequences< / b> / 3D Elevation [Animated]  ->  fx_animate_elevation3d
+_<b>Sequences< / b> / 3D Extrusion [Animated]  ->  fx_animate_extrude3d
+_<b>Sequences< / b> / 3D Image Object [Animated]  ->  fx_animate_imageobject3d
+_<b>Sequences< / b> / 3D Text Pointcloud  ->  fx_text_pointcloud3d
+_<b>Sequences< / b> / 3D Tiles  ->  fx_transition3d
+_<b>Sequences< / b> / B&W Pencil [Animated]  ->  fx_animate_pencilbw
+_<b>Sequences< / b> / B&W Stencil [Animated]  ->  fx_animate_stencilbw
+_<b>Sequences< / b> / Cartoon [Animated]  ->  fx_animate_cartoon
+_<b>Sequences< / b> / Edges [Animated]  ->  fx_animate_edges
+_<b>Sequences< / b> / Edges on Fire  ->  fx_fire_edges
+_<b>Sequences< / b> / Lava Lamp  ->  fx_lavalampbw
+_<b>Sequences< / b> / Lissajous [Animated]  ->  fx_animate_lissajous
+_<b>Sequences< / b> / Moiré Animation  ->  fx_moire
+_<b>Sequences< / b> / Object Animation  ->  fx_tk_animateobject
+_<b>Sequences< / b> / Rodilius [Animated]  ->  fx_animate_rodilius
+_<b>Sequences< / b> / Soft Glow [Animated]  ->  fx_animate_glow
+_<b>Sequences< / b> / Spatial Transition  ->  fx_spatial_transition
+_<b>Various< / b> / Custom Code [Full]  ->  fx_custom_code
+_<b>Various< / b> / Custom Code [Global]  ->  fx_custom_code
+_<b>Various< / b> / Custom Code [Local]  ->  fx_custom_code
+_<b>Various< / b> / Export RGB-565 File  ->  fx_output_565
+_<b>Various< / b> / Games & Demos  ->  fx_gmic_demos
+_<b>Various< / b> / Import Data  ->  fx_import_image
+_<b>Various< / b> / Import RGB-565 File  ->  fx_input_565
+_<b>Various< / b> / Intarsia  ->  fx_intarsia
+_<b>Various< / b> / Sample Image  ->  fx_image_sample
+_<b>Various< / b> / Solve Maze  ->  fx_solve_maze
+_<i>About< / i> / Download External Data  ->  gui_download_all_data
+_<i>About< / i> / Gmicky - Roddy  ->  fx_gmicky
+_<i>Black & White< / i> / Colored Engraving  ->  Engrave_colore
+_<i>Black & White< / i> / Engrave Modifie  ->  engrave_modifie
+_<i>Black & White< / i> / Grid BW Color  ->  samj_Grid_BW_Color
+_<i>Black & White< / i> / Hard Sketch XY  ->  XY_hardsketchbw_samj
+_<i>Black & White< / i> / Masques B&W Masks  ->  samj_Masques_Noir_Et_Blanc
+_<i>Black & White< / i> / NB Edges Engrave  ->  samj_NB_EdgesO_Engrave
+_<i>Black & White< / i> / Scintillements  ->  samj_scintillements
+_<i>Colors< / i> / 64 Couleurs Max  ->  samj_64_Couleurs_Max
+_<i>Colors< / i> / 9 Colors  ->  samj_test_9_colors
+_<i>Colors< / i> / At06A 2017 VarCouleurs  ->  samj_At06A_2017_VarCouleurs
+_<i>Colors< / i> / CeKoaSa 013  ->  samj_CeKoaSa_013
+_<i>Colors< / i> / Color Harmonies  ->  samj_Color_Palettes
+_<i>Colors< / i> / Couleurs Metalliques  ->  Couleurs_Metalliques
+_<i>Colors< / i> / Dorure Gilding  ->  samj_Dorure
+_<i>Colors< / i> / Samj Remplir Fill Flood  ->  samj_Remplir_Fill_Flood
+_<i>Colors< / i> / Samj Test Shapeprevalent  ->  samj_test_shapeprevalent
+_<i>Colors< / i> / Samj Topographie Eliminate Contour Lines  ->  samj_Topographie_Eliminate_Contour_Lines
+_<i>Colors< / i> / Valeur Moyenne LCH  ->  samj_Valeur_Moyenne_LCH
+_<i>Colors< / i> / Variations RVB  ->  samj_Variations_RVB
+_<i>Contours< / i> / Carte De Repoussage  ->  samj_Carte_De_Repoussage
+_<i>Contours< / i> / Colored Outlines  ->  samj_Colored_Outlines
+_<i>Contours< / i> / Coloriage  ->  samj_Coloriage
+_<i>Contours< / i> / Contours Arrondis  ->  samj_Contours_Arrondis
+_<i>Contours< / i> / Contours Blancs  ->  samj_Contours_Blancs
+_<i>Contours< / i> / Contours Coins Vifs  ->  samj_Contours_Coins_Vifs
+_<i>Contours< / i> / Contours Colores  ->  samj_Contours_Colores
+_<i>Contours< / i> / Edge  ->  afre_edge
+_<i>Contours< / i> / Edges Offsets Dots  ->  samj_Edges_Offsets_Dots
+_<i>Contours< / i> / Gradient Norm [JR's Mod]  ->  fx_jr_gradient_norm
+_<i>Contours< / i> / Quelques Isophotes  ->  samj_Quelques_Isophotes
+_<i>Contours< / i> / Quelques Isophotes B  ->  samj_Quelques_Isophotes_B
+_<i>Contours< / i> / Quelques Isophotes C  ->  samj_Quelques_Isophotes_C
+_<i>Contours< / i> / Samj Shapeprevalent Contours  ->  samj_shapeprevalent_contours
+_<i>Contours< / i> / Scintillements Colores Contours  ->  samj_Scintillements_Colores_Contours
+_<i>Contours< / i> / Skeletation  ->  samj_Skeletation
+_<i>Contours< / i> / Test Mauvais Contours  ->  samj_Test_Mauvais_Contours
+_<i>Curves [RGB]< / i> / Blue  ->  fx_apply_RGBcurve
+_<i>Curves [RGB]< / i> / Green  ->  fx_apply_RGBcurve
+_<i>Curves [RGB]< / i> / Red  ->  fx_apply_RGBcurve
+_<i>Curves [YCbCr]< / i> / Blue Chrominance  ->  fx_apply_YCbCrcurve
+_<i>Curves [YCbCr]< / i> / Luminance  ->  fx_apply_YCbCrcurve
+_<i>Curves [YCbCr]< / i> / Red Chrominance  ->  fx_apply_YCbCrcurve
+_<i>Deformations< / i> / Auto-Gnarl  ->  fx_auto_gnarl
+_<i>Deformations< / i> / Beigne Donut  ->  samj_Beigne
+_<i>Deformations< / i> / Cercle Polaire  ->  samj_Cercle_Polaire
+_<i>Deformations< / i> / Ecraser Etirer  ->  samj_Ecraser_Etirer
+_<i>Deformations< / i> / Ecraser Etirer V2  ->  samj_Ecraser_Etirer_V2
+_<i>Deformations< / i> / Random Small Deformations  ->  samj_Random_Small_Deformations
+_<i>Deformations< / i> / Random Small Deformations B  ->  samj_Random_Small_Deformations_B
+_<i>Deformations< / i> / Samj Deformation 20230712  ->  samj_deformation_20230712
+_<i>Degradations< / i> / Deteriorated Areas  ->  samj_Zones_Grises
+_<i>Degradations< / i> / Ellipses Inpaint  ->  samj_Ellipses_Inpaint
+_<i>Degradations< / i> / Image Segments Degrades  ->  samj_Image_Segments_Degrades
+_<i>Degradations< / i> / Image Vers Segments  ->  samj_Image_Vers_Segments
+_<i>Degradations< / i> / Path Et Solidify  ->  samj_Degradations_Path_Solidify
+_<i>Degradations< / i> / Random Plasma  ->  samj_Random_Plasma
+_<i>Degradations< / i> / Samj Bruit Noise  ->  samj_bruit_noise
+_<i>Degradations< / i> / Samj Rotate Flip Image  ->  samj_rotate_flip_image
+_<i>Degradations< / i> / Samj Selection Ellipse  ->  samj_Selection_Ellipse
+_<i>Degradations< / i> / Samj Selection Hermite Spline  ->  samj_Selection_Hermite_Spline
+_<i>Degradations< / i> / Samj Selection Polygone  ->  samj_Selection_Polygone
+_<i>Degradations< / i> / Samj Selection Rectangle  ->  samj_Selection_Rectangle
+_<i>Degradations< / i> / Samj Selection Spline Rounded  ->  samj_Selection_Spline_Rounded
+_<i>Degradations< / i> / Samj Shapeprevalent Degradations  ->  samj_shapeprevalent_degradations
+_<i>Details< / i> / 8-Bit Plane Splitter  ->  fx_bitplane8
+_<i>Details< / i> / Antialias Wavelet  ->  samj_Antialias_Wavelet
+_<i>Details< / i> / Bilinear Enhancement  ->  fx_jr_bilinear
+_<i>Details< / i> / Sharpen [Wavelet]  ->  samj_Wavelet_Sharpen_Test_en
+_<i>Details< / i> / Wavelet Sharpen Test  ->  samj_Wavelet_Sharpen_Test
+_<i>Frames< / i> / At06B 2017 Frame Painting  ->  samj_At06A_2017_frame_painting
+_<i>Gentlemanbeggar< / i> / 60's Cinema  ->  fx_gb_cfx
+_<i>Jayprich< / i> / Jpr Colour Illusion  ->  jpr_colourillusion
+_<i>Jayprich< / i> / Jpr Coltexindex  ->  jpr_coltexindex
+_<i>Jayprich< / i> / Jpr Decimate  ->  jpr_decimate
+_<i>Jayprich< / i> / Jpr Gradient Smooth  ->  jpr_gradient_smooth
+_<i>Jayprich< / i> / Jpr Line Edges  ->  jpr_line_edges
+_<i>Jayprich< / i> / Jpr Orientedthinning  ->  jpr_orientedthinning
+_<i>Jayprich< / i> / Jpr Phasecongruence  ->  jpr_phasecongruence
+_<i>Jayprich< / i> / Jpr Remove Blocks1  ->  jpr_remove_blocks1
+_<i>Jayprich< / i> / Jpr Shapes Gradient  ->  jpr_shapes_gradient
+_<i>Jayprich< / i> / Jpr Specularbumps  ->  jpr_specularbumps
+_<i>Jayprich< / i> / Jpr Warpfromthreshold  ->  jpr_warpfromthreshold
+_<i>Lights & Shadows< / i> / Ombre Portee  ->  samj_Ombre_Portee
+_<i>Lights & Shadows< / i> / Ombre Portee B  ->  samj_Ombre_Portee_B
+_<i>Lights & Shadows< / i> / Ombre Portee C  ->  samj_Ombre_Portee_C
+_<i>Lights & Shadows< / i> / Ombre Portee D  ->  samj_Ombre_Portee_D
+_<i>Lights & Shadows< / i> / Posterize Relief  ->  samj_Posterize_Relief
+_<i>Lylejk< / i> / Blend [Shape Average]  ->  fx_blend_shapeaverage
+_<i>Lylejk< / i> / Lylejk Luma Invert  ->  Lylejk_Luma_Invert
+_<i>Lylejk< / i> / Lylejk Quantize Wicker  ->  Lylejk_Quantize_Wicker
+_<i>Lylejk< / i> / Lylejk Ribbon  ->  Lylejk_Ribbon
+_<i>Lylejk< / i> / Lylejk Ripple  ->  ripple
+_<i>Lylejk< / i> / Lylejk Test TRW  ->  lylejk_test_TRW
+_<i>Lylejk< / i> / Lylejk Wicker  ->  Lylejk_Wicker
+_<i>Lylejk< / i> / Lylejk Wicker 2  ->  Lylejk_Wicker_2
+_<i>Lylejk< / i> / Lylejk Woven  ->  Lylejk_Woven
+_<i>Lylejk< / i> / Lylejk's Stencil  ->  fx_lylejk_stencil
+_<i>Lylejk< / i> / Pen Drawing  ->  fx_pen_drawing
+_<i>Lylejk< / i> / Point Star Outline  ->  garagecoder_lylejk_samj_points_outlines
+_<i>Marcos Capelini< / i> / Film Grain  ->  mc_film_grain
+_<i>McCap< / i> / Hue Overlay Masks  ->  fx_hue_overlay_masks
+_<i>Naggobot< / i> / Abstract Flood  ->  fx_AbstractFlood
+_<i>Okyl168< / i> / Jobs Colors  ->  fx_jobs_colors
+_<i>Patterns< / i> / Contours Gros Pixels  ->  samj_Contours_Gros_Pixels
+_<i>Patterns< / i> / Degrades HSL TSL  ->  samj_Degrades_HSL_TSL
+_<i>Prawnsushi< / i> / 3D Abstract  ->  pr_3dabstract
+_<i>RL< / i> / Plasma Transition  ->  plasma_transition
+_<i>RL< / i> / RandomWaves  ->  randomwaves
+_<i>Rendering< / i> / Adjacent Annular Steiner Chains  ->  samj_Adjacent_Annular_Steiner_Chains
+_<i>Rendering< / i> / Adjacent Rectangles  ->  samj_Rectangles_Adjacents
+_<i>Rendering< / i> / Annular Steiner Chains  ->  samj_Annular_Steiner_Chains
+_<i>Rendering< / i> / Chains Solidify  ->  samj_Chains_Solidify
+_<i>Rendering< / i> / Christmas Balls  ->  samj_Noel_2016
+_<i>Rendering< / i> / Chryzodes  ->  samj_Chryzodes
+_<i>Rendering< / i> / Contour Line Laser  ->  samj_Contour_Line_Laser_LED
+_<i>Rendering< / i> / Dessiner Un Polygone - Draw a Polygon  ->  samj_dessiner_un_polygone
+_<i>Rendering< / i> / Egg Oeuf Granville  ->  samj_Egg_Oeuf_Granville
+_<i>Rendering< / i> / Egg Oeuf Hugelschaffer  ->  samj_Egg_Oeuf_Hugelschaffer
+_<i>Rendering< / i> / Egg Oeuf Rosillo  ->  samj_Egg_Oeuf_Rosillo
+_<i>Rendering< / i> / Engrenages Gears Laser  ->  samj_Engrenages_Laser_LED
+_<i>Rendering< / i> / Etoile De Pompei  ->  samj_etoile_de_pompei_153
+_<i>Rendering< / i> / Etoile De Pompei Triangles Sierpinski  ->  samj_Etoile_De_Pompei_Triangles_Sierpinski
+_<i>Rendering< / i> / Etoiles Remplies Triangles Sierpinski  ->  samj_Etoiles_Remplies_Triangles_Sierpinski
+_<i>Rendering< / i> / Etoiles Stars Laser  ->  samj_Etoiles_Laser_LED
+_<i>Rendering< / i> / Flocon Snowflake Laser  ->  samj_Flocon_Laser_LED
+_<i>Rendering< / i> / Fractal Tree  ->  samj_Fractal_Tree
+_<i>Rendering< / i> / Gradient CIE Lab [Linear]  ->  samj_Linear_Gradient_CIE_Lab
+_<i>Rendering< / i> / Gradient CIE Lab [Shape]  ->  samj_Shape_Linear_Gradient_CIE_Lab
+_<i>Rendering< / i> / Harmonograph  ->  Harmonograph_samj
+_<i>Rendering< / i> / Hawaiian Earring  ->  samj_Hawaiian_Earring
+_<i>Rendering< / i> / Lines of Varying Thickness  ->  samj_Lignes_Epaisseur_Variable
+_<i>Rendering< / i> / Orbites  ->  samj_Orbites
+_<i>Rendering< / i> / Palette De Degrades  ->  samj_Palette_De_Degrades
+_<i>Rendering< / i> / Pappus Chain  ->  samj_Cercles_Tangents_Dans_Cercle
+_<i>Rendering< / i> / Pintograph  ->  Pintograph_samj
+_<i>Rendering< / i> / Poisson D'Avril  ->  samj_Poisson_D_Avril
+_<i>Reptorian< / i> / Array [Random] [Jumble by Px]  ->  fx_rep_array_random_jumble_by_px
+_<i>Reptorian< / i> / Attractor  ->  fx_rep_trsa
+_<i>Reptorian< / i> / Autofill Coloring Book  ->  gui_rep_acb
+_<i>Reptorian< / i> / Axis Streak  ->  gui_axis_streak
+_<i>Reptorian< / i> / Binary Alternating Quaddro Texture [Basic]  ->  rep_binary_quaddro_basic_gui
+_<i>Ronounours< / i> / Auto-Adjust Orientation  ->  fx_adjust_orientation
+_<i>Ronounours< / i> / Blur [Quad]  ->  fx_blur_quad
+_<i>Ronounours< / i> / Curves  ->  fx_apply_curve
+_<i>Sequences< / i> / Spatial Transition To PNG  ->  samj_fx_spatial_transition_to_PNG
+_<i>Sequences< / i> / Transition H V To PNG  ->  samj_transition_H_V_to_PNG
+_<i>Tom Keil< / i> / Beauty Retouch  ->  fx_tk_retouch
+_<i>Tom Keil< / i> / DOF Manipulation  ->  fx_tk_dof
+_<i>Tom Keil< / i> / Infrared Simulation  ->  fx_tk_infrared
+_<i>Tom Keil< / i> / Photoillustration  ->  fx_tk_photoillustration
+_<i>Various< / i> / BoxFiter Map  ->  samj_BoxFiter_Map
+_<i>Various< / i> / BoxFiter Test  ->  samj_BoxFiter_Test
+_<i>Various< / i> / Carres Lignes - Squares Lines  ->  samj_Carres_Lignes
+_<i>Various< / i> / CeKoaSa 001  ->  samj_CeKoaSa_001
+_<i>Various< / i> / CeKoaSa 002  ->  samj_CeKoaSa_002
+_<i>Various< / i> / CeKoaSa 003  ->  samj_CeKoaSa_003
+_<i>Various< / i> / CeKoaSa 004  ->  samj_CeKoaSa_004
+_<i>Various< / i> / CeKoaSa 005  ->  samj_CeKoaSa_005
+_<i>Various< / i> / CeKoaSa 007  ->  samj_CeKoaSa_007
+_<i>Various< / i> / CeKoaSa 008  ->  samj_CeKoaSa_008
+_<i>Various< / i> / CeKoaSa 009  ->  samj_CeKoaSa_009
+_<i>Various< / i> / CeKoaSa 010  ->  samj_CeKoaSa_010
+_<i>Various< / i> / CeKoaSa 011  ->  samj_CeKoaSa_011
+_<i>Various< / i> / CeKoaSa 012  ->  samj_CeKoaSa_012
+_<i>Various< / i> / Diaporama - Slideshow  ->  samj_diaporama
+_<i>Various< / i> / Do Nothing  ->  Je_passe_l_hiver_en_Floride
+_<i>Various< / i> / Layers To PNG  ->  samj_Layers_To_PNG
+_<i>Various< / i> / Polygonize  ->  polygonize_GUI
+_<i>Various< / i> / Recolorize 20130115  ->  gimp_recolorize_20130115_modifie
+_<i>Various< / i> / Relief A  ->  samj_Relief_A
+_<i>Various< / i> / SVG Symetries A  ->  samj_SVG_Symetries_A
+_<i>Various< / i> / SVG TSP  ->  samj_GUI_Test_Liste_Points_TSP
+_<i>Various< / i> / Segments Points TSP  ->  samj_TSP_Segments_GUI
+_<i>Various< / i> / Test A  ->  samj_test_A
+_<i>Various< / i> / Test B  ->  samj_test_B
+_<i>Various< / i> / Test C  ->  samj_test_C
+_<i>Various< / i> / Test Courbes  ->  samj_test_x_color_curves
+_<i>Various< / i> / Test D  ->  samj_test_D
+_<i>Various< / i> / Test Dither Color  ->  samj_test_Dither_Color
+_<i>Various< / i> / Test E  ->  samj_test_E
+_<i>Various< / i> / Test F  ->  samj_test_F
+_<i>Various< / i> / Test G  ->  samj_test_G
+_<i>Various< / i> / Test Solidify  ->  samj_Test_Solidify
+_<i>Various< / i> / Tests Fill  ->  samj_Tests_Fill
+_<i>Various< / i> / Texture 002  ->  samj_gimp_texture_zero_zero_deux
+_<i>Various< / i> / Texture 003  ->  samj_Texture_Aquarelle_1
+_<i>Various< / i> / Toile Araignee  ->  samj_Toile_D_Araignee
+_<i>Various< / i> / Tout Interactif  ->  samj_test_tout_interactif
+_<i>Various< / i> / Triangles Lignes - Lines  ->  samj_Triangles_Lignes
+__<b>Arrays & Tiles< / b> / Little Boxy Things  ->  pr_lilboxy
+__<b>Artistic< / b> / Blockism  ->  fx_blockism
+__<b>Artistic< / b> / Color Abstraction Paint  ->  fx_ColorAbstractionPaint
+__<b>Artistic< / b> / Colored Pencils  ->  fx_cpencil
+__<b>Artistic< / b> / Dream Smoothing  ->  fx_dreamsmooth
+__<b>Artistic< / b> / Dream Smoothing Enhanced  ->  fx_dream_smoothing_enhanced
+__<b>Artistic< / b> / Finger Paint  ->  gtutor_fpaint
+__<b>Artistic< / b> / Graphic Boost  ->  fx_graphic_boost4
+__<b>Artistic< / b> / Graphic Novel  ->  fx_graphic_novelfxl
+__<b>Black & White< / b> / Emboss  ->  gcd_emboss
+__<b>Colors< / b> / CMYK Tone  ->  iain_cmyk_tone_p
+__<b>Colors< / b> / LMS Adjustment  ->  gcd_balance_lms
+__<b>Colors< / b> / Multi Thresholds  ->  tran_multi_threshold
+__<b>Colors< / b> / Normalize Brightness  ->  gcd_normalize_brightness
+__<b>Colors< / b> / Temperature Balance  ->  gcd_temp_balance
+__<b>Colors< / b> / Vibrance [YCH]  ->  fx_rep_vibrance_ych
+__<b>Deformations< / b> / Inverse Bezier Warp  ->  gcd_ebwarp
+__<b>Deformations< / b> / Kaleidoscope [Reptorian-Polar]  ->  gui_rep_polkal
+__<b>Deformations< / b> / Logarithmic Distortion  ->  rep_logpindis_gui
+__<b>Deformations< / b> / Pixel Push  ->  fx_rep_pxpush
+__<b>Deformations< / b> / Point Warp  ->  gui_rep_pw
+__<b>Deformations< / b> / Rotate by Torus Map  ->  fx_rep_rbtt
+__<b>Deformations< / b> / Sinusoidal Water Distortion  ->  rep_sinowaterdist_gui
+__<b>Deformations< / b> / Spiral Distortion  ->  gui_rep_sd
+__<b>Deformations< / b> / Squareroot - Logarithmic Distortion  ->  rep_sqrlogpindis_gui
+__<b>Deformations< / b> / Stitch Distort  ->  fx_rep_stitch
+__<b>Degradations< / b> / Blur [Splinter]  ->  fx_rep_blur_splinter
+__<b>Degradations< / b> / Channel Shuffle  ->  pr_chanshuff
+__<b>Degradations< / b> / Fragment Blur  ->  gui_rep_frblur
+__<b>Degradations< / b> / Lens Blur  ->  fx_gb_lb
+__<b>Degradations< / b> / Sloppy Mess  ->  pr_sloppymess
+__<b>Details< / b> / Emboss-Relief  ->  fx_emboss_relief
+__<b>Details< / b> / Local Contrast Enhancement  ->  fx_LCE
+__<b>Details< / b> / Quick Tonemap  ->  fx_gcd_quicktone
+__<b>Details< / b> / Sharpen [Gradient]  ->  gcd_sharpen_gradient
+__<b>Details< / b> / Sharpen [Tones]  ->  gcd_sharpen_tones
+__<b>Details< / b> / Simple Dehaze  ->  gcd_simple_dehaze
+__<b>Details< / b> / Simple Local Contrast  ->  simplelocalcontrast_p
+__<b>Patterns< / b> / Binary Alternating Quaddro Texture [MultiChannel]  ->  rep_binary_quaddro_mc_gui
+__<b>Patterns< / b> / Halftone Shapes  ->  iain_halftone_shapes
+__<b>Patterns< / b> / Hedcut  ->  hedcut
+__<b>Patterns< / b> / Hitomezashi  ->  fx_rep_hitomezashi
+__<b>Patterns< / b> / Symmetry Master  ->  fx_viral
+__<b>Patterns< / b> / Turbulent Halftone  ->  iain_turbulent_halftone
+__<b>Rendering< / b> / Iris  ->  pr_iris
+__<b>Rendering< / b> / Nebulous  ->  fx_rep_nebulous
+__<b>Rendering< / b> / Pseudorandom Noise  ->  fx_rep_mj_prn
+__<b>Rendering< / b> / Spiral  ->  mathmap_spiral
+__<b>Rendering< / b> / Thorn Fractal - Secant Sea  ->  gui_rep_tfrac
+__<b>Rendering< / b> / Underwoods  ->  pr_underwoods
+__<b>Rendering< / b> / Wiremap  ->  gcd_wiremap
+__<b>Repair< / b> / Anti Alias  ->  gcd_anti_alias
+__<b>Repair< / b> / Banding Denoise  ->  banding_denoise_v2
+__<b>Repair< / b> / Clean Text  ->  afre_cleantext
+__<b>Repair< / b> / Compression Blur  ->  gcd_comp_blur
+__<b>Repair< / b> / Descreen  ->  fx_pahlsson_descreen
+__<b>Repair< / b> / Iain Noise Reduction 2019  ->  iain_nr_2019
+__<b>Repair< / b> / Iain's Fast Denoise  ->  iain_fast_denoise_p
+__<b>Repair< / b> / Moire Removal  ->  iain_moire_removal
+__<b>Repair< / b> / Remove Scratches  ->  fx_remove_scratches
+__<b>Repair< / b> / Smooth [Geometric-Median]  ->  fx_gcd_geometric_median
+__<b>Repair< / b> / Unquantize [JPEG Smooth]  ->  gcd_unquantize
+__<b>Repair< / b> / Upscale [Edge]  ->  fx_gcd_upscale_edge
+__<b>Repair< / b> / Upscale [Noise]  ->  gcd_upscale_noise
+__<b>Repair< / b> / Upscale [Recursive2x]  ->  fx_gcd_upscale_recursive2x
+__<b>Repair< / b> / Upscale [Solver2x]  ->  fx_gcd_upscale_solver2x
+__<b>Stereoscopic 3D< / b> / 3D Conversion  ->  fx_tk_make3D
+__<b>Stereoscopic 3D< / b> / 3D Video Conversion  ->  fx_tk_video3D
+__<b>Stereoscopic 3D< / b> / Automatic Depth Estimation  ->  fx_tk_autodepth
+__<b>Stereoscopic 3D< / b> / De-Anaglyph  ->  fx_tk_deana
+__<b>Stereoscopic 3D< / b> / Depth Map Construction  ->  fx_tk_depthmap
+__<b>Stereoscopic 3D< / b> / Depth Map Reconstruction  ->  fx_tk_depth_obtain
+__<b>Stereoscopic 3D< / b> / Lenticular Print  ->  fx_tk_lenticular
+__<b>Stereoscopic 3D< / b> / Single Image Stereogram  ->  fx_tk_stereogram
+__<b>Stereoscopic 3D< / b> / Stereo Image  ->  gcd_stereo_img
+__<b>Stereoscopic 3D< / b> / Stereoscopic Image Alignment  ->  fx_tk_stereoimage
+__<b>Stereoscopic 3D< / b> / Undo Anaglyph  ->  gcd_unstereo
+__<i>Corvo< / i> / Corvo's Painting 5  ->  fx_corvo_painting_5
+__<i>KaRo's Tests< / i> / CImg NL-Means  ->  fx_karo_cimg_nlmeans
+__<i>KaRo's Tests< / i> / CImg Skeleton  ->  fx_karo_cimg_skel
+__<i>KaRo's Tests< / i> / MM Differences  ->  fx_karo_mm_diff
+__<i>KaRo's Tests< / i> / OC Differences  ->  fx_karo_oc_diff
+__<i>KaRo's Tests< / i> / Pink Operator  ->  fx_karo_pink
+__<i>KaRo's Tests< / i> / Pink Operator Binary  ->  fx_karo_pink_bin
+__<i>KaRo's Tests< / i> / Pink Test Operator Bianca  ->  fx_karo_pink_bianca
+___<b>Artistic< / b> / Angoisse Anguish  ->  samj_Angoisse
+___<b>Artistic< / b> / Barbouillage Paint Daub  ->  samj_Barbouillage_Paint_Daub
+___<b>Artistic< / b> / Chalk It Up [Fr]  ->  samj_chalkitup
+___<b>Artistic< / b> / Dreamy Watercolour  ->  fx_dreamy_watercolour
+___<b>Artistic< / b> / Multi-Mosaic  ->  fx_jr_multi_mosaic_preview
+___<b>Artistic< / b> / Skeletik  ->  samj_Test_Skeletik
+___<b>Colors< / b> / RGB Tone  ->  iain_rgb_tone
+___<b>Colors< / b> / Saturation EQ  ->  Saturation_EQ_p
+___<b>Colors< / b> / Tone Presets  ->  iain_tone_presets_p
+___<b>Contours< / b> / Whirling Lines  ->  fx_whirling_lines
+___<b>Deformations< / b> / Kaleidoscope Layer Cake  ->  fx_jr_klc
+___<b>Deformations< / b> / Layer Cake  ->  fx_layer_cake
+___<b>Deformations< / b> / Layer Cake 2  ->  fx_layer_cake_2
+___<b>Deformations< / b> / PowerTwirl  ->  fx_powertwirl
+___<b>Deformations< / b> / Shifter  ->  fx_shifter
+___<b>Degradations< / b> / Blur [Bloom Glare]  ->  fx_blur_bloom_glare
+___<b>Degradations< / b> / Buffer Destroyer  ->  fx_buffer_destroyer
+___<b>Degradations< / b> / Faux-QAM Glitch  ->  fx_qam_glitch
+___<b>Degradations< / b> / Shredder  ->  fx_shredder
+___<b>Degradations< / b> / UltraWarp++++  ->  fx_ultrawarp4plus
+___<b>Details< / b> / Easy Skin Retouch  ->  iain_easy_skin_retouch
+___<b>Details< / b> / Texture Enhance  ->  iain_texture_enhance_p
+___<b>Patterns< / b> / Denim Texture  ->  Denim_samj
+___<b>Patterns< / b> / Reptile  ->  samj_reptile
+___<b>Patterns< / b> / Soft Random Shades  ->  samj_Soft_Random_Shades
+___<b>Rendering< / b> / Disco  ->  disco
+___<b>Rendering< / b> / Kitaoka Spin Illusion  ->  KittyRings
+___<b>Rendering< / b> / Pythagoras Tree  ->  samj_Arbre_Pythagore
+___<b>Rendering< / b> / Snowflake 2  ->  samj_Flocon_De_Neige
+___<b>Rendering< / b> / Twisted Rays [Samj]  ->  Twisted_Rays

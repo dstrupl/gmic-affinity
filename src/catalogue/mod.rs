@@ -61,32 +61,22 @@ pub struct ChosenFilter {
     pub args: Vec<String>,
 }
 
-/// Lazily-decoded bundled catalogue. T6 populates `BUNDLED_GZ` with
-/// real content; until then we expose a tiny placeholder so this
-/// module compiles standalone.
+/// Lazily-decoded bundled catalogue.
+///
+/// The bytes are pulled in at compile time from
+/// `assets/gmic-catalogue.gmic.gz` (tracked via Git LFS). On first
+/// call we gunzip + parse once and cache the resulting `Catalogue`
+/// for the life of the process.
 static BUILTIN: OnceLock<Catalogue> = OnceLock::new();
 
-#[cfg(not(test))]
 pub fn builtin() -> &'static Catalogue {
     BUILTIN.get_or_init(|| {
-        // Populated for real in T6 via include_bytes!() + flate2.
-        // Until then, returning an empty catalogue lets the rest of
-        // the modules compile and unit-test in isolation.
-        Catalogue {
-            root: Folder {
-                name: String::new(),
-                children: Vec::new(),
-            },
-        }
-    })
-}
-
-#[cfg(test)]
-pub fn builtin() -> &'static Catalogue {
-    BUILTIN.get_or_init(|| Catalogue {
-        root: Folder {
-            name: String::new(),
-            children: Vec::new(),
-        },
+        use std::io::Read;
+        const GZ: &[u8] = include_bytes!("../../assets/gmic-catalogue.gmic.gz");
+        let mut text = String::new();
+        flate2::read::GzDecoder::new(GZ)
+            .read_to_string(&mut text)
+            .expect("bundled gmic-catalogue.gmic.gz must decompress");
+        parser::parse(&text).expect("bundled gmic-catalogue.gmic.gz must parse")
     })
 }

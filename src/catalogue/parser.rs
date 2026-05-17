@@ -62,6 +62,17 @@ impl ParseState {
         let Some(body) = raw.trim_start().strip_prefix("#@gui") else {
             return Ok(());
         };
+        // Reject `#@gui_<lang>` localisation variants (e.g. `#@gui_ja`,
+        // `#@gui_zh`). The English `#@gui` line must be followed by
+        // whitespace, a colon, or end-of-line — never an identifier
+        // character — or we'd otherwise mis-parse Japanese param rows
+        // as filter headers and pollute the catalogue.
+        if matches!(
+            body.chars().next(),
+            Some(c) if c.is_ascii_alphanumeric() || c == '_'
+        ) {
+            return Ok(());
+        }
         let body = body.trim_start();
 
         if let Some(rest) = body.strip_prefix(':') {
@@ -493,6 +504,33 @@ mod tests {
         )
         .unwrap();
         assert_eq!(first_filter(&cat).command, "fx_real");
+    }
+
+    #[test]
+    fn localised_gmic_lang_prefix_is_ignored() {
+        // `#@gui_ja` etc are Japanese-localised mirrors of the catalogue;
+        // we only want the English `#@gui` entries.
+        let cat = parse(
+            "#@gui Cat\n\
+             #@gui_ja Cat\n\
+             #@gui English Filter : fx_eng\n\
+             #@gui_ja Japanese Filter : fx_eng_ja\n\
+             #@gui_ja :Coherence=float(100,0,200)\n",
+        )
+        .unwrap();
+        let folder = match &cat.root.children[0] {
+            Node::Folder(f) => f,
+            _ => panic!("expected the English `Cat` folder"),
+        };
+        let commands: Vec<&str> = folder
+            .children
+            .iter()
+            .filter_map(|c| match c {
+                Node::Filter(f) => Some(f.command.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(commands, vec!["fx_eng"]);
     }
 
     #[test]
