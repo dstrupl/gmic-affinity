@@ -61,12 +61,20 @@ MACOSX_DEPLOYMENT_TARGET ?= 11.0
 #                           single-entry bundle and shrinks the binary.
 #   -lobjc                   Objective-C runtime (required for objc2 /
 #                           AppKit UI code in the `live` feature).
+#   -framework AppKit       resolves the few real C symbols we touch
+#                           that aren't loaded through the ObjC runtime
+#                           class machinery (NSApp* class lookups go via
+#                           objc_getClass and stay lazy, but constants
+#                           like NSEventTrackingRunLoopMode are real
+#                           extern C data and must be bound at link time).
+#                           Implicitly pulls Foundation in.
 BUNDLE_LDFLAGS := \
   -bundle \
   -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET) \
   -Wl,-exported_symbol,_PluginMain \
   -Wl,-dead_strip \
-  -lobjc
+  -lobjc \
+  -framework AppKit
 
 # Cargo features. The default build is a safe no-op PluginMain; set
 # `make ... FEATURES=live` to enable the real pixel pipeline (M3 + M4).

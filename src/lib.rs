@@ -78,7 +78,7 @@ unsafe fn dispatch(selector: i16, filter_record: *mut c_void, _data: *mut isize)
     match selector {
         SELECTOR_ABOUT => NO_ERR,
         SELECTOR_PARAMETERS => {
-            log("PARAMETERS: opening picker (stub)");
+            log("PARAMETERS: opening picker");
             match ui::picker::show_empty() {
                 Some(()) => NO_ERR,
                 None => USER_CANCEL,
