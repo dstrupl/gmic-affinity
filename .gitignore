@@ -20,3 +20,4 @@ Cargo.lock.bak
 
 # Local config that should not be committed
 .env
+.worktrees
