@@ -15,4 +15,6 @@ pub(crate) mod modal_close_delegate;
 #[cfg(feature = "live")]
 pub mod picker;
 #[cfg(feature = "live")]
+pub(crate) mod picker_data_source;
+#[cfg(feature = "live")]
 pub mod runloop;
