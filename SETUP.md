@@ -25,58 +25,44 @@ which Rez             # expect /usr/bin/Rez (from Xcode Command Line Tools)
 xcode-select -p       # if missing, run: xcode-select --install
 ```
 
-## 2. Adobe Photoshop SDK
+## 2. Adobe Photoshop SDK (optional but recommended)
 
-The Photoshop plugin format ships its menu metadata in a `pipl` resource. We
-build that resource with Apple's `Rez` tool from a small `.r` source, which
-`#include`s three headers from the Adobe Photoshop SDK
-(`PIDefines.h`, `PITypes.r`, `PIGeneral.r`).
+The repository ships the pipl resource as plain JSON
+([PiPLs.json](./PiPLs.json)) that the `Makefile` copies into the bundle as
+`Contents/Resources/PiPLs.json`. **You do not need the SDK to build, sign,
+install or run the plugin.**
 
-The SDK is free but gated by an Adobe developer account.
+You only need the SDK if you want to:
 
-### Steps
+- Re-verify `FilterRecord` offsets in [src/ps_types.rs](./src/ps_types.rs)
+  against `PIFilter.h` (e.g. after a future SDK release changes the layout).
+  The current offsets are pinned by `tests/layout.rs`.
+- Browse Adobe's sample plug-ins for reference.
+
+### If you do want the SDK
 
 1. Create (or sign into) a free Adobe developer account at
-   <https://console.adobe.io>.
-2. Navigate to **Downloads -> Creative Cloud -> Photoshop** and download the
-   latest **Photoshop C++ SDK** for macOS. The file is a `.zip` of roughly
-   100-300 MB.
+   <https://developer.adobe.com/console>.
+2. Find the Photoshop developer area and download **"Adobe Photoshop SDK"**
+   for macOS (the 2026 v2 release is the one this repo was developed
+   against). The file is a `.zip` of roughly 60-100 MB.
 3. Unpack to a stable path. This project defaults to:
 
    ```
    ~/SDKs/photoshop-sdk/
    ```
 
-   so that after unpacking you should see, for example,
-   `~/SDKs/photoshop-sdk/photoshopapi/`.
+   so that you have, for example,
+   `~/SDKs/photoshop-sdk/pluginsdk/photoshopapi/photoshop/PIFilter.h`.
 
-4. Export `PHOTOSHOP_SDK` in your shell so the `Makefile` can find it:
+### What the SDK is used for here
 
-   ```bash
-   # ~/.zshrc (or ~/.bashrc)
-   export PHOTOSHOP_SDK="$HOME/SDKs/photoshop-sdk"
-   ```
-
-   Then `source ~/.zshrc` (or open a new shell).
-
-### What we use from the SDK
-
-| File                                         | Used by                  |
-|----------------------------------------------|--------------------------|
-| `photoshopapi/photoshop/PIFilter.h`          | Struct-offset reference  |
-| `photoshopapi/resources/PIDefines.h`         | `Rez` include for pipl   |
-| `photoshopapi/resources/PITypes.r`           | `Rez` include for pipl   |
-| `photoshopapi/resources/PIGeneral.r`         | `Rez` include for pipl   |
-
-If the layout inside your downloaded SDK differs, set
-`PHOTOSHOP_SDK_RESOURCES` and/or `PHOTOSHOP_SDK_HEADERS` to the correct
-sub-paths and the `Makefile` will pick them up.
-
-### If you cannot install the SDK
-
-Milestones M1, M3, M4, M5, M6 do not strictly require the SDK. Only M2
-(pipl resource for the proper menu name "G'MIC...") needs it. Without M2
-the plugin still loads, but Affinity will show it under a default category.
+| File                                                                  | Used by                                |
+|-----------------------------------------------------------------------|----------------------------------------|
+| `pluginsdk/photoshopapi/photoshop/PIFilter.h`                         | Source of truth for FilterRecord       |
+| `pluginsdk/photoshopapi/photoshop/PIGeneral.h`                        | Source of truth for selectors / errors |
+| `pluginsdk/pipl-schema.json`                                          | Schema for our PiPLs.json              |
+| `pluginsdk/samplecode/filter/colormunger/common/PiPLs.json`           | Reference pipl in modern format        |
 
 ## 3. Affinity Photo
 

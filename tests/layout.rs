@@ -1,67 +1,52 @@
 //! `FilterRecord` layout verification.
 //!
 //! Wrong offsets here cause silent pixel corruption or crashes inside
-//! Affinity. The values below come from PRD §8 and claim to match the 2021
-//! macOS 64-bit Adobe Photoshop SDK. They have NOT yet been reconciled
-//! against the real `PIFilter.h` (M3 owns that).
+//! Affinity. The expected values below are the canonical layout reported
+//! by a `clang -arch arm64` probe against `PIFilter.h` from the Adobe
+//! Photoshop SDK 2026 v2 (`pluginsdk/photoshopapi/photoshop/PIFilter.h`).
 //!
-//! These offset assertions are gated behind `#[ignore]` so `cargo test`
-//! still passes; run `cargo test -- --ignored` to see the current
-//! actual-vs-expected gap. Once the SDK is on disk, fix the struct (or the
-//! expected values) until both `cargo test` and `cargo test -- --ignored`
-//! pass, then remove the `#[ignore]` attribute.
+//! If you upgrade the SDK and these tests fail, re-run the probe in
+//! `/tmp/pslayout/probe.c` (the recipe lives in git history of this file's
+//! introduction) and update both the struct and these constants together.
 
 use std::mem::{offset_of, size_of};
 
-// The crate is referenced by its `[lib].name` (`GmicFilter`) rather than the
-// package name because we set `name = "GmicFilter"` in Cargo.toml; the rlib
-// crate-type is what makes it linkable into this integration test.
-use GmicFilter::ps_types::{FilterRecord, VRect};
+use GmicFilter::ps_types::{FilterRecord, Point, PSRGBColor, Rect};
 
 #[test]
-fn vrect_is_8_bytes() {
-    assert_eq!(size_of::<VRect>(), 8);
+fn primitive_sizes_match_sdk() {
+    assert_eq!(size_of::<Rect>(),       8, "Rect");
+    assert_eq!(size_of::<Point>(),      4, "Point");
+    assert_eq!(size_of::<PSRGBColor>(), 6, "PSRGBColor");
 }
 
 #[test]
-fn report_actual_filter_record_layout() {
-    // Always-running informational test: prints the offsets our struct
-    // currently produces. `cargo test -- --nocapture` to see the output.
-    eprintln!(
-        "FilterRecord size           = {}",
-        size_of::<FilterRecord>()
-    );
-    eprintln!(
-        "offset_of!(in_data)         = {}",
-        offset_of!(FilterRecord, in_data)
-    );
-    eprintln!(
-        "offset_of!(in_row_bytes)    = {}",
-        offset_of!(FilterRecord, in_row_bytes)
-    );
-    eprintln!(
-        "offset_of!(out_data)        = {}",
-        offset_of!(FilterRecord, out_data)
-    );
-    eprintln!(
-        "offset_of!(out_row_bytes)   = {}",
-        offset_of!(FilterRecord, out_row_bytes)
-    );
+fn filter_record_total_size() {
+    // sizeof(FilterRecord) in the 2026 v2 macOS 64-bit SDK is 648 bytes.
+    assert_eq!(size_of::<FilterRecord>(), 648);
 }
 
 #[test]
-#[ignore = "PRD §8 expected offsets; enable once reconciled against PIFilter.h"]
-fn filter_record_matches_prd_section_8() {
-    assert_eq!(offset_of!(FilterRecord, in_data), 88, "in_data offset");
-    assert_eq!(
-        offset_of!(FilterRecord, in_row_bytes),
-        96,
-        "in_row_bytes offset"
-    );
-    assert_eq!(offset_of!(FilterRecord, out_data), 104, "out_data offset");
-    assert_eq!(
-        offset_of!(FilterRecord, out_row_bytes),
-        112,
-        "out_row_bytes offset"
-    );
+fn filter_record_field_offsets_match_sdk() {
+    assert_eq!(offset_of!(FilterRecord, serial_number),   0,   "serial_number");
+    assert_eq!(offset_of!(FilterRecord, abort_proc),      8,   "abort_proc");
+    assert_eq!(offset_of!(FilterRecord, progress_proc),  16,   "progress_proc");
+    assert_eq!(offset_of!(FilterRecord, parameters),     24,   "parameters");
+    assert_eq!(offset_of!(FilterRecord, image_size),     32,   "image_size");
+    assert_eq!(offset_of!(FilterRecord, planes),         36,   "planes");
+    assert_eq!(offset_of!(FilterRecord, filter_rect),    38,   "filter_rect");
+    assert_eq!(offset_of!(FilterRecord, background),     46,   "background");
+    assert_eq!(offset_of!(FilterRecord, foreground),     52,   "foreground");
+    assert_eq!(offset_of!(FilterRecord, max_space),      60,   "max_space");
+    assert_eq!(offset_of!(FilterRecord, buffer_space),   64,   "buffer_space");
+    assert_eq!(offset_of!(FilterRecord, in_rect),        68,   "in_rect");
+    assert_eq!(offset_of!(FilterRecord, in_lo_plane),    76,   "in_lo_plane");
+    assert_eq!(offset_of!(FilterRecord, in_hi_plane),    78,   "in_hi_plane");
+    assert_eq!(offset_of!(FilterRecord, out_rect),       80,   "out_rect");
+    assert_eq!(offset_of!(FilterRecord, out_lo_plane),   88,   "out_lo_plane");
+    assert_eq!(offset_of!(FilterRecord, out_hi_plane),   90,   "out_hi_plane");
+    assert_eq!(offset_of!(FilterRecord, in_data),        96,   "in_data");
+    assert_eq!(offset_of!(FilterRecord, in_row_bytes),  104,   "in_row_bytes");
+    assert_eq!(offset_of!(FilterRecord, out_data),      112,   "out_data");
+    assert_eq!(offset_of!(FilterRecord, out_row_bytes), 120,   "out_row_bytes");
 }

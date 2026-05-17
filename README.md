@@ -36,23 +36,29 @@ feature `live`:
 | `make bundle FEATURES=live`            | Real pixel pipeline (M3 pass-through + M4 G'MIC).     |
 
 Why the split? The plugin entry point dereferences a host-supplied
-`FilterRecord` struct, and the layout in `src/ps_types.rs` has not yet been
-reconciled byte-for-byte against `PIFilter.h` from the Adobe Photoshop SDK
-(see [SETUP.md](./SETUP.md)). The default no-op build never touches the
-struct, so it is safe to install even before that reconciliation lands. Once
-`cargo test -- --ignored` passes, switch to `FEATURES=live`.
+`FilterRecord` struct. The default no-op build never touches it, so it is
+useful for verifying that the bundle merely loads. The `live` build runs
+the real M3 + M4 pipeline. `FilterRecord` offsets are pinned by
+`tests/layout.rs` against the Adobe Photoshop SDK 2026 v2's `PIFilter.h`,
+so the `live` build is safe to install whenever `cargo test` is green.
 
 Common targets:
 
 ```bash
 make             # ARM-only no-op bundle (fast iteration)
 make universal   # ARM + x86_64 lipo'd bundle
-make pipl        # build GmicFilter.rsrc from GmicFilter.r (needs SDK)
 make install     # copy GmicFilter.plugin into Affinity Photo 2 plugins folder
 make uninstall   # remove the installed plugin
 make test        # cargo test under both default and --features live
 make clippy      # cargo clippy --all-targets --all-features -D warnings
+make help        # full list of targets
 ```
+
+The pipl resource that tells Affinity our menu name, category, and
+supported image modes lives in [PiPLs.json](./PiPLs.json) and is copied
+verbatim into `Contents/Resources/PiPLs.json` by every bundle target. This
+is the modern Adobe Photoshop SDK 2026+ format and supersedes the legacy
+Rez/.rsrc workflow.
 
 See [PRD.md](./PRD.md) §7 for the full PRD-side build and install procedure.
 

@@ -20,18 +20,18 @@ SHELL := /bin/bash
 
 BUNDLE      := GmicFilter.plugin
 BUNDLE_BIN  := $(BUNDLE)/Contents/MacOS/GmicFilter
-BUNDLE_RSRC := $(BUNDLE)/Contents/Resources/GmicFilter.rsrc
+BUNDLE_PIPL := $(BUNDLE)/Contents/Resources/PiPLs.json
 PLIST       := Info.plist
-RSRC_SRC    := GmicFilter.r
-RSRC_OUT    := GmicFilter.rsrc
+PIPL_SRC    := PiPLs.json
 
 LIB_NAME    := libGmicFilter.dylib
 ARM_LIB     := target/aarch64-apple-darwin/release/$(LIB_NAME)
 X86_LIB     := target/x86_64-apple-darwin/release/$(LIB_NAME)
 
 # Cargo features. The default build is a safe no-op PluginMain; set
-# `make ... FEATURES=live` once the FilterRecord layout is reconciled
-# against PIFilter.h to enable the real pixel pipeline.
+# `make ... FEATURES=live` to enable the real pixel pipeline (M3 + M4).
+# The FilterRecord layout is now SDK-verified (see tests/layout.rs), so
+# `FEATURES=live` is safe to install whenever you want the gmic pipeline.
 FEATURES ?=
 CARGO_FEATURE_ARGS := $(if $(FEATURES),--features $(FEATURES),)
 
@@ -40,11 +40,13 @@ CARGO_FEATURE_ARGS := $(if $(FEATURES),--features $(FEATURES),)
 # but v3 is not the M1 target.
 AFFINITY_PLUGINS_DIR ?= $(HOME)/Library/Application Support/Affinity Photo 2/Plugins
 
-PHOTOSHOP_SDK            ?= $(HOME)/SDKs/photoshop-sdk
-PHOTOSHOP_SDK_RESOURCES  ?= $(PHOTOSHOP_SDK)/photoshopapi/resources
-PHOTOSHOP_SDK_HEADERS    ?= $(PHOTOSHOP_SDK)/photoshopapi/photoshop
+# Path to the unpacked Adobe Photoshop SDK. Only needed if you want to
+# re-verify FilterRecord layout against PIFilter.h (see SETUP.md and
+# tests/layout.rs). The pipl resource is now plain JSON committed in this
+# repo (PiPLs.json), so the SDK is no longer a build dependency.
+PHOTOSHOP_SDK ?= $(HOME)/SDKs/photoshop-sdk
 
-.PHONY: all bundle universal universal-install pipl install uninstall clean test fmt clippy help
+.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy help
 
 all: bundle
 
@@ -55,19 +57,18 @@ help:
 	@echo "  make install            Install GmicFilter.plugin into Affinity Photo 2."
 	@echo "  make universal-install  Convenience: 'make universal' then 'make install'."
 	@echo "  make uninstall          Remove the installed plugin."
-	@echo "  make pipl               Build GmicFilter.rsrc from GmicFilter.r (needs SDK)."
 	@echo "  make test               Run cargo test under both default and --features live."
 	@echo "  make clippy             Run cargo clippy --all-targets --all-features -D warnings."
 	@echo "  make fmt                Run cargo fmt."
 	@echo "  make clean              Remove build artefacts."
 	@echo ""
 	@echo "Feature flag:"
-	@echo "  FEATURES=live           Real M3/M4 PluginMain (only after layout reconciled)."
-	@echo "                          Example: make universal FEATURES=live"
+	@echo "  FEATURES=live           Real M3/M4 PluginMain (TIFF round-trip via gmic)."
+	@echo "                          Example: make universal-install FEATURES=live"
 	@echo ""
 	@echo "Environment:"
-	@echo "  PHOTOSHOP_SDK             SDK root (default: \$$HOME/SDKs/photoshop-sdk)"
-	@echo "  AFFINITY_PLUGINS_DIR      install dest (default: Affinity Photo 2 Plugins)"
+	@echo "  AFFINITY_PLUGINS_DIR    install dest (default: Affinity Photo 2 Plugins)"
+	@echo "  PHOTOSHOP_SDK           SDK root, optional (default: \$$HOME/SDKs/photoshop-sdk)"
 
 # Fast iteration: ARM-only build assembled into the plugin bundle.
 bundle: $(ARM_LIB)
@@ -75,11 +76,7 @@ bundle: $(ARM_LIB)
 	cp "$(ARM_LIB)" "$(BUNDLE_BIN)"
 	chmod +x "$(BUNDLE_BIN)"
 	cp "$(PLIST)" "$(BUNDLE)/Contents/Info.plist"
-	@if [ -f "$(RSRC_OUT)" ]; then \
-	  cp "$(RSRC_OUT)" "$(BUNDLE_RSRC)"; \
-	else \
-	  echo "[bundle] note: no $(RSRC_OUT) found; run 'make pipl' for proper menu metadata"; \
-	fi
+	cp "$(PIPL_SRC)" "$(BUNDLE_PIPL)"
 	codesign --force --deep --sign - "$(BUNDLE)"
 
 universal: $(ARM_LIB) $(X86_LIB)
@@ -87,11 +84,7 @@ universal: $(ARM_LIB) $(X86_LIB)
 	lipo -create "$(ARM_LIB)" "$(X86_LIB)" -output "$(BUNDLE_BIN)"
 	chmod +x "$(BUNDLE_BIN)"
 	cp "$(PLIST)" "$(BUNDLE)/Contents/Info.plist"
-	@if [ -f "$(RSRC_OUT)" ]; then \
-	  cp "$(RSRC_OUT)" "$(BUNDLE_RSRC)"; \
-	else \
-	  echo "[universal] note: no $(RSRC_OUT) found; run 'make pipl' for proper menu metadata"; \
-	fi
+	cp "$(PIPL_SRC)" "$(BUNDLE_PIPL)"
 	codesign --force --deep --sign - "$(BUNDLE)"
 
 # Note: the architecture-specific outputs are intentionally PHONY because the
@@ -104,14 +97,6 @@ $(ARM_LIB):
 
 $(X86_LIB):
 	cargo build --release --target x86_64-apple-darwin $(CARGO_FEATURE_ARGS)
-
-pipl:
-	@if [ ! -d "$(PHOTOSHOP_SDK_RESOURCES)" ]; then \
-	  echo "ERROR: Photoshop SDK resources dir not found at $(PHOTOSHOP_SDK_RESOURCES)"; \
-	  echo "       See SETUP.md to install the Adobe Photoshop SDK."; \
-	  exit 1; \
-	fi
-	Rez -o "$(RSRC_OUT)" "$(RSRC_SRC)" -i "$(PHOTOSHOP_SDK_RESOURCES)"
 
 install: bundle
 	@mkdir -p "$(AFFINITY_PLUGINS_DIR)"
@@ -143,4 +128,4 @@ clippy:
 
 clean:
 	cargo clean
-	rm -rf "$(BUNDLE)" "$(RSRC_OUT)"
+	rm -rf "$(BUNDLE)"

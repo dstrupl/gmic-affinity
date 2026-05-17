@@ -1,0 +1,91 @@
+{
+  "PiPLs": [
+    {
+      "Kind": "Filter",
+      "Name": "G'MIC...",
+      "Category": "G'MIC",
+      "Version": 4,
+      "SubVersion": 0,
+      "ComponentVersionShortNum": 1,
+      "ComponentVersionMinorRevNum": 0,
+      "ComponentVersionDotRevNum": 0,
+      "ComponentName": "GmicFilter",
+      "CodeMacARM64": "PluginMain",
+      "CodeMacIntel64": "PluginMain",
+      "SupportedModes": {
+        "Bitmap":       false,
+        "GrayScale":    false,
+        "IndexedColor": false,
+        "RGBColor":     true,
+        "CMYKColor":    false,
+        "HSLColor":     false,
+        "HSBColor":     false,
+        "Multichannel": false,
+        "Duotone":      false,
+        "LABColor":     false
+      },
+      "EnableInfo": "in (PSHOP_ImageMode, RGBMode, RGBColorMode) && PSHOP_ImageDepth == 8",
+      "PlugInMaxSize": [32768, 32768],
+      "MonitorScalingAware": true,
+      "FilterLayerSupport": true,
+      "FilterCaseInfo": [
+        {
+          "InputHandling":               "InWhiteMat",
+          "OutputHandling":              "OutWhiteMat",
+          "WriteOutsideSelection":       false,
+          "FiltersLayerMasks":           false,
+          "WorksWithBlankData":          true,
+          "DontCopySourceToDestination": false
+        },
+        {
+          "InputHandling":               "InWhiteMat",
+          "OutputHandling":              "OutWhiteMat",
+          "WriteOutsideSelection":       false,
+          "FiltersLayerMasks":           false,
+          "WorksWithBlankData":          true,
+          "DontCopySourceToDestination": false
+        },
+        {
+          "InputHandling":               "InWhiteMat",
+          "OutputHandling":              "OutWhiteMat",
+          "WriteOutsideSelection":       false,
+          "FiltersLayerMasks":           false,
+          "WorksWithBlankData":          true,
+          "DontCopySourceToDestination": false
+        },
+        {
+          "InputHandling":               "InWhiteMat",
+          "OutputHandling":              "OutWhiteMat",
+          "WriteOutsideSelection":       false,
+          "FiltersLayerMasks":           false,
+          "WorksWithBlankData":          true,
+          "DontCopySourceToDestination": false
+        },
+        {
+          "InputHandling":               "InWhiteMat",
+          "OutputHandling":              "OutWhiteMat",
+          "WriteOutsideSelection":       false,
+          "FiltersLayerMasks":           false,
+          "WorksWithBlankData":          true,
+          "DontCopySourceToDestination": false
+        },
+        {
+          "InputHandling":               "InWhiteMat",
+          "OutputHandling":              "OutWhiteMat",
+          "WriteOutsideSelection":       false,
+          "FiltersLayerMasks":           false,
+          "WorksWithBlankData":          true,
+          "DontCopySourceToDestination": false
+        },
+        {
+          "InputHandling":               "InWhiteMat",
+          "OutputHandling":              "OutWhiteMat",
+          "WriteOutsideSelection":       false,
+          "FiltersLayerMasks":           false,
+          "WorksWithBlankData":          true,
+          "DontCopySourceToDestination": false
+        }
+      ]
+    }
+  ]
+}

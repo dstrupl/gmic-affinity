@@ -1,83 +1,102 @@
 //! Photoshop-compatible filter plugin C types.
 //!
-//! The definitions here mirror Adobe's `PIFilter.h` and friends. Only a small
-//! subset of the full `FilterRecord` is named; the remaining ~600 bytes are
-//! covered by a trailing `_pad` so the host's pointer arithmetic into our
-//! struct still lands on valid memory.
+//! These definitions mirror the canonical layout of `FilterRecord` and
+//! friends from `PIFilter.h` in the Adobe Photoshop SDK 2026 v2, verified
+//! by `tests/layout.rs` via `offset_of!`.
 //!
-//! IMPORTANT: The exact byte offsets of `in_data`, `out_data` and friends
-//! must match the layout of `FilterRecord` in the Adobe Photoshop SDK header.
-//! See `tests/layout.rs` for the verification test. As of M1 we have not yet
-//! reconciled the PRD's two inconsistent offset claims against the real SDK
-//! header; the no-op `PluginMain` in M1 never dereferences these fields so a
-//! mismatch cannot crash Affinity at this stage. M3 owns the verification.
+//! Only a small subset of the full `FilterRecord` is named (the fields up
+//! to `outRowBytes` plus a trailing `_pad` covering the rest); pointer
+//! arithmetic into our struct still lands on valid memory because the
+//! padded struct size matches `sizeof(FilterRecord) == 648`.
 
 #![allow(dead_code)]
 
 use std::ffi::c_void;
 
+/// QuickDraw `Rect` (`struct { int16 top, left, bottom, right }`).
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct VRect {
-    pub top: i16,
-    pub left: i16,
+pub struct Rect {
+    pub top:    i16,
+    pub left:   i16,
     pub bottom: i16,
-    pub right: i16,
+    pub right:  i16,
 }
+
+// Compatibility alias for code that still imports the old PRD name.
+pub type VRect = Rect;
+
+/// QuickDraw `Point` (`struct { int16 v, h }`).
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct Point {
+    pub v: i16,
+    pub h: i16,
+}
+
+/// SDK `PSRGBColor`: three 16-bit channels packed without padding,
+/// `sizeof(PSRGBColor) == 6`.
+pub type PSRGBColor = [u8; 6];
 
 pub type TestAbortProc = Option<unsafe extern "C" fn() -> i16>;
-pub type ProgressProc = Option<unsafe extern "C" fn(i32, i32)>;
+pub type ProgressProc  = Option<unsafe extern "C" fn(i32, i32)>;
 
-/// Partial `FilterRecord`. Field names follow PRD §6.2 and Adobe's
-/// `PIFilter.h`. The trailing `_pad` reserves space for the SDK fields we
-/// don't name so the struct's size at least matches the documented 796 bytes
-/// on 64-bit macOS.
-///
-/// The pad size below is conservative; it may be tightened once the real
-/// layout is reconciled against `PIFilter.h`.
+/// Partial `FilterRecord`. Field order and names match `PIFilter.h` exactly
+/// up through `outRowBytes`; everything from there to `sizeof(FilterRecord)
+/// == 648` is collapsed into `_pad`. Renaming the field set, or reordering
+/// any of them, requires updating `tests/layout.rs`.
 #[repr(C)]
 pub struct FilterRecord {
-    pub serial_number: i32,
-    pub abort_proc: TestAbortProc,
-    pub progress_proc: ProgressProc,
-    pub parameters: *mut c_void,
-    pub background: [u8; 6], // RGBColor
-    pub foreground: [u8; 6], // RGBColor
-    pub buffer_space: i32,
-    pub max_space: i32,
-    pub image_modes_allowed: i32,
-    pub filter_rect: VRect,
-    pub image_mode: i16,
-    pub image_size: VRect,
-    pub planes: i16,
-    pub in_rect: VRect,
-    pub in_lo_plane: i16,
-    pub in_hi_plane: i16,
-    pub out_rect: VRect,
-    pub out_lo_plane: i16,
-    pub out_hi_plane: i16,
-    pub in_data: *mut u8,
-    pub in_row_bytes: i32,
-    pub out_data: *mut u8,
-    pub out_row_bytes: i32,
-    // Cover the remaining SDK fields without naming them.
-    pub _pad: [u8; 700],
+    pub serial_number: i32,         // offset 0
+    // 4 bytes of padding here for 8-byte pointer alignment.
+    pub abort_proc:    TestAbortProc, // offset 8
+    pub progress_proc: ProgressProc,  // offset 16
+    pub parameters:    *mut c_void,   // offset 24 (Handle)
+    pub image_size:    Point,         // offset 32 (legacy 16-bit Point)
+    pub planes:        i16,           // offset 36
+    pub filter_rect:   Rect,          // offset 38
+    pub background:    PSRGBColor,    // offset 46
+    pub foreground:    PSRGBColor,    // offset 52
+    // 2 bytes of padding for i32 alignment.
+    pub max_space:     i32,           // offset 60
+    pub buffer_space:  i32,           // offset 64
+    pub in_rect:       Rect,          // offset 68
+    pub in_lo_plane:   i16,           // offset 76
+    pub in_hi_plane:   i16,           // offset 78
+    pub out_rect:      Rect,          // offset 80
+    pub out_lo_plane:  i16,           // offset 88
+    pub out_hi_plane:  i16,           // offset 90
+    // 4 bytes of padding for 8-byte pointer alignment.
+    pub in_data:       *mut u8,       // offset 96
+    pub in_row_bytes:  i32,           // offset 104
+    // 4 bytes of padding for 8-byte pointer alignment.
+    pub out_data:      *mut u8,       // offset 112
+    pub out_row_bytes: i32,           // offset 120
+    // Remaining ~524 bytes: isFloating/haveMask/autoMask, maskRect/maskData,
+    // backColor/foreColor (32-bit), hostSig/hostProc, imageMode and the
+    // rest of the post-3.0 additions. We don't access these yet, but the
+    // struct must remain the correct total size so the host's pointer
+    // arithmetic into FilterRecord lands inside our allocation.
+    pub _pad: [u8; 648 - 124],
 }
 
-// Selector codes as defined in Adobe's `PIFilter.h`. PRD §4.2 omits
-// `filterSelectorAbout` and is therefore off-by-one; trust §6.3 / the SDK
-// header instead.
-pub const SELECTOR_ABOUT: i16 = 0;
+// Selector codes from PIFilter.h (verified via `offsetof` probe against
+// the SDK 2026 v2 headers).
+pub const SELECTOR_ABOUT:      i16 = 0;
 pub const SELECTOR_PARAMETERS: i16 = 1;
-pub const SELECTOR_PREPARE: i16 = 2;
-pub const SELECTOR_START: i16 = 3;
-pub const SELECTOR_CONTINUE: i16 = 4;
-pub const SELECTOR_FINISH: i16 = 5;
+pub const SELECTOR_PREPARE:    i16 = 2;
+pub const SELECTOR_START:      i16 = 3;
+pub const SELECTOR_CONTINUE:   i16 = 4;
+pub const SELECTOR_FINISH:     i16 = 5;
 
-// Result codes.
-pub const NO_ERR: i16 = 0;
-pub const USER_CANCEL: i16 = 1; // filterBadParameters / cancel-ish; refined later
-pub const FILTER_BAD_MODE: i16 = -1;
+// Result codes from PIGeneral.h.
+pub const NO_ERR:           i16 = 0;
+pub const USER_CANCELED:    i16 = -128;
+pub const FILTER_BAD_MODE:  i16 = -30101;
+
+// Legacy alias kept so M3 code that returned `USER_CANCEL` still compiles
+// to the right value.
+pub const USER_CANCEL: i16 = USER_CANCELED;
 
 #[cfg(test)]
 mod tests {
@@ -85,7 +104,17 @@ mod tests {
     use std::mem::size_of;
 
     #[test]
-    fn vrect_is_8_bytes() {
-        assert_eq!(size_of::<VRect>(), 8, "VRect must be 8 bytes (4 x i16)");
+    fn rect_is_8_bytes() {
+        assert_eq!(size_of::<Rect>(), 8);
+    }
+
+    #[test]
+    fn point_is_4_bytes() {
+        assert_eq!(size_of::<Point>(), 4);
+    }
+
+    #[test]
+    fn psrgbcolor_is_6_bytes() {
+        assert_eq!(size_of::<PSRGBColor>(), 6);
     }
 }
