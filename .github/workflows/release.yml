@@ -1,0 +1,90 @@
+# Tag-driven release pipeline. Triggered by pushing a `v*` tag (e.g.
+# `v0.1.0`, `v0.1.0-rc.1`). Builds the universal `FEATURES=live` zip
+# via `make release` and publishes it as a GitHub Release asset.
+#
+# This is a separate workflow from `ci.yml` on purpose: CI runs on every
+# push and PR; release runs only on tags. Tags are expected to point at
+# commits that have already gone green on CI.
+#
+# See docs/design/2026-05-18-release-v0.1-distribution.md §4.5 for the
+# design rationale and §5.4 for what happens after the asset is uploaded
+# (manual cask bump in the homebrew tap repo).
+
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# We need write access to create the GitHub Release and upload assets.
+# Nothing else.
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: build + publish zip
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The bundled gmic catalogue snapshot lives in Git LFS; without
+          # `lfs: true` the Makefile's check-lfs guard (Makefile:158)
+          # fails fast because the working tree only holds the LFS
+          # pointer text instead of the gzip stream.
+          lfs: true
+          # Tag builds don't need credentials persisted past checkout.
+          persist-credentials: false
+
+      - name: Toolchain
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          # Release builds are cold-ish (different feature set, profile=
+          # release) and run rarely, but a cache hit still saves ~3-4
+          # min on a tag rebuild.
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-release-
+            ${{ runner.os }}-cargo-
+
+      - name: Build release zip
+        # `make release` enforces FEATURES=live (target-scoped), runs
+        # the universal build, runs `verify-bundle` (filetype 8 on both
+        # slices), and assembles dist/GmicFilter-<tag>.zip.
+        run: make release RELEASE_VERSION=${{ github.ref_name }}
+
+      - name: Show artifact metadata
+        run: |
+          ls -la dist/
+          shasum -a 256 dist/GmicFilter-${{ github.ref_name }}.zip
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/GmicFilter-${{ github.ref_name }}.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          # Mark pre-release for any tag matching `v*-rc*` / `v*-alpha*`
+          # / `v*-beta*` etc. so the cask doesn't accidentally point a
+          # stable channel at an RC. Stable tags (e.g. `v0.1.0`) are
+          # full releases.
+          prerelease: ${{ contains(github.ref_name, '-') }}
