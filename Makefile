@@ -84,7 +84,12 @@ BUNDLE_LDFLAGS := \
 # The FilterRecord layout is now SDK-verified (see tests/layout.rs), so
 # `FEATURES=live` is safe to install whenever you want the gmic pipeline.
 FEATURES ?=
-CARGO_FEATURE_ARGS := $(if $(FEATURES),--features $(FEATURES),)
+# Deferred (=) on purpose: target-scoped overrides like
+#   release: FEATURES := live
+# need this to re-evaluate at recipe expansion time. With `:=` here the
+# string is locked in at parse time and the override is silently
+# ignored (which would ship a no-op release zip).
+CARGO_FEATURE_ARGS = $(if $(FEATURES),--features $(FEATURES),)
 
 # Comma-separated list of Affinity Plugins folders. The install /
 # universal-install / uninstall targets iterate over the list and operate
@@ -138,7 +143,7 @@ REZ_FLAGS := \
   -d "PRAGMA_ONCE=0" \
   -useDF
 
-.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy help pipl check-lfs refresh-catalogue picker-example audit-unsupported
+.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy help pipl check-lfs refresh-catalogue picker-example audit-unsupported release
 
 all: bundle
 
@@ -155,6 +160,7 @@ help:
 	@echo "  make test               Run cargo test under both default and --features live."
 	@echo "  make clippy             Run cargo clippy --all-targets --all-features -D warnings."
 	@echo "  make fmt                Run cargo fmt."
+	@echo "  make release            Build the universal bundle and assemble dist/GmicFilter-<ver>.zip."
 	@echo "  make clean              Remove build artefacts."
 	@echo ""
 	@echo "Feature flag:"
@@ -351,7 +357,68 @@ clippy:
 
 clean:
 	cargo clean
-	rm -rf "$(BUNDLE)" "$(PIPL_RSRC_OUT)"
+	rm -rf "$(BUNDLE)" "$(PIPL_RSRC_OUT)" "$(DIST_DIR)"
+
+# -------- release packaging --------
+#
+# `make release` builds the universal bundle (FEATURES=live by default —
+# this is what end users want; override on the command line if needed)
+# and assembles the distribution zip used by both the GitHub release
+# and the Homebrew tap. Layout matches §2 of
+# docs/design/2026-05-18-release-v0.1-distribution.md:
+#
+#   dist/GmicFilter-<version>.zip
+#   └── GmicFilter-<version>/
+#       ├── GmicFilter.plugin/
+#       ├── install.command
+#       └── README.txt
+#
+# RELEASE_VERSION defaults to `git describe`. CI overrides it with the
+# tag name (e.g. v0.1.0); for local dry runs it picks up something like
+# `v0.1.0-2-gabcdef0` which is fine for testing the layout.
+RELEASE_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+DIST_DIR        := dist
+RELEASE_NAME    := GmicFilter-$(RELEASE_VERSION)
+RELEASE_STAGE   := $(DIST_DIR)/$(RELEASE_NAME)
+RELEASE_ZIP     := $(DIST_DIR)/$(RELEASE_NAME).zip
+
+# `make release` always uses the live feature: this is the artifact end
+# users install. Override on the command line only if you know why.
+release: FEATURES := live
+release: universal
+	@if [ ! -f install.command ]; then \
+	  echo "ERROR: install.command missing at repo root."; exit 1; \
+	fi
+	@if [ ! -f release/README.txt ]; then \
+	  echo "ERROR: release/README.txt missing."; exit 1; \
+	fi
+	@rm -rf "$(RELEASE_STAGE)" "$(RELEASE_ZIP)"
+	@mkdir -p "$(RELEASE_STAGE)"
+	cp -R "$(BUNDLE)" "$(RELEASE_STAGE)/"
+	cp install.command "$(RELEASE_STAGE)/install.command"
+	cp release/README.txt "$(RELEASE_STAGE)/README.txt"
+	chmod +x "$(RELEASE_STAGE)/install.command"
+	# Strip Finder / quarantine / pre-existing xattrs from the staged
+	# tree before zipping. Code-signing data for .plugin bundles lives in
+	# Contents/_CodeSignature/ (real files), not in xattrs, so this is
+	# safe and keeps the resulting zip free of `._*` AppleDouble
+	# sidecars that confuse Linux/Windows users who unzip out of band.
+	xattr -rc "$(RELEASE_STAGE)"
+	# ditto, not zip(1), so symlinks inside the .plugin bundle survive
+	# round-tripping cleanly. -c -k = create, PKZip-compatible.
+	# --keepParent preserves the GmicFilter-<ver>/ top-level directory
+	# inside the zip. --norsrc / --noextattr / --noqtn / --noacl
+	# guarantee no AppleDouble files even if a fresh xattr lands on the
+	# tree between `xattr -rc` and `ditto`.
+	cd "$(DIST_DIR)" && ditto -c -k --keepParent \
+	  --norsrc --noextattr --noqtn --noacl \
+	  "$(RELEASE_NAME)" "$(RELEASE_NAME).zip"
+	@echo ""
+	@echo "Built $(RELEASE_ZIP)"
+	@echo "Size:    $$(stat -f %z "$(RELEASE_ZIP)") bytes"
+	@echo "SHA256:  $$(shasum -a 256 "$(RELEASE_ZIP)" | awk '{print $$1}')"
+	@echo ""
+	@echo "Cask url:  https://github.com/dstrupl/gmic-affinity/releases/download/$(RELEASE_VERSION)/$(RELEASE_NAME).zip"
 
 # Regenerate the bundled catalogue snapshot from the locally installed
 # gmic. Pipeline:
