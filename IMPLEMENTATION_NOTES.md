@@ -471,4 +471,56 @@ worth automating against Affinity itself.
 
 ---
 
+## 11. Release process
+
+The full design lives in
+[`docs/design/2026-05-18-release-v0.1-distribution.md`](./docs/design/2026-05-18-release-v0.1-distribution.md).
+This section is the operator's runbook only — when the design and this
+section disagree, the design wins.
+
+**Tagging.** Releases are driven by tags matching `v*`. Use semver
+(`v0.1.0`, `v0.1.1`, `v0.2.0`) and prefer signed annotated tags
+(`git tag -s vX.Y.Z -m "vX.Y.Z"`). Pre-release tags use the `-rc.N`
+suffix (`v0.1.0-rc.1`); the release workflow auto-marks anything
+containing a `-` as a GitHub pre-release so cask consumers don't pick
+it up by accident.
+
+**Release-day runbook.** Each step is tagged 🤖 (agent-runnable in a
+workspace shell with `gh` configured) or 👤 (requires a human).
+
+1. 🤖 Verify `main` is green on the `ci.yml` workflow:
+   `gh run list --branch main --workflow ci.yml --limit 1`.
+2. 🤖 Tag and push:
+   `git tag -s vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`.
+3. 🤖 (auto-runs) The `release.yml` workflow builds the universal
+   `FEATURES=live` zip via `make release` and publishes
+   `dist/GmicFilter-vX.Y.Z.zip` as a GitHub Release asset. Watch with
+   `gh run watch` or `gh run list --workflow release.yml`.
+4. 🤖 Compute the asset SHA256:
+   `curl -sL https://github.com/dstrupl/gmic-affinity/releases/download/vX.Y.Z/GmicFilter-vX.Y.Z.zip | shasum -a 256`.
+5. 🤖 Open the cask-bump PR against the tap repo. Once the tap exists
+   and is checked out locally, this is `sed -i '' …` on `version` and
+   `sha256` plus `gh pr create`. Tap CI runs `brew audit --cask`.
+6. 👤 End-to-end verify on a fresh user account: `brew install --cask
+   gmic-affinity`, restart Affinity, run a filter. The `brew install`
+   command is 🤖 but the visual verification is 👤.
+
+**Why ad-hoc signing in v0.1.** No Apple Developer Program enrolment
+($99/yr + per-release notarisation overhead). The cask + manual
+`install.command` paths both work without notarisation as long as the
+quarantine bit is either tolerated by Affinity (path C) or stripped on
+install (path D). See the design doc §3 (Phase 0) for the empirical
+checks gating this assumption, and §7 for the conditions under which
+notarisation moves into v0.2 scope. Notarisation would slot in at the
+end of `make release` (`xcrun notarytool submit … --wait`) and a
+`xcrun stapler staple` step before zipping.
+
+**Roll-back.** If a release is broken: delete the GitHub release
+(`gh release delete vX.Y.Z --yes`) so brew users can't fetch it,
+revert the tap PR (or open a new one pointing at the previous good
+version), and document the failure mode in the design doc's Phase 0
+deliverable so we don't repeat it.
+
+---
+
 *End of Implementation Notes*

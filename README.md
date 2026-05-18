@@ -4,9 +4,10 @@ A Rust-based Photoshop-compatible filter plugin (`.plugin`) for macOS that bridg
 [G'MIC](https://gmic.eu/) into [Affinity Photo 2](https://affinity.serif.com/photo/)
 and later versions (including Affinity by Canva v3).
 
-Status: **MVP shipped (2026-05-17).** The plugin loads in Affinity Photo 2,
+Status: **v0.1 release in progress.** The plugin loads in Affinity Photo 2,
 appears as `Filters → Plugins → G'MIC → G'MIC...`, hands pixels through gmic
-end-to-end and writes the result back inline.
+end-to-end and writes the result back inline. v0.1 ships universal,
+ad-hoc-signed, for both Affinity Photo 2 and Affinity Photo v3.
 
 Documentation set:
 
@@ -14,7 +15,41 @@ Documentation set:
 - [IMPLEMENTATION_NOTES.md](./IMPLEMENTATION_NOTES.md) — engineering
   detail: plugin format, `FilterRecord` layout, build pipeline, and the
   post-mortem of the five surprises that ate most of the bring-up.
+- [docs/design/2026-05-18-release-v0.1-distribution.md](./docs/design/2026-05-18-release-v0.1-distribution.md)
+  — v0.1 release / distribution design.
 - This file — install + day-to-day troubleshooting.
+
+## Install
+
+### Homebrew (recommended)
+
+```bash
+brew tap dstrupl/gmic-affinity
+brew install --cask gmic-affinity
+```
+
+The cask installs `GmicFilter.plugin` into both Affinity plugin folders
+that exist on your machine (Affinity Photo 2 and/or Affinity Photo v3)
+and pulls in the runtime `gmic` dependency. Restart Affinity Photo to
+pick up the plugin.
+
+### Manual install (zip)
+
+1. Download the latest `GmicFilter-vX.Y.Z.zip` from the
+   [Releases page](https://github.com/dstrupl/gmic-affinity/releases/latest).
+2. Unzip. Double-click `install.command` in the unzipped folder.
+   - First time only: macOS may say "install.command cannot be opened
+     because it is from an unidentified developer." Right-click →
+     **Open** → **Open**, or in Terminal:
+     `xattr -dr com.apple.quarantine .` then `./install.command`.
+3. Make sure `gmic` is installed: `brew install gmic-qt`
+   (or just `brew install gmic` for the CLI alone).
+4. Restart Affinity Photo and look for **Filters → Plugins → G'MIC →
+   G'MIC…**.
+
+If the plugin is not detected, open
+**Affinity → Settings → Photoshop Plugins** and tick
+*"Allow unknown plugins to be used"*.
 
 ## What it does
 
@@ -41,13 +76,70 @@ to the **Filters → Plugins → G'MIC** submenu. Invoking it:
 `Filter → Last Filter` (`Cmd-F`) replays the last picked filter without
 re-opening the dialog.
 
+## Configuration
+
+The picker (v2) supersedes the older `~/.config/gmic-affinity/filter.txt`
+mechanism. User state — the last filter, the recents MRU, and
+per-filter remembered argument values — lives in:
+
+```
+~/Library/Application Support/gmic-affinity/settings.json
+```
+
+It is written atomically (temp + rename) after every OK from the
+picker. If the file is unreadable on next open it is renamed to
+`settings.json.broken-<ts>` and a fresh empty one is written; the
+user-visible effect is loss of recents / remembered values, never a
+crash.
+
+`Filter → Last Filter` (Cmd-F) reads `settings.last` directly: even
+across an Affinity restart, Cmd-F replays the last filter you picked
+without opening the dialog.
+
+## Troubleshooting
+
+- Plugin doesn't appear in the Filters menu / "Detected Plugins" is
+  empty: check the three things Affinity Photo silently rejects on
+  (this list is the result of dissecting AKVIS Coloriage, which is
+  known-working under Affinity, and the matching `fs_usage` traces of
+  Affinity's plugin scanner — see commit history):
+  ```bash
+  INST="$HOME/Library/Application Support/Affinity Photo 2/Plugins/GmicFilter.plugin"
+  # 1) Mach-O type must be 8 (MH_BUNDLE), not 6 (MH_DYLIB).
+  otool -h "$INST/Contents/MacOS/GmicFilter"
+  # 2) PluginMain (or whatever name your pipl's CodeMac{ARM,Intel}64
+  #    declares) must be in the dynamic symbol table.
+  nm -gU "$INST/Contents/MacOS/GmicFilter"
+  # 3) A legacy pipl resource file named after CFBundleExecutable must
+  #    sit next to the modern PiPLs.json:
+  ls -la "$INST/Contents/Resources/GmicFilter.rsrc"
+  strings "$INST/Contents/Resources/GmicFilter.rsrc" | head
+  ```
+  Then open `Affinity Photo 2 -> Settings -> Photoshop Plugins`, ensure
+  "Allow unknown plugins to be used" is ticked, and restart Affinity.
+- Filter does nothing visible: open `Console.app`, filter on
+  `gmic-affinity`. Each `PluginMain` call logs its selector.
+- `gmic exited with status N`: try the same filter directly from a shell
+  on a small TIFF; verify it works.
+
+## License
+
+MIT. See [LICENSE](./LICENSE).
+
+---
+
+# For developers
+
+The rest of this file is for contributors building the plugin from
+source. End users should follow the *Install* section above.
+
 ## Requirements
 
 - macOS (Apple Silicon or Intel)
 - [Rust](https://rustup.rs/) (stable, with `aarch64-apple-darwin` and
   `x86_64-apple-darwin` targets for a universal build)
 - `gmic` via Homebrew: `brew install gmic-qt`
-- Affinity Photo 2 or later
+- Affinity Photo 2 or Affinity Photo v3
 - Git LFS — one-time per machine: `git lfs install`. After cloning,
   `git lfs pull` once. The bundled catalogue snapshot
   (`assets/gmic-catalogue.gmic.gz`) is LFS-tracked; without hydration
@@ -75,7 +167,7 @@ Common targets:
 ```bash
 make                    # ARM-only no-op bundle (fast iteration)
 make universal          # ARM + x86_64 lipo'd bundle
-make install            # copy GmicFilter.plugin into Affinity Photo 2 plugins folder
+make install            # copy GmicFilter.plugin into every detected Affinity Plugins folder
 make uninstall          # remove the installed plugin
 make picker-example     # open the picker standalone (no Affinity install needed)
 make refresh-catalogue  # regenerate assets/gmic-catalogue.* from local gmic
@@ -130,53 +222,12 @@ nm    -gU GmicFilter.plugin/Contents/MacOS/GmicFilter  # must export _PluginMain
 
 See [PRD.md](./PRD.md) §7 for the full PRD-side build and install procedure.
 
-## Configuration
+## Releasing
 
-The picker (v2) supersedes the older `~/.config/gmic-affinity/filter.txt`
-mechanism. User state — the last filter, the recents MRU, and
-per-filter remembered argument values — lives in:
-
-```
-~/Library/Application Support/gmic-affinity/settings.json
-```
-
-It is written atomically (temp + rename) after every OK from the
-picker. If the file is unreadable on next open it is renamed to
-`settings.json.broken-<ts>` and a fresh empty one is written; the
-user-visible effect is loss of recents / remembered values, never a
-crash.
-
-`Filter → Last Filter` (Cmd-F) reads `settings.last` directly: even
-across an Affinity restart, Cmd-F replays the last filter you picked
-without opening the dialog.
-
-## Troubleshooting
-
-- Plugin doesn't appear in the Filters menu / "Detected Plugins" is
-  empty: check the three things Affinity Photo 2 silently rejects on
-  (this list is the result of dissecting AKVIS Coloriage, which is
-  known-working under Affinity, and the matching `fs_usage` traces of
-  Affinity's plugin scanner — see commit history):
-  ```bash
-  INST="$HOME/Library/Application Support/Affinity Photo 2/Plugins/GmicFilter.plugin"
-  # 1) Mach-O type must be 8 (MH_BUNDLE), not 6 (MH_DYLIB).
-  otool -h "$INST/Contents/MacOS/GmicFilter"
-  # 2) PluginMain (or whatever name your pipl's CodeMac{ARM,Intel}64
-  #    declares) must be in the dynamic symbol table.
-  nm -gU "$INST/Contents/MacOS/GmicFilter"
-  # 3) A legacy pipl resource file named after CFBundleExecutable must
-  #    sit next to the modern PiPLs.json:
-  ls -la "$INST/Contents/Resources/GmicFilter.rsrc"
-  strings "$INST/Contents/Resources/GmicFilter.rsrc" | head
-  ```
-  All three are produced by `make universal-install`. Then open
-  `Affinity Photo 2 -> Settings -> Photoshop Plugins`, ensure "Allow
-  unknown plugins to be used" is ticked, and restart Affinity.
-- Filter does nothing visible: open `Console.app`, filter on
-  `gmic-affinity`. Each `PluginMain` call logs its selector.
-- `gmic exited with status N`: try the same filter directly from a shell
-  on a small TIFF; verify it works.
-
-## License
-
-TBD.
+Tag a green commit on `main` with `vX.Y.Z` (or `vX.Y.Z-rc.N`) and push
+the tag. The `release` GitHub Actions workflow builds the universal
+zip and publishes it as a GitHub Release. Then bump `version` and
+`sha256` in the [Homebrew tap](https://github.com/dstrupl/homebrew-gmic-affinity)
+cask. Full runbook: [IMPLEMENTATION_NOTES.md](./IMPLEMENTATION_NOTES.md)
+§11 and the design doc
+[`docs/design/2026-05-18-release-v0.1-distribution.md`](./docs/design/2026-05-18-release-v0.1-distribution.md).

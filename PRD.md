@@ -72,7 +72,7 @@ Homebrew `gmic` present:
 
 | # | Acceptance criterion                                                                                                  | Status |
 |---|------------------------------------------------------------------------------------------------------------------------|--------|
-| 1 | Bundle copied to `~/Library/Application Support/Affinity Photo 2/Plugins/` is discovered after Affinity restart.       | ✅     |
+| 1 | Bundle copied to `~/Library/Application Support/Affinity Photo 2/Plugins/` and/or `~/Library/Application Support/Affinity/Plugins/` is discovered after Affinity Photo 2 / Affinity Photo v3 restart. | ✅ (v2 verified; v3 pending Phase 0 of [release design](./docs/design/2026-05-18-release-v0.1-distribution.md)) |
 | 2 | Bundle appears in **Preferences → Photoshop Plugins → Detected** (Unknown status is acceptable).                       | ✅     |
 | 3 | A filter entry `G'MIC...` exists under **Filters → Plugins → G'MIC**.                                                  | ✅     |
 | 4 | Invoking the filter on an 8-bit RGB document produces a visibly transformed image in-place (no separate file dialog).  | ✅     |
@@ -88,7 +88,7 @@ Homebrew `gmic` present:
 | Component              | Minimum                                            |
 |------------------------|----------------------------------------------------|
 | OS                     | macOS 14 Sonoma (tested), should work on 12+      |
-| Host                   | Affinity Photo 2 (Serif store build) on macOS     |
+| Host                   | Affinity Photo 2 (Serif store build) or Affinity Photo v3 (Affinity by Canva) on macOS |
 | CPU                    | Apple Silicon (ARM64) or Intel (x86\_64)          |
 | External dependency    | Homebrew `gmic-qt` (provides the `gmic` binary)   |
 | Build-time (developer) | Rust stable, Xcode Command Line Tools, optional Adobe Photoshop SDK (only needed to *regenerate* `GmicFilter.rsrc`; a pre-built copy ships in the repo) |
@@ -100,6 +100,8 @@ Homebrew `gmic` present:
 | Capability                                       | Status                  |
 |---------------------------------------------------|-------------------------|
 | Affinity Photo 2 loads and lists the plugin       | ✅ shipped              |
+| Affinity Photo v3 loads and lists the plugin      | 🟡 pending Phase 0 verification (see release design doc) |
+| Distributed via Homebrew tap + GitHub release zip | 🟡 v0.1 in progress (see [release design doc](./docs/design/2026-05-18-release-v0.1-distribution.md)) |
 | Filter runs end-to-end on a real image            | ✅ shipped              |
 | Universal binary (arm64 + x86\_64)                | ✅ shipped              |
 | 8-bit RGB / RGBA / Greyscale                      | ✅ shipped              |
@@ -140,7 +142,7 @@ Homebrew `gmic` present:
 | ~~Parameter UI~~                  | ~~Either a native sheet via `filterSelectorParameters`, or launching `gmic_qt` standalone for filter picking.~~ Shipped in v2 via native Cocoa picker + dynamic parameter form. |
 | 16/32-bit support                 | Promote `tiff_io` to those depths, update PiPL `EnableInfo`. |
 | Tiled processing                  | Required to handle gigapixel images without OOM. |
-| Notarised distribution            | `.dmg` with a Developer-ID-signed bundle, run through `notarytool`. |
+| Notarised distribution            | `.dmg` with a Developer-ID-signed bundle, run through `notarytool`. v0.1 ships unnotarised via Homebrew tap + zip; see [`docs/design/2026-05-18-release-v0.1-distribution.md`](./docs/design/2026-05-18-release-v0.1-distribution.md) for the current channel and the deferral rationale. |
 | Affinity v3 scripting integration | The v3 MCP/Scripts panel could invoke this plugin programmatically. |
 | Bundled `gmic`                    | Optional — could ship a vendored gmic binary so users do not need Homebrew. |
 
