@@ -1,0 +1,31 @@
+name: cask audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: brew audit + style
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: brew update
+        run: brew update
+
+      - name: brew audit --cask
+        # The same gate the central homebrew-cask repo runs on PRs.
+        # Catching policy regressions on the tap means we won't be
+        # blindsided if we ever submit upstream.
+        run: brew audit --cask Casks/gmic-affinity.rb
+
+      - name: brew style
+        run: brew style Casks/gmic-affinity.rb
