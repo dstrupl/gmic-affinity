@@ -5,7 +5,7 @@
 #   make bundle       -> same as `make`
 #   make universal    -> build aarch64 + x86_64 and lipo into one universal binary
 #   make pipl         -> compile GmicFilter.r -> GmicFilter.rsrc (needs PHOTOSHOP_SDK)
-#   make install      -> copy GmicFilter.plugin into Affinity Photo 2 Plugins folder
+#   make install      -> copy GmicFilter.plugin into every detected Affinity Plugins folder
 #   make uninstall    -> remove the installed plugin
 #   make clean        -> cargo clean + remove bundle artefacts
 #
@@ -14,7 +14,10 @@
 #                              (default: $HOME/SDKs/photoshop-sdk)
 #   PHOTOSHOP_SDK_RESOURCES    override resources include dir if SDK layout differs
 #   PHOTOSHOP_SDK_HEADERS      override headers include dir if SDK layout differs
-#   AFFINITY_PLUGINS_DIR       override install destination
+#   AFFINITY_PLUGINS_DIRS      comma-separated list of install destinations
+#                              (default: Affinity Photo 2 + Affinity v3)
+#   AFFINITY_PLUGINS_DIR       legacy singular override; if set, replaces
+#                              AFFINITY_PLUGINS_DIRS (back-compat)
 
 SHELL := /bin/bash
 
@@ -83,10 +86,24 @@ BUNDLE_LDFLAGS := \
 FEATURES ?=
 CARGO_FEATURE_ARGS := $(if $(FEATURES),--features $(FEATURES),)
 
-# Default install path is Affinity Photo 2. The Affinity v3 path is
-#   $(HOME)/Library/Application Support/Affinity/Plugins
-# but v3 is not the M1 target.
-AFFINITY_PLUGINS_DIR ?= $(HOME)/Library/Application Support/Affinity Photo 2/Plugins
+# Comma-separated list of Affinity Plugins folders. The install /
+# universal-install / uninstall targets iterate over the list and operate
+# on every entry whose *parent* directory exists (proxy for "this version
+# of Affinity is installed"). Entries whose parent is missing are
+# skipped silently.
+#
+# v0.1 ships for both Affinity Photo 2 and Affinity by Canva v3 (see
+# docs/design/2026-05-18-release-v0.1-distribution.md §4.1).
+#
+# The legacy singular AFFINITY_PLUGINS_DIR is honoured for backwards
+# compatibility: if it is set explicitly (env or make-arg), it overrides
+# AFFINITY_PLUGINS_DIRS so existing developer workflows keep working.
+AFFINITY_PLUGINS_DIRS ?= $(HOME)/Library/Application Support/Affinity Photo 2/Plugins,$(HOME)/Library/Application Support/Affinity/Plugins
+ifdef AFFINITY_PLUGINS_DIR
+EFFECTIVE_PLUGINS_DIRS := $(AFFINITY_PLUGINS_DIR)
+else
+EFFECTIVE_PLUGINS_DIRS := $(AFFINITY_PLUGINS_DIRS)
+endif
 
 # Path to the unpacked Adobe Photoshop SDK. Required for two things:
 #   1. Compiling the legacy pipl resource (GmicFilter.r -> .rsrc) — without
@@ -129,7 +146,7 @@ help:
 	@echo "Targets:"
 	@echo "  make bundle             Build ARM-only GmicFilter.plugin (no-op PluginMain)."
 	@echo "  make universal          Build universal (arm64 + x86_64) GmicFilter.plugin."
-	@echo "  make install            Install GmicFilter.plugin into Affinity Photo 2."
+	@echo "  make install            Install GmicFilter.plugin into every detected Affinity Plugins folder."
 	@echo "  make universal-install  Convenience: 'make universal' then 'make install'."
 	@echo "  make uninstall          Remove the installed plugin."
 	@echo "  make picker-example     Open the picker standalone (no Affinity install needed)."
@@ -145,7 +162,8 @@ help:
 	@echo "                          Example: make universal-install FEATURES=live"
 	@echo ""
 	@echo "Environment:"
-	@echo "  AFFINITY_PLUGINS_DIR    install dest (default: Affinity Photo 2 Plugins)"
+	@echo "  AFFINITY_PLUGINS_DIRS   comma-separated install dests (default: Affinity Photo 2 + v3)"
+	@echo "  AFFINITY_PLUGINS_DIR    legacy singular override; replaces the list if set"
 	@echo "  PHOTOSHOP_SDK           SDK root, optional (default: \$$HOME/SDKs/photoshop-sdk)"
 
 # Fail fast if the LFS-tracked catalogue snapshot is still a pointer
@@ -256,23 +274,70 @@ verify-bundle:
 	done; \
 	echo "verify-bundle: $(BUNDLE_BIN) is MH_BUNDLE on all slices."
 
+# Bash helper used by install / universal-install / uninstall. We expand
+# the comma-separated list inline rather than storing it in $(foreach) so
+# directory entries that contain spaces (they all do — "Affinity Photo 2"
+# / "Application Support") survive correctly.
+# Note on shell-loop quoting: we assign the make-expanded list to a
+# shell variable first, then iterate over the *unquoted parameter
+# expansion* `$$dirs`. This is deliberate. `for dir in $(VAR)` lets
+# Make interpolate the value into the script source, and the shell
+# parser then tokenises on whitespace at parse time, breaking
+# directories that contain spaces (every Affinity path does:
+# "Application Support", "Affinity Photo 2", ...). Word-splitting on
+# parameter expansions, by contrast, uses IFS at runtime, so
+# `IFS=','; for dir in $$dirs;` splits cleanly on commas only.
+define INSTALL_BUNDLE_TO_TARGETS
+	@set -e; \
+	dirs='$(EFFECTIVE_PLUGINS_DIRS)'; \
+	IFS=','; \
+	installed=0; \
+	skipped=0; \
+	for dir in $$dirs; do \
+	  parent="$$(dirname "$$dir")"; \
+	  if [ -d "$$parent" ]; then \
+	    mkdir -p "$$dir"; \
+	    rm -rf "$$dir/$(BUNDLE)"; \
+	    cp -R "$(BUNDLE)" "$$dir/"; \
+	    echo "Installed: $$dir/$(BUNDLE)"; \
+	    installed=$$((installed + 1)); \
+	  else \
+	    echo "Skipped (no $$parent): $$dir"; \
+	    skipped=$$((skipped + 1)); \
+	  fi; \
+	done; \
+	if [ "$$installed" -eq 0 ]; then \
+	  echo ""; \
+	  echo "WARNING: no Affinity install detected under any of:"; \
+	  for dir in $$dirs; do echo "  - $$dir"; done; \
+	  echo "Install Affinity Photo 2 or v3, or set AFFINITY_PLUGINS_DIR explicitly."; \
+	  exit 2; \
+	fi; \
+	echo "Restart Affinity to pick up the change."
+endef
+
+define UNINSTALL_BUNDLE_FROM_TARGETS
+	@set -e; \
+	dirs='$(EFFECTIVE_PLUGINS_DIRS)'; \
+	IFS=','; \
+	for dir in $$dirs; do \
+	  if [ -e "$$dir/$(BUNDLE)" ]; then \
+	    rm -rf "$$dir/$(BUNDLE)"; \
+	    echo "Removed: $$dir/$(BUNDLE)"; \
+	  else \
+	    echo "Not present: $$dir/$(BUNDLE)"; \
+	  fi; \
+	done
+endef
+
 install: bundle
-	@mkdir -p "$(AFFINITY_PLUGINS_DIR)"
-	rm -rf "$(AFFINITY_PLUGINS_DIR)/$(BUNDLE)"
-	cp -R "$(BUNDLE)" "$(AFFINITY_PLUGINS_DIR)/"
-	@echo "Installed to $(AFFINITY_PLUGINS_DIR)/$(BUNDLE)"
-	@echo "Restart Affinity Photo 2 to pick up the change."
+	$(INSTALL_BUNDLE_TO_TARGETS)
 
 universal-install: universal
-	@mkdir -p "$(AFFINITY_PLUGINS_DIR)"
-	rm -rf "$(AFFINITY_PLUGINS_DIR)/$(BUNDLE)"
-	cp -R "$(BUNDLE)" "$(AFFINITY_PLUGINS_DIR)/"
-	@echo "Installed (universal) to $(AFFINITY_PLUGINS_DIR)/$(BUNDLE)"
-	@echo "Restart Affinity Photo 2 to pick up the change."
+	$(INSTALL_BUNDLE_TO_TARGETS)
 
 uninstall:
-	rm -rf "$(AFFINITY_PLUGINS_DIR)/$(BUNDLE)"
-	@echo "Removed $(AFFINITY_PLUGINS_DIR)/$(BUNDLE) (if it existed)."
+	$(UNINSTALL_BUNDLE_FROM_TARGETS)
 
 test:
 	cargo test $(CARGO_FEATURE_ARGS)
