@@ -6,10 +6,15 @@ plugin that adds a "G'MIC..." entry under Filters → Plugins → G'MIC
 in Affinity Photo. It works for Affinity Photo 2 and Affinity Photo
 v3 (Affinity by Canva).
 
-1. Make sure gmic is installed:
+1. Make sure the gmic CLI is installed:
 
-       brew install gmic-qt
-       (or just  brew install gmic   if you only need the CLI)
+       brew install gmic
+
+   This plugin shells out to /opt/homebrew/bin/gmic; it has its own
+   built-in picker dialog, so you do NOT need G'MIC-Qt (the
+   standalone GUI / GIMP plugin) for this plugin to work. G'MIC-Qt
+   is not on Homebrew anyway; if you want it for other reasons,
+   download it from https://gmic.eu/download.html.
 
 2. Double-click install.command in this folder. macOS may prompt:
 

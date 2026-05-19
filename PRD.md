@@ -18,7 +18,7 @@ later (including Affinity by Canva v3).
 
 [G'MIC](https://gmic.eu/) (GREYC's Magic for Image Computing) is a
 powerful open-source image-processing framework with hundreds of filters,
-available on macOS via Homebrew (`brew install gmic-qt`). Affinity Photo
+available on macOS via Homebrew (`brew install gmic`). Affinity Photo
 is a professional image editor that supports Photoshop-compatible filter
 plugins (`.plugin` bundles) on macOS.
 
@@ -90,7 +90,7 @@ Homebrew `gmic` present:
 | OS                     | macOS 14 Sonoma (tested), should work on 12+      |
 | Host                   | Affinity Photo 2 (Serif store build) or Affinity Photo v3 (Affinity by Canva) on macOS |
 | CPU                    | Apple Silicon (ARM64) or Intel (x86\_64)          |
-| External dependency    | Homebrew `gmic-qt` (provides the `gmic` binary)   |
+| External dependency    | Homebrew `gmic` formula (provides the `gmic` CLI; G'MIC-Qt is *not* a Homebrew package and is not needed) |
 | Build-time (developer) | Rust stable, Xcode Command Line Tools, optional Adobe Photoshop SDK (only needed to *regenerate* `GmicFilter.rsrc`; a pre-built copy ships in the repo) |
 
 ---
@@ -154,7 +154,8 @@ Homebrew `gmic` present:
 |--------------------------------------------|-----|
 | Adobe Photoshop SDK                        | https://console.adobe.io → Downloads → Creative Cloud → Photoshop C++ SDK |
 | G'MIC documentation                        | https://gmic.eu/reference/ |
-| G'MIC Homebrew formula                     | `brew info gmic-qt` |
+| G'MIC Homebrew formula                     | `brew info gmic` |
+| G'MIC-Qt standalone GUI / GIMP plugin      | <https://gmic.eu/download.html> (not on Homebrew, not required by this plugin) |
 | gmic-8bf (Windows reference implementation) | https://github.com/0xC0000054/gmic-8bf |
 | Affinity plugin preferences                | Affinity Photo → Edit → Preferences → Photoshop Plugins |
 

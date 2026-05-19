@@ -9,10 +9,15 @@ cask "gmic-affinity" do
   desc "Photoshop-compatible filter plugin bridging G'MIC into Affinity Photo"
   homepage "https://github.com/dstrupl/gmic-affinity"
 
-  # The plugin shells out to the gmic CLI. We depend on the lighter
-  # `gmic` formula and let users brew-install `gmic-qt` separately if
-  # they want the GUI. README.md and release/README.txt mirror this
-  # framing so users aren't confused.
+  # The plugin shells out to the gmic CLI. The `gmic` formula provides
+  # exactly that binary plus the runtime libs (cimg, fftw, libtiff,
+  # libpng, openexr, libomp). It does not ship a Qt GUI, but we don't
+  # need one — the picker dialog is our own native Cocoa code.
+  #
+  # G'MIC-Qt (the standalone GUI / GIMP plugin from gmic.eu) is NOT a
+  # Homebrew formula or cask and is intentionally not depended on. It
+  # is unrelated to this plugin; users who want it can grab it from
+  # https://gmic.eu/download.html separately.
   depends_on formula: "gmic"
   depends_on macos:   ">= :big_sur"
 

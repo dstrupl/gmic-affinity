@@ -42,8 +42,11 @@ pick up the plugin.
      because it is from an unidentified developer." Right-click →
      **Open** → **Open**, or in Terminal:
      `xattr -dr com.apple.quarantine .` then `./install.command`.
-3. Make sure `gmic` is installed: `brew install gmic-qt`
-   (or just `brew install gmic` for the CLI alone).
+3. Make sure the `gmic` CLI is installed: `brew install gmic`. The
+   plugin shells out to it; the Cocoa picker dialog is built in.
+   (G'MIC-Qt — the standalone GUI / GIMP plugin — is not on Homebrew
+   and is not needed for this plugin. If you want it anyway, grab it
+   from <https://gmic.eu/download.html>.)
 4. Restart Affinity Photo and look for **Filters → Plugins → G'MIC →
    G'MIC…**.
 
@@ -138,7 +141,8 @@ source. End users should follow the *Install* section above.
 - macOS (Apple Silicon or Intel)
 - [Rust](https://rustup.rs/) (stable, with `aarch64-apple-darwin` and
   `x86_64-apple-darwin` targets for a universal build)
-- `gmic` via Homebrew: `brew install gmic-qt`
+- `gmic` CLI via Homebrew: `brew install gmic` (G'MIC-Qt is not on
+  Homebrew and is not needed by this plugin)
 - Affinity Photo 2 or Affinity Photo v3
 - Git LFS — one-time per machine: `git lfs install`. After cloning,
   `git lfs pull` once. The bundled catalogue snapshot

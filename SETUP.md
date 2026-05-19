@@ -12,8 +12,9 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 # Both Apple Silicon and Intel targets (universal binary)
 rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
-# G'MIC binary
-brew install gmic-qt
+# G'MIC CLI binary (the plugin shells out to this; G'MIC-Qt the GUI is
+# NOT on Homebrew and is not needed for development of this plugin).
+brew install gmic
 ```
 
 Verify:
@@ -72,8 +73,13 @@ You only need the SDK if you want to:
 3. Tick **"Allow unknown plugins to be used"**.
 4. Restart Affinity Photo.
 
-The `make install` target copies the built bundle into:
+The `make install` target copies the built bundle into every detected
+Affinity Plugins folder:
 
 ```
 ~/Library/Application Support/Affinity Photo 2/Plugins/
+~/Library/Application Support/Affinity/Plugins/        (Affinity Photo v3)
 ```
+
+Folders whose parent doesn't exist are skipped, so machines with only
+one Affinity version installed still work.

@@ -233,7 +233,9 @@ camera images (a 6000×4000 RGBA buffer is already 96 MB).
 - Xcode Command Line Tools (provides `clang`, `lipo`, `codesign`, `Rez`).
 - Optional: Adobe Photoshop SDK (only required to *regenerate*
   `GmicFilter.rsrc` from `GmicFilter.r`; a pre-built copy is committed).
-- Homebrew `gmic-qt` at runtime.
+- Homebrew `gmic` formula at runtime (provides the `gmic` CLI; the
+  GUI / GIMP plugin "G'MIC-Qt" is a separate project from gmic.eu and
+  is not used or needed by this plugin).
 
 ### Make targets
 
@@ -241,7 +243,7 @@ camera images (a 6000×4000 RGBA buffer is already 96 MB).
 |----------------------|---------------------------------------------------------------------------|
 | `make bundle`        | Single-arch (host arm64) `.plugin` for fast dev iteration.                |
 | `make universal`     | Universal `.plugin` (arm64 + x86\_64), Rez'd PiPL, lipo'd, ad-hoc signed. |
-| `make install`       | `make bundle` + copy into Affinity Photo 2 plugins dir.                   |
+| `make install`       | `make bundle` + copy into every detected Affinity Plugins dir (Affinity Photo 2 + v3). |
 | `make universal-install` | `make universal` + copy. **This is the one you usually want.**        |
 | `make verify-bundle` | `otool -h` every slice, assert filetype `MH_BUNDLE` (8).                  |
 | `make pipl`          | Re-run Rez if `PHOTOSHOP_SDK` is set; otherwise reuse committed `.rsrc`.  |
