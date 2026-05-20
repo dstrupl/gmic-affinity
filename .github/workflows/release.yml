@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # The bundled gmic catalogue snapshot lives in Git LFS; without
           # `lfs: true` the Makefile's check-lfs guard (Makefile:158)
