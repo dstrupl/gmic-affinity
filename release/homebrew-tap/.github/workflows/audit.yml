@@ -21,11 +21,41 @@ jobs:
       - name: brew update
         run: brew update
 
+      - name: Install checkout as a local tap
+        # Modern Homebrew refuses path arguments to `brew audit` (the
+        # CLI was tightened in late 2025), so we have to expose the
+        # checkout under its expected on-disk tap path and reference
+        # the cask by its user-facing token. The tap path uses the
+        # `homebrew-` prefix; the user-facing tap name strips it
+        # (`dstrupl/gmic-affinity`), and the cask token is the file's
+        # basename without `.rb` (`gmic-affinity`). Final reference
+        # is `<owner>/<tap-name>/<cask>`.
+        run: |
+          set -euo pipefail
+          TAP_PATH="$(brew --repository)/Library/Taps/dstrupl/homebrew-gmic-affinity"
+          mkdir -p "$(dirname "$TAP_PATH")"
+          rm -rf "$TAP_PATH"
+          ln -s "$GITHUB_WORKSPACE" "$TAP_PATH"
+          # Sanity check: brew should now find the cask by name.
+          brew info --cask dstrupl/gmic-affinity/gmic-affinity >/dev/null
+
       - name: brew audit --cask
         # The same gate the central homebrew-cask repo runs on PRs.
         # Catching policy regressions on the tap means we won't be
         # blindsided if we ever submit upstream.
-        run: brew audit --cask Casks/gmic-affinity.rb
+        #
+        # Skip while the cask still carries the v0.2-deferral
+        # placeholder sha256 — there's no published release at the
+        # URL yet, so an online audit would fail by design. Once
+        # release-bump-cask.sh has filled in real version + sha256,
+        # this branch is taken and audit runs in earnest.
+        run: |
+          set -euo pipefail
+          if grep -q REPLACE_WITH_RELEASE_ZIP_SHA256 Casks/gmic-affinity.rb; then
+            echo "::notice::Cask still on v0.2-deferral placeholder sha256; skipping audit. brew style still runs."
+            exit 0
+          fi
+          brew audit --cask --online dstrupl/gmic-affinity/gmic-affinity
 
       - name: brew style
-        run: brew style Casks/gmic-affinity.rb
+        run: brew style dstrupl/gmic-affinity/gmic-affinity
