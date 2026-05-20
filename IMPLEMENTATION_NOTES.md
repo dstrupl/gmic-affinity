@@ -487,41 +487,87 @@ suffix (`v0.1.0-rc.1`); the release workflow auto-marks anything
 containing a `-` as a GitHub pre-release so cask consumers don't pick
 it up by accident.
 
-**Release-day runbook.** Each step is tagged 🤖 (agent-runnable in a
-workspace shell with `gh` configured) or 👤 (requires a human).
+**v0.1 release-day runbook.** Each step is tagged 🤖 (agent-runnable
+in a workspace shell with `gh` configured) or 👤 (requires a human).
+v0.1 ships **one channel** — the GitHub-release zip + `install.command`.
 
 1. 🤖 Verify `main` is green on the `ci.yml` workflow:
    `gh run list --branch main --workflow ci.yml --limit 1`.
 2. 🤖 Tag and push:
-   `git tag -s vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`.
+   `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`.
+   (Use `-s` instead of `-a` if you have GPG/SSH signing configured —
+   `git config --get user.signingkey`.)
 3. 🤖 (auto-runs) The `release.yml` workflow builds the universal
    `FEATURES=live` zip via `make release` and publishes
-   `dist/GmicFilter-vX.Y.Z.zip` as a GitHub Release asset. Watch with
+   `dist/GmicFilter-vX.Y.Z.zip` as a GitHub Release asset. Pre-release
+   tags (anything with `-` in the name) are auto-flagged. Watch with
    `gh run watch` or `gh run list --workflow release.yml`.
-4. 🤖 Compute the asset SHA256:
-   `curl -sL https://github.com/dstrupl/gmic-affinity/releases/download/vX.Y.Z/GmicFilter-vX.Y.Z.zip | shasum -a 256`.
-5. 🤖 Open the cask-bump PR against the tap repo. Once the tap exists
-   and is checked out locally, this is `sed -i '' …` on `version` and
-   `sha256` plus `gh pr create`. Tap CI runs `brew audit --cask`.
-6. 👤 End-to-end verify on a fresh user account: `brew install --cask
-   gmic-affinity`, restart Affinity, run a filter. The `brew install`
-   command is 🤖 but the visual verification is 👤.
+4. 🤖 Sanity-check the published asset matches what the runner built:
+   ```bash
+   curl -sL https://github.com/dstrupl/gmic-affinity/releases/download/vX.Y.Z/GmicFilter-vX.Y.Z.zip | shasum -a 256
+   ```
+   Compare against the workflow's "Show artifact metadata" log line —
+   they must match.
+5. 👤 End-to-end verify on a fresh user account: download the zip,
+   unzip, double-click `install.command`, restart Affinity Photo (2
+   and/or v3), run a filter. See [release design doc §11
+   tracker M8](./docs/design/2026-05-18-release-v0.1-distribution.md)
+   for the smoke-test checklist.
 
 **Why ad-hoc signing in v0.1.** No Apple Developer Program enrolment
-($99/yr + per-release notarisation overhead). The cask + manual
-`install.command` paths both work without notarisation as long as the
-quarantine bit is either tolerated by Affinity (path C) or stripped on
-install (path D). See the design doc §3 (Phase 0) for the empirical
-checks gating this assumption, and §7 for the conditions under which
-notarisation moves into v0.2 scope. Notarisation would slot in at the
-end of `make release` (`xcrun notarytool submit … --wait`) and a
-`xcrun stapler staple` step before zipping.
+($99/yr + per-release notarisation overhead) — `install.command`
+strips `com.apple.quarantine` user-side via `xattr -dr` before
+copying the bundle into the Affinity plugin folders, which is what
+lets ad-hoc-signed code load inside Affinity's hardened-runtime
+process. See the design doc §3 (Phase 0) for the empirical checks
+gating this assumption.
 
 **Roll-back.** If a release is broken: delete the GitHub release
-(`gh release delete vX.Y.Z --yes`) so brew users can't fetch it,
-revert the tap PR (or open a new one pointing at the previous good
-version), and document the failure mode in the design doc's Phase 0
+(`gh release delete vX.Y.Z --yes`) so users can't fetch it. The
+`install.command` script bails cleanly on missing
+`GmicFilter.plugin`, so a half-uninstalled state on a user's machine
+is recoverable by re-running install.command from a known-good
+release zip. Document the failure mode in the design doc's Phase 0
 deliverable so we don't repeat it.
+
+### v0.2 plan — bring the Homebrew cask online
+
+The cask runbook above used to read "open the tap-bump PR; users
+upgrade with `brew upgrade --cask`". That step has moved to v0.2 and
+is gated on Apple Developer enrolment. Concretely:
+
+1. Apple Developer Program enrolment (~$99/yr, 24–72h verification
+   wait). Out-of-band — does not block any code work.
+2. Wire `codesign --sign "Developer ID Application: …"` into
+   `make release` and `release.yml`, replacing the current `--sign -`
+   ad-hoc step.
+3. Add `xcrun notarytool submit … --keychain-profile … --wait` after
+   the build step, then `xcrun stapler staple` against the staged
+   `GmicFilter.plugin` before `ditto` zips it.
+4. Verify the produced bundle: `spctl --assess -vv` should report
+   "accepted" + "Notarized Developer ID".
+5. Drop the v0.2-deferral comment from
+   `release/homebrew-tap/Casks/gmic-affinity.rb`. No DSL changes —
+   no `quarantine false`, no `--no-quarantine` — a notarised bundle
+   loads through Gatekeeper directly.
+6. Push the local tap mirror (single-commit at
+   `~/projects/homebrew-gmic-affinity/`) to a new GitHub repo
+   `dstrupl/homebrew-gmic-affinity` per
+   `release/homebrew-tap/PUBLISHING.md`.
+7. End-to-end smoke test on a fresh user: `brew tap` →
+   `brew install --cask gmic-affinity` → restart Affinity → run a
+   filter.
+
+The cask, tap-CI, `release/homebrew-tap/PUBLISHING.md`, and the
+double-`artifact` shape (one zip, two install destinations) are all
+done already — only steps 1–4 above involve real new work.
+
+**Hard external deadline:** Homebrew ends support for casks that
+fail Gatekeeper checks on **2026-09-01**
+([Homebrew/brew#20755](https://github.com/homebrew/brew/issues/20755)).
+v0.2 needs to ship before that, or the cask path is gone for good.
+The zip channel is unaffected and remains a working fallback. Full
+context: design doc §12.
 
 ---
 

@@ -100,8 +100,9 @@ Homebrew `gmic` present:
 | Capability                                       | Status                  |
 |---------------------------------------------------|-------------------------|
 | Affinity Photo 2 loads and lists the plugin       | ✅ shipped              |
-| Affinity Photo v3 loads and lists the plugin      | 🟡 pending Phase 0 verification (see release design doc) |
-| Distributed via Homebrew tap + GitHub release zip | 🟡 v0.1 in progress (see [release design doc](./docs/design/2026-05-18-release-v0.1-distribution.md)) |
+| Affinity Photo v3 loads and lists the plugin      | ✅ shipped (Phase 0 step 2 PASS on 2026-05-19; see release design doc §3) |
+| Distributed via GitHub release zip + `install.command` | ✅ shipped (universal `.plugin` zip, double-clickable installer; see [release design doc](./docs/design/2026-05-18-release-v0.1-distribution.md)) |
+| Distributed via Homebrew cask                     | 🟡 v0.2 (cask + tap repo scaffolded under [`release/homebrew-tap/`](./release/homebrew-tap/) but unpublished. Blocked on Apple Developer ID + notarisation; see release design doc §12 for the late-2025 Homebrew Cask DSL changes that triggered this deferral) |
 | Filter runs end-to-end on a real image            | ✅ shipped              |
 | Universal binary (arm64 + x86\_64)                | ✅ shipped              |
 | 8-bit RGB / RGBA / Greyscale                      | ✅ shipped              |
@@ -142,7 +143,7 @@ Homebrew `gmic` present:
 | ~~Parameter UI~~                  | ~~Either a native sheet via `filterSelectorParameters`, or launching `gmic_qt` standalone for filter picking.~~ Shipped in v2 via native Cocoa picker + dynamic parameter form. |
 | 16/32-bit support                 | Promote `tiff_io` to those depths, update PiPL `EnableInfo`. |
 | Tiled processing                  | Required to handle gigapixel images without OOM. |
-| Notarised distribution            | `.dmg` with a Developer-ID-signed bundle, run through `notarytool`. v0.1 ships unnotarised via Homebrew tap + zip; see [`docs/design/2026-05-18-release-v0.1-distribution.md`](./docs/design/2026-05-18-release-v0.1-distribution.md) for the current channel and the deferral rationale. |
+| Notarised cask distribution       | Apple Developer ID signing + `notarytool` notarisation + stapler, then publish the cask in [`release/homebrew-tap/`](./release/homebrew-tap/) to `dstrupl/homebrew-gmic-affinity`. v0.1 ships unnotarised via the GitHub-release zip + `install.command`; the cask is gated on this work and is the headline of v0.2. Hard external deadline: 2026-09-01 — Homebrew sunsets all casks that fail Gatekeeper checks regardless of workarounds. See [release design doc §7 + §12](./docs/design/2026-05-18-release-v0.1-distribution.md). |
 | Affinity v3 scripting integration | The v3 MCP/Scripts panel could invoke this plugin programmatically. |
 | Bundled `gmic`                    | Optional — could ship a vendored gmic binary so users do not need Homebrew. |
 

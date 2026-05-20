@@ -21,38 +21,51 @@ Documentation set:
 
 ## Install
 
-### Homebrew (recommended)
-
-```bash
-brew tap dstrupl/gmic-affinity
-brew install --cask gmic-affinity
-```
-
-The cask installs `GmicFilter.plugin` into both Affinity plugin folders
-that exist on your machine (Affinity Photo 2 and/or Affinity Photo v3)
-and pulls in the runtime `gmic` dependency. Restart Affinity Photo to
-pick up the plugin.
-
 ### Manual install (zip)
 
-1. Download the latest `GmicFilter-vX.Y.Z.zip` from the
-   [Releases page](https://github.com/dstrupl/gmic-affinity/releases/latest).
-2. Unzip. Double-click `install.command` in the unzipped folder.
-   - First time only: macOS may say "install.command cannot be opened
-     because it is from an unidentified developer." Right-click →
-     **Open** → **Open**, or in Terminal:
-     `xattr -dr com.apple.quarantine .` then `./install.command`.
-3. Make sure the `gmic` CLI is installed: `brew install gmic`. The
+This is the only install path for v0.1 — see "Why no Homebrew yet?"
+below.
+
+1. Make sure the `gmic` CLI is installed: `brew install gmic`. The
    plugin shells out to it; the Cocoa picker dialog is built in.
    (G'MIC-Qt — the standalone GUI / GIMP plugin — is not on Homebrew
    and is not needed for this plugin. If you want it anyway, grab it
    from <https://gmic.eu/download.html>.)
+2. Download the latest `GmicFilter-vX.Y.Z.zip` from the
+   [Releases page](https://github.com/dstrupl/gmic-affinity/releases/latest).
+3. Unzip. Double-click `install.command` in the unzipped folder.
+   - First time only: macOS may say "install.command cannot be opened
+     because it is from an unidentified developer." Right-click →
+     **Open** → **Open**, or in Terminal:
+     `xattr -dr com.apple.quarantine .` then `./install.command`.
+   - The script copies `GmicFilter.plugin` into every Affinity plugin
+     folder that exists on your machine (Affinity Photo 2 and/or
+     Affinity Photo v3) and strips the macOS quarantine bit so
+     Affinity will load it.
 4. Restart Affinity Photo and look for **Filters → Plugins → G'MIC →
    G'MIC…**.
 
 If the plugin is not detected, open
 **Affinity → Settings → Photoshop Plugins** and tick
 *"Allow unknown plugins to be used"*.
+
+### Why no Homebrew yet?
+
+The original v0.1 plan included a private Homebrew tap
+(`brew install --cask gmic-affinity`) as a one-liner alternative.
+Homebrew is in the middle of a security tightening that retired the
+cask-side workaround unsigned plugins like this one needed, and is
+ending support for any cask that fails Apple Gatekeeper checks on
+**2026-09-01** (see [Homebrew/brew#20755](https://github.com/homebrew/brew/issues/20755)).
+Without Apple Developer-ID code-signing + notarisation, brew is no
+longer a viable distribution path.
+
+v0.2 will add the cask back once the produced bundle is properly
+signed and notarised. The cask scaffolding under
+[`release/homebrew-tap/`](./release/homebrew-tap/) is preserved for
+that work. Until then, the manual zip + `install.command` path lands
+the same files in the same places that brew would, and is unaffected
+by the upcoming Homebrew policy change.
 
 ## What it does
 
@@ -230,8 +243,12 @@ See [PRD.md](./PRD.md) §7 for the full PRD-side build and install procedure.
 
 Tag a green commit on `main` with `vX.Y.Z` (or `vX.Y.Z-rc.N`) and push
 the tag. The `release` GitHub Actions workflow builds the universal
-zip and publishes it as a GitHub Release. Then bump `version` and
-`sha256` in the [Homebrew tap](https://github.com/dstrupl/homebrew-gmic-affinity)
-cask. Full runbook: [IMPLEMENTATION_NOTES.md](./IMPLEMENTATION_NOTES.md)
-§11 and the design doc
+zip and publishes it as a GitHub Release. That zip is the v0.1
+shipping artifact — no further publishing step is required.
+
+The `release/homebrew-tap/` directory carries the cask file plus tap
+CI for the future v0.2 brew-cask channel; it is not published in v0.1
+(see the design doc §12 for why). Full runbook:
+[IMPLEMENTATION_NOTES.md](./IMPLEMENTATION_NOTES.md) §11 and the
+design doc
 [`docs/design/2026-05-18-release-v0.1-distribution.md`](./docs/design/2026-05-18-release-v0.1-distribution.md).

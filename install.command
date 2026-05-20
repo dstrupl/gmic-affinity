@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# install.command — double-clickable installer for the manual (zip) install
-# path. Lives at the repo root, gets copied verbatim into the release zip
-# by `make release`, and is also the runbook for what `brew install --cask
-# gmic-affinity` does underneath. Keep behaviour aligned with §4.3 of
-# docs/design/2026-05-18-release-v0.1-distribution.md.
+# install.command — double-clickable installer for the v0.1 zip install.
+# Lives at the repo root, gets copied verbatim into the release zip by
+# `make release`. v0.1 ships this as the only install path (the original
+# Homebrew cask plan is deferred to v0.2 — see §12 of
+# docs/design/2026-05-18-release-v0.1-distribution.md).
 #
 # Idempotent: running it again replaces the already-installed bundle.
 

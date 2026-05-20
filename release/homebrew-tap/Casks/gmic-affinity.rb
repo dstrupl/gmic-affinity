@@ -21,23 +21,38 @@ cask "gmic-affinity" do
   depends_on formula: "gmic"
   depends_on macos:   ">= :big_sur"
 
-  # Phase 0 step 3 (2026-05-19) confirmed empirically that both Affinity
-  # Photo 2 and Affinity Photo v3 (3.2.1) reject the bundle at filter
-  # invocation time when com.apple.quarantine is set: macOS Gatekeeper
-  # blocks the dlopen of an ad-hoc-signed Mach-O carrying the
-  # quarantine bit inside a hardened-runtime host process and shows
-  # the "GmicFilter.plugin Not Opened — Apple could not verify..."
-  # alert. This is a system-level behaviour, not Affinity-specific,
-  # and applies until we notarise the bundle (deferred to v0.2 per
-  # docs/design/2026-05-18-release-v0.1-distribution.md §7).
+  # ============================================================
+  # NOT YET PUBLISHED — held back pending notarisation (v0.2).
+  # ============================================================
+  # Phase 0 step 3 (2026-05-19) confirmed empirically that both
+  # Affinity Photo 2 and Affinity Photo v3 (3.2.1) reject this bundle
+  # at filter invocation time when com.apple.quarantine is set:
+  # macOS Gatekeeper blocks the dlopen of an ad-hoc-signed Mach-O
+  # carrying the quarantine bit inside a hardened-runtime host
+  # process and shows the "GmicFilter.plugin Not Opened — Apple
+  # could not verify..." alert.
   #
-  # `quarantine false` here tells brew to strip com.apple.quarantine
-  # at install time, which lands the bundle on disk in the same state
-  # the manual `install.command` produces (it runs
-  # `xattr -dr com.apple.quarantine` before copying into the Affinity
-  # plugin folders). Once we add notarisation, drop this line so the
-  # cask reverts to brew's default quarantine-on behaviour.
-  quarantine false
+  # The original v0.1 plan was to declare `quarantine false` here so
+  # brew would strip the bit at install time. That stanza no longer
+  # exists in the modern Cask DSL — it was removed alongside the
+  # `--no-quarantine` install-flag deprecation in Sept-Oct 2025
+  # (Homebrew/brew#20755, Homebrew/brew#20929). On 2026-09-01
+  # Homebrew will end support for casks that fail Gatekeeper checks
+  # entirely, regardless of any user-side workaround. Therefore an
+  # unsigned/un-notarised bundle cannot be distributed via brew.
+  #
+  # v0.1 ships only via the manual zip + install.command path
+  # (see docs/design/2026-05-18-release-v0.1-distribution.md §4.4),
+  # which strips the quarantine bit user-side via `xattr -dr` and is
+  # unaffected by the Homebrew deprecation. v0.2 work covers Apple
+  # Developer enrolment + signing + notarisation; once the produced
+  # bundle is notarised, this cask becomes immediately viable
+  # (Gatekeeper accepts the load, no `quarantine false` knob needed)
+  # and we publish the tap repo from `release/homebrew-tap/`.
+  #
+  # Until then this file is staged-but-unpublished scaffolding. It
+  # passes `brew style` so the future tap-repo bring-up is one bump
+  # of `version` + `sha256` away. It is NOT a working cask today.
 
   # Install one source bundle into both Affinity plugin folders. If
   # `brew audit --cask` rejects two `artifact` stanzas pointing at the
