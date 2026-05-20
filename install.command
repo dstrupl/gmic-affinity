@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# install.command — double-clickable installer for the v0.1 zip install.
-# Lives at the repo root, gets copied verbatim into the release zip by
-# `make release`. v0.1 ships this as the only install path (the original
-# Homebrew cask plan is deferred to v0.2 — see §12 of
-# docs/design/2026-05-18-release-v0.1-distribution.md).
+# install.command — double-clickable installer for the GitHub-release
+# zip. Lives at the repo root, gets copied verbatim into the release
+# zip by both `make release` (the signed pipeline used for stable
+# tags from v0.2 onwards) and `make release-unsigned` (CI-driven for
+# pre-release tags). For v0.1 this was the only install path; from
+# v0.2 the Homebrew cask becomes a parallel option for users who
+# prefer it (see release/notarisation/SIGNING.md).
 #
 # Idempotent: running it again replaces the already-installed bundle.
 

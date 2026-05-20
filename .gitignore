@@ -20,4 +20,9 @@ Cargo.lock.bak
 
 # Local config that should not be committed
 .env
+.env.*
+# .env.local in particular: per-developer signing/notarisation config used
+# by `make release` (the Developer ID Application certificate name and the
+# notarytool keychain-profile name). Lives only on the signer's machine.
+# See release/notarisation/SIGNING.md.
 .worktrees

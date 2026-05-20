@@ -1,21 +1,38 @@
-# Tag-driven release pipeline. Triggered by pushing a `v*` tag (e.g.
-# `v0.1.0`, `v0.1.0-rc.1`). Builds the universal `FEATURES=live` zip
-# via `make release` and publishes it as a GitHub Release asset.
+# Pre-release-tag pipeline. Triggered by pushing a hyphenated `v*-*`
+# tag (e.g. `v0.2.0-rc.1`, `v0.2.0-beta.2`). Builds the universal
+# `FEATURES=live` zip via `make release-unsigned` and publishes it as
+# a GitHub Release asset, marked as a prerelease.
 #
-# This is a separate workflow from `ci.yml` on purpose: CI runs on every
-# push and PR; release runs only on tags. Tags are expected to point at
-# commits that have already gone green on CI.
+# Stable releases (vX.Y.Z without a hyphen) are NOT handled here. They
+# go through `make release` on the signing collaborator's machine,
+# which produces a Developer ID-signed + notarised + stapled bundle,
+# creates the GitHub release, and bumps the homebrew tap cask. CI
+# can't do that step because the Developer ID Application certificate
+# and notarytool keychain profile only live on the signer's machine
+# (see release/notarisation/SIGNING.md).
 #
-# See docs/design/2026-05-18-release-v0.1-distribution.md §4.5 for the
-# design rationale and §5.4 for what happens after the asset is uploaded
-# (manual cask bump in the homebrew tap repo).
+# Why this split:
+#   - pre-release artefacts are for testing only and don't need
+#     notarisation; users who download them have explicitly opted in
+#     to running an ad-hoc-signed bundle and will use install.command
+#     (which strips the quarantine xattr) or `make universal-install`
+#     locally.
+#   - stable releases must be notarised because (a) Homebrew ends
+#     support for non-Gatekeeper-passing casks on 2026-09-01 and
+#     (b) ad-hoc-signed bundles fail to load in Affinity Photo when
+#     the quarantine xattr is set (see Phase 0 §3 in the design doc).
+#
+# Design rationale: docs/design/2026-05-18-release-v0.1-distribution.md
+# §2 + §12. Operator-side: IMPLEMENTATION_NOTES.md §11.
 
 name: release
 
 on:
   push:
     tags:
-      - "v*"
+      # Pre-release tags only: must contain a hyphen.
+      # `v0.2.0-rc.1` matches; `v0.2.0` does not.
+      - "v*-*"
 
 # We need write access to create the GitHub Release and upload assets.
 # Nothing else.
@@ -67,10 +84,13 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Build release zip
-        # `make release` enforces FEATURES=live (target-scoped), runs
-        # the universal build, runs `verify-bundle` (filetype 8 on both
-        # slices), and assembles dist/GmicFilter-<tag>.zip.
-        run: make release RELEASE_VERSION=${{ github.ref_name }}
+        # `make release-unsigned` enforces FEATURES=live (target-scoped),
+        # runs the universal build, runs `verify-bundle` (filetype 8 on
+        # both slices), and assembles dist/GmicFilter-<tag>.zip with
+        # only the ad-hoc signature `make universal` already laid down.
+        # Stable tags don't reach this workflow (see `on.push.tags`),
+        # so we never need Developer ID material here.
+        run: make release-unsigned RELEASE_VERSION=${{ github.ref_name }}
 
       - name: Show artifact metadata
         run: |
@@ -83,8 +103,8 @@ jobs:
           files: dist/GmicFilter-${{ github.ref_name }}.zip
           fail_on_unmatched_files: true
           generate_release_notes: true
-          # Mark pre-release for any tag matching `v*-rc*` / `v*-alpha*`
-          # / `v*-beta*` etc. so the cask doesn't accidentally point a
-          # stable channel at an RC. Stable tags (e.g. `v0.1.0`) are
-          # full releases.
+          # The trigger filter (`v*-*`) only admits pre-release tags
+          # in the first place, so this is always true here. Kept
+          # explicit (rather than hardcoded `true`) so the intent is
+          # obvious to anyone reading the workflow in isolation.
           prerelease: ${{ contains(github.ref_name, '-') }}

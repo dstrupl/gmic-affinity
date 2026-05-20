@@ -143,7 +143,22 @@ REZ_FLAGS := \
   -d "PRAGMA_ONCE=0" \
   -useDF
 
-.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy help pipl check-lfs refresh-catalogue picker-example audit-unsupported release
+.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy help pipl check-lfs refresh-catalogue picker-example audit-unsupported \
+        release release-unsigned release-preflight release-build-signed \
+        release-notarize release-staple release-verify release-publish release-bump-cask
+
+# Per-developer signing/notarisation config. Sourced if present;
+# `make release` (the signed pipeline) requires it. The file is
+# gitignored. Friend-facing schema and setup walkthrough live in
+# release/notarisation/SIGNING.md. Operator-side: IMPLEMENTATION_NOTES.md
+# §11.
+-include .env.local
+
+# Defaults for variables that .env.local may override. Anything sensitive
+# (signing identity name, Apple ID) intentionally has no default — the
+# preflight will refuse to run if they're unset.
+NOTARYTOOL_KEYCHAIN_PROFILE ?= gmic-affinity-notary
+TAP_REPO_URL                ?= git@github.com:dstrupl/homebrew-gmic-affinity.git
 
 all: bundle
 
@@ -160,7 +175,11 @@ help:
 	@echo "  make test               Run cargo test under both default and --features live."
 	@echo "  make clippy             Run cargo clippy --all-targets --all-features -D warnings."
 	@echo "  make fmt                Run cargo fmt."
-	@echo "  make release            Build the universal bundle and assemble dist/GmicFilter-<ver>.zip."
+	@echo "  make release            Full signed + notarised release pipeline (publishes a GitHub"
+	@echo "                          release and bumps the homebrew tap). Requires .env.local +"
+	@echo "                          Apple Developer ID setup; see release/notarisation/SIGNING.md."
+	@echo "  make release-unsigned   Build the universal bundle and assemble dist/GmicFilter-<ver>.zip"
+	@echo "                          ad-hoc-signed only (used by release.yml for pre-release tags)."
 	@echo "  make clean              Remove build artefacts."
 	@echo ""
 	@echo "Feature flag:"
@@ -361,11 +380,15 @@ clean:
 
 # -------- release packaging --------
 #
-# `make release` builds the universal bundle (FEATURES=live by default —
-# this is what end users want; override on the command line if needed)
-# and assembles the distribution zip used by both the GitHub release
-# and the Homebrew tap. Layout matches §2 of
-# docs/design/2026-05-18-release-v0.1-distribution.md:
+# Two pipelines live here. `make release` is the v0.2+ signed and
+# notarised pipeline run by the project's signing collaborator (with
+# Apple Developer ID + .env.local setup); it produces a notarised zip,
+# publishes a GitHub release, and bumps the homebrew tap cask. `make
+# release-unsigned` is the pre-v0.2 behaviour: build + zip + ad-hoc
+# signature only, no publishing. release.yml uses release-unsigned for
+# pre-release (`v*-*`) tags.
+#
+# Both pipelines emit the same on-disk shape:
 #
 #   dist/GmicFilter-<version>.zip
 #   └── GmicFilter-<version>/
@@ -373,19 +396,161 @@ clean:
 #       ├── install.command
 #       └── README.txt
 #
-# RELEASE_VERSION defaults to `git describe`. CI overrides it with the
-# tag name (e.g. v0.1.0); for local dry runs it picks up something like
-# `v0.1.0-2-gabcdef0` which is fine for testing the layout.
+# Friend-facing setup + per-release walkthrough: release/notarisation/SIGNING.md
+# Operator-side runbook: IMPLEMENTATION_NOTES.md §11
+# Design rationale: docs/design/2026-05-18-release-v0.1-distribution.md §2 + §12
+
+# RELEASE_VERSION defaults to `git describe`. release.yml overrides it
+# with the tag name (e.g. v0.1.0); for local dry-runs it picks up
+# something like `v0.1.0-2-gabcdef0` which is fine for testing the
+# `release-unsigned` layout. The signed `release` target rejects any
+# value that isn't an exact `vX.Y.Z` tag — see release-preflight.
 RELEASE_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 DIST_DIR        := dist
 RELEASE_NAME    := GmicFilter-$(RELEASE_VERSION)
 RELEASE_STAGE   := $(DIST_DIR)/$(RELEASE_NAME)
 RELEASE_ZIP     := $(DIST_DIR)/$(RELEASE_NAME).zip
+NOTARY_INPUT    := $(DIST_DIR)/$(RELEASE_NAME)-notary-input.zip
 
-# `make release` always uses the live feature: this is the artifact end
-# users install. Override on the command line only if you know why.
-release: FEATURES := live
-release: universal
+# ===== `make release` — full signed + notarised + published pipeline =====
+#
+# Steps are split into chainable phony helpers so individual phases can
+# be retried after a failure without redoing the (slow) earlier ones.
+# In particular, notarisation submits are network round-trips and may
+# fail on first run with fixable build-side issues; you do NOT want
+# that to invalidate a successful sign step.
+
+release: release-preflight release-build-signed release-notarize \
+         release-staple release-verify release-publish release-bump-cask
+	@echo ""
+	@echo "================================================================"
+	@echo "  Released $(RELEASE_VERSION)"
+	@echo "================================================================"
+	@echo ""
+	@echo "Smoke-test on a fresh user account:"
+	@echo "  brew tap dstrupl/gmic-affinity"
+	@echo "  brew install --cask gmic-affinity"
+
+# Preflight: external script so the (long) check list reads cleanly.
+# Verifies RELEASE_VERSION shape, working tree cleanliness, signing
+# config, keychain identity, gh auth, tap repo reachability, and tag
+# uniqueness. Bails with a clear error before any side-effecting step.
+release-preflight:
+	@./scripts/release-preflight.sh "$(RELEASE_VERSION)" \
+	  "$(DEVELOPER_ID_APP_SIGNATURE)" \
+	  "$(NOTARYTOOL_KEYCHAIN_PROFILE)" \
+	  "$(TAP_REPO_URL)"
+
+# Build the universal bundle (FEATURES=live), then re-sign it with the
+# Developer ID Application certificate. The universal target itself
+# laid down an ad-hoc signature; --force overrides. --options runtime
+# enables the hardened runtime (mandatory for notarisation). --timestamp
+# requests a secure RFC 3161 timestamp from Apple's TSA (also
+# mandatory for notarisation).
+release-build-signed: FEATURES := live
+release-build-signed: universal
+	@if [ -z "$(DEVELOPER_ID_APP_SIGNATURE)" ]; then \
+	  echo "ERROR: DEVELOPER_ID_APP_SIGNATURE is not set."; \
+	  echo "       Create .env.local with the schema documented in"; \
+	  echo "       release/notarisation/SIGNING.md."; \
+	  exit 1; \
+	fi
+	codesign --force --options runtime --timestamp \
+	  --sign "$(DEVELOPER_ID_APP_SIGNATURE)" \
+	  "$(BUNDLE)"
+	@echo "Signed $(BUNDLE) with: $(DEVELOPER_ID_APP_SIGNATURE)"
+	@codesign --display --verbose=2 "$(BUNDLE)" 2>&1 | head -10
+
+# Submit the signed bundle to Apple's notary service. notarytool only
+# accepts .zip / .pkg / .dmg, so we wrap the bundle in a transient zip
+# (NOTARY_INPUT) — distinct from the final user-facing zip we produce
+# in release-publish. --wait blocks until the verdict comes back
+# (typically 1-5 minutes).
+#
+# On rejection, notarytool prints a submission ID; pull the diagnostic
+# log with:
+#   xcrun notarytool log <submission-id> --keychain-profile $(NOTARYTOOL_KEYCHAIN_PROFILE)
+release-notarize:
+	@mkdir -p "$(DIST_DIR)"
+	@rm -f "$(NOTARY_INPUT)"
+	ditto -c -k --keepParent --norsrc --noextattr --noqtn --noacl \
+	  "$(BUNDLE)" "$(NOTARY_INPUT)"
+	@echo "Submitting $(NOTARY_INPUT) to Apple notary service (1-5 min)..."
+	xcrun notarytool submit "$(NOTARY_INPUT)" \
+	  --keychain-profile "$(NOTARYTOOL_KEYCHAIN_PROFILE)" \
+	  --wait
+
+# Staple the notarisation ticket into the bundle so offline machines
+# can verify without round-tripping to Apple. Without this, Gatekeeper
+# has to call home on first launch on each user's machine; with it,
+# verification is local and fast.
+release-staple:
+	xcrun stapler staple "$(BUNDLE)"
+
+# Verification triple. spctl --assess is the most stringent: it
+# requires the magic phrase "Notarized Developer ID" in its output,
+# which is the same check the cask install path will run. If any of
+# these fail, do NOT push the release.
+release-verify:
+	@echo "=== codesign --verify ==="
+	codesign --verify --strict --verbose=2 "$(BUNDLE)"
+	@echo ""
+	@echo "=== spctl --assess (must say 'Notarized Developer ID') ==="
+	spctl --assess --type install --verbose=2 "$(BUNDLE)"
+	@echo ""
+	@echo "=== stapler validate ==="
+	xcrun stapler validate "$(BUNDLE)"
+	@echo ""
+	@echo "release-verify: bundle is signed, notarised, and stapled."
+
+# Stage the now-notarised bundle alongside install.command + README.txt,
+# zip it, and create a GitHub release. Pushes the tag at the current
+# HEAD via gh's --target.
+release-publish:
+	@if [ ! -f install.command ]; then \
+	  echo "ERROR: install.command missing at repo root."; exit 1; \
+	fi
+	@if [ ! -f release/README.txt ]; then \
+	  echo "ERROR: release/README.txt missing."; exit 1; \
+	fi
+	@rm -rf "$(RELEASE_STAGE)" "$(RELEASE_ZIP)"
+	@mkdir -p "$(RELEASE_STAGE)"
+	cp -R "$(BUNDLE)" "$(RELEASE_STAGE)/"
+	cp install.command "$(RELEASE_STAGE)/install.command"
+	cp release/README.txt "$(RELEASE_STAGE)/README.txt"
+	chmod +x "$(RELEASE_STAGE)/install.command"
+	xattr -rc "$(RELEASE_STAGE)"
+	cd "$(DIST_DIR)" && ditto -c -k --keepParent \
+	  --norsrc --noextattr --noqtn --noacl \
+	  "$(RELEASE_NAME)" "$(RELEASE_NAME).zip"
+	@echo ""
+	@echo "Built $(RELEASE_ZIP) ($$(stat -f %z "$(RELEASE_ZIP)") bytes)"
+	@echo "SHA256: $$(shasum -a 256 "$(RELEASE_ZIP)" | awk '{print $$1}')"
+	@echo ""
+	@echo "Creating GitHub release $(RELEASE_VERSION) (also pushes the tag)..."
+	gh release create "$(RELEASE_VERSION)" "$(RELEASE_ZIP)" \
+	  --target $$(git rev-parse HEAD) \
+	  --title "$(RELEASE_VERSION)" \
+	  --generate-notes
+
+# Clone the homebrew tap, bump version + sha256 (and on the very first
+# v0.2.x run also strip the v0.2-deferral comment block from the cask),
+# `brew style` to confirm clean, commit, and push. Idempotent: re-runs
+# after a successful first bump are no-ops on the deferral-strip and
+# overwrite the version/sha256 lines with the current values.
+release-bump-cask:
+	@./scripts/release-bump-cask.sh "$(RELEASE_VERSION)" "$(RELEASE_ZIP)" "$(TAP_REPO_URL)"
+
+# ===== `make release-unsigned` — pre-v0.2 behaviour =====
+#
+# Build the universal bundle (FEATURES=live by default — this is what
+# end users want; override on the command line only if you know why),
+# stage with install.command + README.txt, zip with `ditto`. No
+# Developer ID signing, no notarisation, no GH release, no cask bump.
+# Used by .github/workflows/release.yml for pre-release (v*-*) tags
+# and any local dry-run / unsigned dev artifact.
+release-unsigned: FEATURES := live
+release-unsigned: universal
 	@if [ ! -f install.command ]; then \
 	  echo "ERROR: install.command missing at repo root."; exit 1; \
 	fi
@@ -414,11 +579,9 @@ release: universal
 	  --norsrc --noextattr --noqtn --noacl \
 	  "$(RELEASE_NAME)" "$(RELEASE_NAME).zip"
 	@echo ""
-	@echo "Built $(RELEASE_ZIP)"
+	@echo "Built $(RELEASE_ZIP) (unsigned / ad-hoc)"
 	@echo "Size:    $$(stat -f %z "$(RELEASE_ZIP)") bytes"
 	@echo "SHA256:  $$(shasum -a 256 "$(RELEASE_ZIP)" | awk '{print $$1}')"
-	@echo ""
-	@echo "Cask url:  https://github.com/dstrupl/gmic-affinity/releases/download/$(RELEASE_VERSION)/$(RELEASE_NAME).zip"
 
 # Regenerate the bundled catalogue snapshot from the locally installed
 # gmic. Pipeline:
