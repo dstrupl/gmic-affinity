@@ -305,6 +305,33 @@ fn alert_gmic_error(chosen: &ChosenFilter, error: &gmic::GmicError) {
                 true,
             );
         }
+        gmic::GmicError::TimedOut { seconds } => {
+            crate::ui::alert::alert_error(
+                sink,
+                "G'MIC",
+                &format!(
+                    "G'MIC did not finish `{}` within {} seconds. Try this filter on a smaller image or with lighter settings.",
+                    chosen.command, seconds
+                ),
+                true,
+            );
+        }
+        gmic::GmicError::UnsupportedForImageSize {
+            command: _,
+            width,
+            height,
+            max_edge,
+        } => {
+            crate::ui::alert::alert_error(
+                sink,
+                "G'MIC",
+                &format!(
+                    "`{}` is too expensive for a {}x{} image. Try it on an image no larger than {}px on the longest edge.",
+                    chosen.command, width, height, max_edge
+                ),
+                false,
+            );
+        }
         gmic::GmicError::Tiff(_) => {
             crate::ui::alert::alert_error(
                 sink,

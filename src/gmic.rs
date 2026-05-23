@@ -14,7 +14,8 @@ use std::fs;
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 use crate::filter::{validate_filter_record, FilterError};
 use crate::logging::log;
@@ -34,6 +35,9 @@ pub const MAX_FILTER_CONFIG_BYTES: u64 = 4 * 1024;
 /// line sane.
 pub const MAX_FILTER_ARGS: usize = 64;
 pub const MAX_ARG_BYTES: usize = 1024;
+pub const GMIC_TIMEOUT_SECS: u64 = 60;
+
+const LINIFY_MAX_EDGE: u32 = 1024;
 
 #[derive(Debug)]
 pub enum GmicError {
@@ -45,7 +49,18 @@ pub enum GmicError {
     InvalidCharsInConfig,
     TooManyArgs(usize),
     ArgTooLong(usize),
-    Failed { status: Option<i32> },
+    Failed {
+        status: Option<i32>,
+    },
+    TimedOut {
+        seconds: u64,
+    },
+    UnsupportedForImageSize {
+        command: String,
+        width: u32,
+        height: u32,
+        max_edge: u32,
+    },
 }
 
 impl std::fmt::Display for GmicError {
@@ -69,6 +84,18 @@ impl std::fmt::Display for GmicError {
                 Some(c) => write!(f, "gmic exited with status {c}"),
                 None => write!(f, "gmic terminated by signal"),
             },
+            GmicError::TimedOut { seconds } => {
+                write!(f, "gmic did not finish within {seconds}s")
+            }
+            GmicError::UnsupportedForImageSize {
+                command,
+                width,
+                height,
+                max_edge,
+            } => write!(
+                f,
+                "{command} is limited to images up to {max_edge}px on the longest edge (got {width}x{height})"
+            ),
         }
     }
 }
@@ -202,20 +229,61 @@ pub fn build_argv(
 /// don't pollute Console.app on success. On failure we surface the exit
 /// status so the caller can log it.
 pub fn run_subprocess(gmic: &Path, args: &[OsString], tmpdir: &Path) -> Result<(), GmicError> {
+    run_subprocess_with_timeout(gmic, args, tmpdir, Duration::from_secs(GMIC_TIMEOUT_SECS))
+}
+
+fn run_subprocess_with_timeout(
+    gmic: &Path,
+    args: &[OsString],
+    tmpdir: &Path,
+    timeout: Duration,
+) -> Result<(), GmicError> {
     log(&format!(
         "spawn {} (argc={}) tmpdir={}",
         gmic.display(),
         args.len(),
         tmpdir.display()
     ));
-    let output = Command::new(gmic)
+    let mut child = Command::new(gmic)
         .args(args)
         .env_clear()
         .env("PATH", "/usr/bin:/bin")
         .env("HOME", tmpdir)
         .env("TMPDIR", tmpdir)
         .env("LANG", "C")
-        .output()?;
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let started = Instant::now();
+    loop {
+        if child.try_wait()?.is_some() {
+            break;
+        }
+        if started.elapsed() >= timeout {
+            log(&format!(
+                "gmic timeout after {:.1}s; killing child",
+                timeout.as_secs_f64()
+            ));
+            let _ = child.kill();
+            let output = child.wait_with_output()?;
+            log_gmic_output(&output);
+            return Err(GmicError::TimedOut {
+                seconds: timeout.as_secs(),
+            });
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let output = child.wait_with_output()?;
+    log_gmic_output(&output);
+    if !output.status.success() {
+        return Err(GmicError::Failed {
+            status: output.status.code(),
+        });
+    }
+    Ok(())
+}
+
+fn log_gmic_output(output: &std::process::Output) {
     log(&format!(
         "gmic exit status={:?} stdout={}B stderr={}B",
         output.status.code(),
@@ -239,12 +307,6 @@ pub fn run_subprocess(gmic: &Path, args: &[OsString], tmpdir: &Path) -> Result<(
             .collect();
         log(&format!("gmic stdout: {trimmed}"));
     }
-    if !output.status.success() {
-        return Err(GmicError::Failed {
-            status: output.status.code(),
-        });
-    }
-    Ok(())
 }
 
 /// Full filter run: validate FilterRecord, write input TIFF, exec gmic,
@@ -372,6 +434,7 @@ fn run_with_tokens(fr: &mut FilterRecord, tokens: &[String]) -> Result<(), GmicE
         "run_filter: width={} height={} planes={} in_row_bytes={} out_row_bytes={}",
         buf.width, buf.height, buf.planes, buf.in_row_bytes, buf.out_row_bytes
     ));
+    reject_known_expensive_filter(tokens, buf.width as u32, buf.height as u32)?;
 
     let gmic = locate_gmic()?;
     log(&format!("located gmic at {}", gmic.display()));
@@ -411,6 +474,25 @@ fn run_with_tokens(fr: &mut FilterRecord, tokens: &[String]) -> Result<(), GmicE
         buf.out_row_bytes as u32,
     )?;
 
+    Ok(())
+}
+
+fn reject_known_expensive_filter(
+    tokens: &[String],
+    width: u32,
+    height: u32,
+) -> Result<(), GmicError> {
+    let Some(command) = tokens.first().map(|s| s.trim_start_matches('-')) else {
+        return Ok(());
+    };
+    if command == "fx_linify" && width.max(height) > LINIFY_MAX_EDGE {
+        return Err(GmicError::UnsupportedForImageSize {
+            command: command.to_string(),
+            width,
+            height,
+            max_edge: LINIFY_MAX_EDGE,
+        });
+    }
     Ok(())
 }
 
@@ -548,6 +630,40 @@ mod tests {
             build_argv(Path::new("a"), Path::new("b"), "-blur 3", 2),
             Err(GmicError::Tiff(TiffError::UnsupportedPlanes(2)))
         ));
+    }
+
+    #[test]
+    fn linify_is_rejected_on_large_images() {
+        let tokens = vec!["-fx_linify".to_string(), "40,2,40,10,24,0,0".to_string()];
+        assert!(matches!(
+            reject_known_expensive_filter(&tokens, 6000, 4000),
+            Err(GmicError::UnsupportedForImageSize {
+                command,
+                width: 6000,
+                height: 4000,
+                max_edge: LINIFY_MAX_EDGE,
+            }) if command == "fx_linify"
+        ));
+    }
+
+    #[test]
+    fn linify_is_allowed_on_small_images() {
+        let tokens = vec!["-fx_linify".to_string(), "40,2,40,10,24,0,0".to_string()];
+        reject_known_expensive_filter(&tokens, 1024, 768).unwrap();
+    }
+
+    #[test]
+    fn subprocess_timeout_kills_child() {
+        let dir = tempfile::tempdir().unwrap();
+        let args = vec![OsString::from("-c"), OsString::from("while :; do :; done")];
+        let err = run_subprocess_with_timeout(
+            Path::new("/bin/sh"),
+            &args,
+            dir.path(),
+            Duration::from_millis(50),
+        )
+        .unwrap_err();
+        assert!(matches!(err, GmicError::TimedOut { .. }));
     }
 
     #[test]

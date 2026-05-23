@@ -38,10 +38,11 @@ fn value_matches_kind(value: &str, kind: &ParamKind) -> bool {
         }
         ParamKind::Text { .. } => true,
         ParamKind::Note(_) | ParamKind::Separator | ParamKind::Link { .. } => true,
-        // Internal params are non-interactive — we always overwrite
-        // any saved value with the declaration's default when
-        // forming argv, so the round-trip is trivially "valid".
-        ParamKind::Internal { .. } => true,
+        // Internal params are non-interactive. Never trust stale
+        // remembered values here; always fall back to the declaration
+        // default so hidden gmic-qt controls stay in the headless-safe
+        // state chosen by the parser.
+        ParamKind::Internal { .. } => false,
         ParamKind::Unknown(_) => true,
     }
 }
@@ -154,5 +155,18 @@ mod tests {
         )];
         let out = reconcile(&["not-a-number".into()], &params);
         assert_eq!(out, vec!["5".to_string()]);
+    }
+
+    #[test]
+    fn internal_saved_value_is_overwritten() {
+        let params = vec![p(
+            "headless-preview",
+            ParamKind::Internal {
+                label: "headless-preview".into(),
+                default: "0".into(),
+            },
+        )];
+        let out = reconcile(&["1".into()], &params);
+        assert_eq!(out, vec!["0".to_string()]);
     }
 }
