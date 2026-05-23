@@ -20,9 +20,10 @@
 //!   `PluginMain`, defended against rather than handled).
 
 use objc2::rc::Retained;
-use objc2::runtime::{AnyObject, ProtocolObject};
+use objc2::runtime::{AnyObject, NSObjectProtocol, ProtocolObject};
+use objc2::{declare_class, msg_send, msg_send_id, mutability, ClassType, DeclaredClass};
 use objc2_app_kit::{
-    NSAutoresizingMaskOptions, NSBackingStoreType, NSBezelStyle, NSButton, NSButtonType,
+    NSAutoresizingMaskOptions, NSBackingStoreType, NSBezelStyle, NSButton, NSButtonType, NSEvent,
     NSModalResponseOK, NSOutlineView, NSPanel, NSScrollElasticity, NSScrollView, NSSearchField,
     NSSplitView, NSTableColumn, NSView, NSWindow, NSWindowStyleMask,
 };
@@ -202,10 +203,8 @@ pub fn show_picker(
     // raw, non-retaining reference to its observers, so dropping the
     // controller without first removing it would leave the clip view
     // posting notifications into a freed Objective-C object the next
-    // time something resizes the right pane (e.g. a Cmd-W close
-    // animation while the modal pump is still draining its
-    // NSEventTrackingRunLoopMode events). Unregister first, then
-    // drop.
+    // time something resizes the right pane (e.g. during a Cmd-W
+    // close animation). Unregister first, then drop.
     unsafe {
         objc2_foundation::NSNotificationCenter::defaultCenter().removeObserver(&form_controller);
     }
@@ -409,14 +408,45 @@ pub fn show_empty() -> Option<()> {
     show_picker(catalogue::builtin(), None).map(|_| ())
 }
 
+declare_class! {
+    /// Scroll view used for the picker tree. Affinity's plugin modal
+    /// context scrolls this outline smoothly only when wheel events
+    /// are handled on our subclass boundary before AppKit continues
+    /// through the normal `NSScrollView` implementation.
+    struct TreeScrollView;
+
+    unsafe impl ClassType for TreeScrollView {
+        type Super = NSScrollView;
+        type Mutability = mutability::MainThreadOnly;
+        const NAME: &'static str = "GmicPickerTreeScrollView";
+    }
+
+    impl DeclaredClass for TreeScrollView {}
+
+    unsafe impl NSObjectProtocol for TreeScrollView {}
+
+    unsafe impl TreeScrollView {
+        #[method(scrollWheel:)]
+        unsafe fn scroll_wheel(&self, event: &NSEvent) {
+            let _: () = unsafe { msg_send![super(self), scrollWheel: event] };
+        }
+    }
+}
+
+impl TreeScrollView {
+    fn new_with_frame(mtm: MainThreadMarker, frame: CGRect) -> Retained<Self> {
+        unsafe { msg_send_id![mtm.alloc::<Self>(), initWithFrame: frame] }
+    }
+}
+
 /// Build the side-by-side split view that hosts the tree on the left
 /// and the parameter form on the right. The frame slots beneath the
 /// search bar and grows with the window.
 fn build_split_view(
     mtm: MainThreadMarker,
     content_bounds: CGRect,
-    tree: &Retained<NSScrollView>,
-    form: &Retained<NSScrollView>,
+    tree: &NSScrollView,
+    form: &NSScrollView,
 ) -> Retained<NSSplitView> {
     // The split view sits between the search bar (top) and the
     // button bar (bottom). Cocoa's coordinate origin is bottom-left,
@@ -527,7 +557,7 @@ fn build_scroll_view(
     mtm: MainThreadMarker,
     content_bounds: CGRect,
     outline: &Retained<NSOutlineView>,
-) -> Retained<NSScrollView> {
+) -> Retained<TreeScrollView> {
     // Outline view sits below the search bar.
     let scroll_height = content_bounds.size.height - SEARCH_BAR_HEIGHT - SEARCH_BAR_GAP * 2.0;
     let frame = CGRect {
@@ -537,7 +567,7 @@ fn build_scroll_view(
             height: scroll_height,
         },
     };
-    let scroll: Retained<NSScrollView> = unsafe { NSScrollView::initWithFrame(mtm.alloc(), frame) };
+    let scroll = TreeScrollView::new_with_frame(mtm, frame);
     unsafe {
         scroll.setHasVerticalScroller(true);
         // Grow with the window: width + height fully flexible so a
