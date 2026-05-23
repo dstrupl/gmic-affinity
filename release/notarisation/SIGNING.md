@@ -279,7 +279,8 @@ Use the exact `DEVELOPER_ID_APP_SIGNATURE` value you put in
 `.env.local` for the second argument. Use the exact tap URL that
 `make release` will use for the fourth argument; the default shown
 above is SSH, so switch it to the HTTPS URL if that's what you put in
-`.env.local`.
+`.env.local`. Keep `v0.0.0` as-is during setup; do not replace it
+with the real release version here.
 
 `v0.0.0` is a valid semver-shaped tag that should never exist as a
 real project release, so the script can exercise the setup-sensitive
