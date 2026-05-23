@@ -216,7 +216,7 @@ impl ParseState {
         } else {
             label_raw
         };
-        let kind = parse_kind(decl_part.trim());
+        let kind = parse_kind_for_param(&label, decl_part.trim());
         filter.params.push(Param { label, kind });
         Ok(())
     }
@@ -352,6 +352,23 @@ fn normalized_kind_head(head: &str) -> &str {
     // `~kind(...)` marks gmic-qt "advanced"; `_kind(...)` marks silent.
     // We surface both as ordinary controls for now.
     head.trim().trim_start_matches(['~', '_'])
+}
+
+fn parse_kind_for_param(label: &str, decl: &str) -> ParamKind {
+    if is_preview_progression_param(label, decl) {
+        return ParamKind::Internal {
+            label: "headless-preview".to_string(),
+            default: "0".to_string(),
+        };
+    }
+    parse_kind(decl)
+}
+
+fn is_preview_progression_param(label: &str, decl: &str) -> bool {
+    let label = label.to_ascii_lowercase();
+    label.contains("preview")
+        && label.contains("progress")
+        && decl.trim_start().starts_with("_bool")
 }
 
 fn parse_kind(decl: &str) -> ParamKind {
@@ -883,6 +900,30 @@ mod tests {
             }
         );
         assert_eq!(params[1].kind, ParamKind::Bool { default: true });
+    }
+
+    #[test]
+    fn preview_progression_bool_is_disabled_for_headless_runs() {
+        let cat = parse(
+            "#@gui Artistic\n#@gui Linify : fx_linify, fx_linify_preview(0)\n\
+             #@gui : Density = float(40,0,100)\n\
+             #@gui : Spreading = float(2,0,10)\n\
+             #@gui : Resolution (%) = float(40,0,100)\n\
+             #@gui : Line Opacity = float(10,0,30)\n\
+             #@gui : Line Precision = int(24,1,128)\n\
+             #@gui : Color Mode = choice(0,\"Subtractive\",\"Additive\")\n\
+             #@gui : Preview Progression While Running = _bool(1)\n",
+        )
+        .unwrap();
+
+        let params = &first_filter(&cat).params;
+        assert_eq!(
+            params[6].kind,
+            ParamKind::Internal {
+                label: "headless-preview".into(),
+                default: "0".into(),
+            }
+        );
     }
 
     #[test]

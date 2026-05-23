@@ -1,7 +1,7 @@
 //! Smoke test: bundled gmic-catalogue.gmic.gz decompresses, parses,
 //! and contains a sensible number of filters + known anchors.
 
-use GmicFilter::catalogue::{self, Folder, Node};
+use GmicFilter::catalogue::{self, Filter, Folder, Node, ParamKind};
 
 #[test]
 fn snapshot_decompresses_parses_and_has_minimum_content() {
@@ -31,6 +31,16 @@ fn anchor_filters_present() {
     }
 }
 
+#[test]
+fn fx_linify_defaults_disable_preview_progression_for_headless_run() {
+    let cat = catalogue::builtin();
+    let linify = find_filter(&cat.root, "fx_linify").expect("fx_linify must stay in catalogue");
+    assert_eq!(
+        default_cli_args(linify),
+        vec!["40", "2", "40", "10", "24", "0", "0"]
+    );
+}
+
 fn count(folder: &Folder) -> (usize, usize) {
     let mut folders = 0;
     let mut filters = 0;
@@ -54,5 +64,52 @@ fn collect_commands<'a>(folder: &'a Folder, out: &mut Vec<&'a str>) {
             Node::Folder(f) => collect_commands(f, out),
             Node::Filter(f) => out.push(&f.command),
         }
+    }
+}
+
+fn find_filter<'a>(folder: &'a Folder, command: &str) -> Option<&'a Filter> {
+    for child in &folder.children {
+        match child {
+            Node::Folder(f) => {
+                if let Some(found) = find_filter(f, command) {
+                    return Some(found);
+                }
+            }
+            Node::Filter(f) if f.command == command => return Some(f),
+            Node::Filter(_) => {}
+        }
+    }
+    None
+}
+
+fn default_cli_args(filter: &Filter) -> Vec<String> {
+    filter
+        .params
+        .iter()
+        .filter_map(|param| match &param.kind {
+            ParamKind::Int { default, .. } => Some(default.to_string()),
+            ParamKind::Float { default, .. } => Some(format_float(*default)),
+            ParamKind::Bool { default } => Some(if *default { "1" } else { "0" }.to_string()),
+            ParamKind::Choice { default, .. } => Some(default.to_string()),
+            ParamKind::Color { default_rgb } => Some(format!(
+                "{},{},{}",
+                default_rgb[0], default_rgb[1], default_rgb[2]
+            )),
+            ParamKind::Text { default } => Some(default.clone()),
+            ParamKind::Internal { default, .. } => Some(default.clone()),
+            ParamKind::Note(_)
+            | ParamKind::Separator
+            | ParamKind::Link { .. }
+            | ParamKind::Unknown(_) => None,
+        })
+        .collect()
+}
+
+fn format_float(v: f64) -> String {
+    if (v.round() - v).abs() < 1e-9 {
+        format!("{}", v.round() as i64)
+    } else {
+        let s = format!("{v:.4}");
+        s.trim_end_matches('0').trim_end_matches('.').to_string()
     }
 }
