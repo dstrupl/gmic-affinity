@@ -239,6 +239,33 @@ pub(crate) enum FormCell {
     Internal { default: String },
 }
 
+#[derive(Clone, Copy)]
+struct RowLayout {
+    width: CGFloat,
+    cell_x: CGFloat,
+    cell_w: CGFloat,
+    y: CGFloat,
+}
+
+enum RowOutcome {
+    Rendered { cell: FormCell, row_height: CGFloat },
+    Hidden(FormCell),
+}
+
+#[derive(Clone, Copy)]
+struct IntRowSpec {
+    default: i64,
+    min: i64,
+    max: i64,
+}
+
+#[derive(Clone, Copy)]
+struct FloatRowSpec {
+    default: f64,
+    min: f64,
+    max: f64,
+}
+
 /// Per-controller mutable state. Held inside the `declare_class!`
 /// type via `MainThreadOnly` so the AppKit delegate callbacks can
 /// borrow it without locks.
@@ -658,184 +685,315 @@ impl FormController {
     ) -> CGFloat {
         let width = self.row_width();
         let (cell_x, cell_w) = self.control_column(width);
+        let layout = RowLayout {
+            width,
+            cell_x,
+            cell_w,
+            y,
+        };
+        let outcome = self.render_param_row(mtm, param, layout, prefill);
 
-        // Per-row layout: we let the label measure its own wrapped
-        // height (so long labels don't get clipped), then size the
-        // row to `max(label_height, control_height)` so the label
-        // and control share a baseline.
-        let cell: FormCell;
-        let row_height: CGFloat;
-
-        match &param.kind {
-            ParamKind::Int { default, min, max } => {
-                let label_h =
-                    self.add_label(mtm, &param.label, 12.0, FORM_HMARGIN, y, FORM_LABEL_WIDTH);
-                let starting = prefill
-                    .and_then(|v| v.parse::<i64>().ok())
-                    .unwrap_or(*default);
-                let slider = self.add_slider(
-                    mtm,
-                    cell_x,
-                    y,
-                    cell_w,
-                    *min as f64,
-                    *max as f64,
-                    starting as f64,
-                    /* integer = */ true,
-                );
-                cell = FormCell::Int {
-                    slider,
-                    min: *min,
-                    max: *max,
-                };
-                row_height = label_h.max(FORM_ROW_HEIGHT);
+        match outcome {
+            RowOutcome::Rendered { cell, row_height } => {
+                self.ivars().cells.borrow_mut().push(cell);
+                y + row_height + FORM_ROW_GAP
             }
-            ParamKind::Float { default, min, max } => {
-                let label_h =
-                    self.add_label(mtm, &param.label, 12.0, FORM_HMARGIN, y, FORM_LABEL_WIDTH);
-                let starting = prefill
-                    .and_then(|v| v.parse::<f64>().ok())
-                    .unwrap_or(*default);
-                let slider = self.add_slider(
-                    mtm, cell_x, y, cell_w, *min, *max, starting, /* integer = */ false,
-                );
-                cell = FormCell::Float {
-                    slider,
-                    min: *min,
-                    max: *max,
-                };
-                row_height = label_h.max(FORM_ROW_HEIGHT);
-            }
-            ParamKind::Bool { default } => {
-                // Bool gets a checkbox with the param label as its
-                // title; no separate left-side label.
-                let starting = match prefill {
-                    Some("1") | Some("true") => true,
-                    Some("0") | Some("false") => false,
-                    _ => *default,
-                };
-                let button = self.add_checkbox(mtm, &param.label, starting, FORM_HMARGIN, y, width);
-                cell = FormCell::Bool { button };
-                row_height = FORM_ROW_HEIGHT;
-            }
-            ParamKind::Choice { choices, default } => {
-                let label_h =
-                    self.add_label(mtm, &param.label, 12.0, FORM_HMARGIN, y, FORM_LABEL_WIDTH);
-                // Saved values are integer indices, but legacy paths
-                // may have stored the literal choice label. Accept
-                // both shapes so a downgrade doesn't lose state.
-                let starting = match prefill {
-                    Some(s) => match s.parse::<usize>() {
-                        Ok(idx) if idx < choices.len() => idx,
-                        _ => choices.iter().position(|c| c == s).unwrap_or(*default),
-                    },
-                    None => *default,
-                };
-                let popup = self.add_popup(mtm, cell_x, y, cell_w, choices, starting);
-                cell = FormCell::Choice {
-                    popup,
-                    choices: choices.clone(),
-                };
-                row_height = label_h.max(FORM_ROW_HEIGHT);
-            }
-            ParamKind::Color { default_rgb } => {
-                let label_h =
-                    self.add_label(mtm, &param.label, 12.0, FORM_HMARGIN, y, FORM_LABEL_WIDTH);
-                let starting = prefill.and_then(parse_rgb_triple).unwrap_or(*default_rgb);
-                let well = self.add_color_well(mtm, cell_x, y, cell_w, starting);
-                cell = FormCell::Color { well };
-                row_height = label_h.max(FORM_ROW_HEIGHT);
-            }
-            ParamKind::Text { default } => {
-                let label_h =
-                    self.add_label(mtm, &param.label, 12.0, FORM_HMARGIN, y, FORM_LABEL_WIDTH);
-                let starting = prefill.unwrap_or(default.as_str());
-                let field = self.add_textfield(mtm, cell_x, y, cell_w, starting);
-                cell = FormCell::Text { field };
-                row_height = label_h.max(FORM_ROW_HEIGHT);
-            }
-            ParamKind::Note(body) => {
-                let trimmed = body.trim();
-                if trimmed.is_empty() {
-                    // Don't waste a row on a `note("")` placeholder
-                    // (G'MIC uses these as filler in some filters).
-                    self.ivars().cells.borrow_mut().push(FormCell::Static);
-                    return y;
-                }
-                let label_h = self.add_label(mtm, trimmed, 11.0, FORM_HMARGIN, y, width);
-                cell = FormCell::Static;
-                row_height = label_h;
-            }
-            ParamKind::Separator => {
-                self.add_separator(mtm, FORM_HMARGIN, y, width);
-                cell = FormCell::Static;
-                row_height = 12.0;
-            }
-            ParamKind::Link { label, url } => {
-                // Render as a non-actionable hyperlink-style label;
-                // wiring NSWorkspace::openURL behind a target/action
-                // belongs to T10 along with the rest of the
-                // declare_class action handlers.
-                let display = if url.is_empty() {
-                    label.clone()
-                } else {
-                    format!("{label}  ({url})")
-                };
-                let label_h = self.add_label(mtm, &display, 12.0, FORM_HMARGIN, y, width);
-                cell = FormCell::Static;
-                row_height = label_h;
-            }
-            ParamKind::Internal { label: _, default } => {
-                // Render as a single light-weight row so the user can
-                // see what's being passed to the filter without it
-                // dominating the form, then store the value so OK
-                // emits it back into argv. If the param itself has
-                // no label (the common case for `value(...)` /
-                // `button(...)` decls in gmic stdlib), skip rendering
-                // entirely — the param still contributes via the
-                // FormCell below.
-                let user_label = param.label.trim();
-                if user_label.is_empty() {
-                    self.ivars().cells.borrow_mut().push(FormCell::Internal {
-                        default: default.clone(),
-                    });
-                    return y;
-                }
-                let label_h =
-                    self.add_label(mtm, user_label, 12.0, FORM_HMARGIN, y, FORM_LABEL_WIDTH);
-                let display = format!("(internal: {default})");
-                let value_h = self.add_label(mtm, &display, 11.0, cell_x, y, cell_w);
-                cell = FormCell::Internal {
-                    default: default.clone(),
-                };
-                row_height = label_h.max(value_h).max(FORM_ROW_HEIGHT);
-            }
-            ParamKind::Unknown(raw) => {
-                let label = param.label.trim();
-                let raw_trim = raw.trim();
-                // Skip empty-label Unknown rows entirely. G'MIC's
-                // stdlib emits hidden internal placeholders like
-                // `: value(0)` (no label, no user-visible payload)
-                // as part of its parameter wiring; rendering them as
-                // `(unsupported: value(0))` adds noise without
-                // giving the user anything actionable. Filters with
-                // a real labelled-but-unrecognised parameter (e.g.
-                // `~point(...)`) still surface so we don't silently
-                // drop something the user might care about.
-                if label.is_empty() {
-                    self.ivars().cells.borrow_mut().push(FormCell::Static);
-                    return y;
-                }
-                let label_h = self.add_label(mtm, label, 12.0, FORM_HMARGIN, y, FORM_LABEL_WIDTH);
-                let display = format!("(unsupported: {raw_trim})");
-                let value_h = self.add_label(mtm, &display, 11.0, cell_x, y, cell_w);
-                cell = FormCell::Static;
-                row_height = label_h.max(value_h).max(FORM_ROW_HEIGHT);
+            RowOutcome::Hidden(cell) => {
+                self.ivars().cells.borrow_mut().push(cell);
+                y
             }
         }
+    }
 
-        self.ivars().cells.borrow_mut().push(cell);
-        y + row_height + FORM_ROW_GAP
+    fn render_param_row(
+        &self,
+        mtm: MainThreadMarker,
+        param: &Param,
+        layout: RowLayout,
+        prefill: Option<&str>,
+    ) -> RowOutcome {
+        match &param.kind {
+            ParamKind::Int { default, min, max } => self.add_int_row(
+                mtm,
+                &param.label,
+                layout,
+                prefill,
+                IntRowSpec {
+                    default: *default,
+                    min: *min,
+                    max: *max,
+                },
+            ),
+            ParamKind::Float { default, min, max } => self.add_float_row(
+                mtm,
+                &param.label,
+                layout,
+                prefill,
+                FloatRowSpec {
+                    default: *default,
+                    min: *min,
+                    max: *max,
+                },
+            ),
+            ParamKind::Bool { default } => {
+                self.add_bool_row(mtm, &param.label, layout, prefill, *default)
+            }
+            ParamKind::Choice { choices, default } => {
+                self.add_choice_row(mtm, &param.label, layout, prefill, choices, *default)
+            }
+            ParamKind::Color { default_rgb } => {
+                self.add_color_row(mtm, &param.label, layout, prefill, *default_rgb)
+            }
+            ParamKind::Text { default } => {
+                self.add_text_row(mtm, &param.label, layout, prefill, default)
+            }
+            ParamKind::Note(body) => self.add_note_row(mtm, layout, body),
+            ParamKind::Separator => self.add_separator_row(mtm, layout),
+            ParamKind::Link { label, url } => self.add_link_row(mtm, layout, label, url),
+            ParamKind::Internal { label: _, default } => {
+                self.add_internal_row(mtm, param, layout, default)
+            }
+            ParamKind::Unknown(raw) => self.add_unknown_row(mtm, param, layout, raw),
+        }
+    }
+
+    fn add_int_row(
+        &self,
+        mtm: MainThreadMarker,
+        label: &str,
+        layout: RowLayout,
+        prefill: Option<&str>,
+        spec: IntRowSpec,
+    ) -> RowOutcome {
+        let label_h = self.add_control_label(mtm, label, layout);
+        let starting = prefill
+            .and_then(|v| v.parse::<i64>().ok())
+            .unwrap_or(spec.default);
+        let slider = self.add_slider(
+            mtm,
+            layout.cell_x,
+            layout.y,
+            layout.cell_w,
+            spec.min as f64,
+            spec.max as f64,
+            starting as f64,
+            /* integer = */ true,
+        );
+        RowOutcome::Rendered {
+            cell: FormCell::Int {
+                slider,
+                min: spec.min,
+                max: spec.max,
+            },
+            row_height: label_h.max(FORM_ROW_HEIGHT),
+        }
+    }
+
+    fn add_float_row(
+        &self,
+        mtm: MainThreadMarker,
+        label: &str,
+        layout: RowLayout,
+        prefill: Option<&str>,
+        spec: FloatRowSpec,
+    ) -> RowOutcome {
+        let label_h = self.add_control_label(mtm, label, layout);
+        let starting = prefill
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(spec.default);
+        let slider = self.add_slider(
+            mtm,
+            layout.cell_x,
+            layout.y,
+            layout.cell_w,
+            spec.min,
+            spec.max,
+            starting,
+            /* integer = */ false,
+        );
+        RowOutcome::Rendered {
+            cell: FormCell::Float {
+                slider,
+                min: spec.min,
+                max: spec.max,
+            },
+            row_height: label_h.max(FORM_ROW_HEIGHT),
+        }
+    }
+
+    fn add_bool_row(
+        &self,
+        mtm: MainThreadMarker,
+        label: &str,
+        layout: RowLayout,
+        prefill: Option<&str>,
+        default: bool,
+    ) -> RowOutcome {
+        // Bool gets a checkbox with the param label as its title; no
+        // separate left-side label.
+        let starting = match prefill {
+            Some("1") | Some("true") => true,
+            Some("0") | Some("false") => false,
+            _ => default,
+        };
+        let button = self.add_checkbox(mtm, label, starting, FORM_HMARGIN, layout.y, layout.width);
+        RowOutcome::Rendered {
+            cell: FormCell::Bool { button },
+            row_height: FORM_ROW_HEIGHT,
+        }
+    }
+
+    fn add_choice_row(
+        &self,
+        mtm: MainThreadMarker,
+        label: &str,
+        layout: RowLayout,
+        prefill: Option<&str>,
+        choices: &[String],
+        default: usize,
+    ) -> RowOutcome {
+        let label_h = self.add_control_label(mtm, label, layout);
+        let starting = choice_starting_index(prefill, choices, default);
+        let popup = self.add_popup(
+            mtm,
+            layout.cell_x,
+            layout.y,
+            layout.cell_w,
+            choices,
+            starting,
+        );
+        RowOutcome::Rendered {
+            cell: FormCell::Choice {
+                popup,
+                choices: choices.to_vec(),
+            },
+            row_height: label_h.max(FORM_ROW_HEIGHT),
+        }
+    }
+
+    fn add_color_row(
+        &self,
+        mtm: MainThreadMarker,
+        label: &str,
+        layout: RowLayout,
+        prefill: Option<&str>,
+        default_rgb: [u8; 3],
+    ) -> RowOutcome {
+        let label_h = self.add_control_label(mtm, label, layout);
+        let starting = prefill.and_then(parse_rgb_triple).unwrap_or(default_rgb);
+        let well = self.add_color_well(mtm, layout.cell_x, layout.y, layout.cell_w, starting);
+        RowOutcome::Rendered {
+            cell: FormCell::Color { well },
+            row_height: label_h.max(FORM_ROW_HEIGHT),
+        }
+    }
+
+    fn add_text_row(
+        &self,
+        mtm: MainThreadMarker,
+        label: &str,
+        layout: RowLayout,
+        prefill: Option<&str>,
+        default: &str,
+    ) -> RowOutcome {
+        let label_h = self.add_control_label(mtm, label, layout);
+        let starting = prefill.unwrap_or(default);
+        let field = self.add_textfield(mtm, layout.cell_x, layout.y, layout.cell_w, starting);
+        RowOutcome::Rendered {
+            cell: FormCell::Text { field },
+            row_height: label_h.max(FORM_ROW_HEIGHT),
+        }
+    }
+
+    fn add_note_row(&self, mtm: MainThreadMarker, layout: RowLayout, body: &str) -> RowOutcome {
+        let trimmed = body.trim();
+        if trimmed.is_empty() {
+            // Don't waste a row on a `note("")` placeholder.
+            return RowOutcome::Hidden(FormCell::Static);
+        }
+        let row_height = self.add_label(mtm, trimmed, 11.0, FORM_HMARGIN, layout.y, layout.width);
+        RowOutcome::Rendered {
+            cell: FormCell::Static,
+            row_height,
+        }
+    }
+
+    fn add_separator_row(&self, mtm: MainThreadMarker, layout: RowLayout) -> RowOutcome {
+        self.add_separator(mtm, FORM_HMARGIN, layout.y, layout.width);
+        RowOutcome::Rendered {
+            cell: FormCell::Static,
+            row_height: 12.0,
+        }
+    }
+
+    fn add_link_row(
+        &self,
+        mtm: MainThreadMarker,
+        layout: RowLayout,
+        label: &str,
+        url: &str,
+    ) -> RowOutcome {
+        let display = if url.is_empty() {
+            label.to_owned()
+        } else {
+            format!("{label}  ({url})")
+        };
+        let row_height = self.add_label(mtm, &display, 12.0, FORM_HMARGIN, layout.y, layout.width);
+        RowOutcome::Rendered {
+            cell: FormCell::Static,
+            row_height,
+        }
+    }
+
+    fn add_internal_row(
+        &self,
+        mtm: MainThreadMarker,
+        param: &Param,
+        layout: RowLayout,
+        default: &str,
+    ) -> RowOutcome {
+        // Hidden internal decls still contribute their default to argv,
+        // but empty labels should not crowd the form.
+        let user_label = param.label.trim();
+        let cell = FormCell::Internal {
+            default: default.to_owned(),
+        };
+        if user_label.is_empty() {
+            return RowOutcome::Hidden(cell);
+        }
+
+        let label_h = self.add_control_label(mtm, user_label, layout);
+        let display = format!("(internal: {default})");
+        let value_h = self.add_label(mtm, &display, 11.0, layout.cell_x, layout.y, layout.cell_w);
+        RowOutcome::Rendered {
+            cell,
+            row_height: label_h.max(value_h).max(FORM_ROW_HEIGHT),
+        }
+    }
+
+    fn add_unknown_row(
+        &self,
+        mtm: MainThreadMarker,
+        param: &Param,
+        layout: RowLayout,
+        raw: &str,
+    ) -> RowOutcome {
+        let label = param.label.trim();
+        if label.is_empty() {
+            return RowOutcome::Hidden(FormCell::Static);
+        }
+
+        let label_h = self.add_control_label(mtm, label, layout);
+        let display = format!("(unsupported: {})", raw.trim());
+        let value_h = self.add_label(mtm, &display, 11.0, layout.cell_x, layout.y, layout.cell_w);
+        RowOutcome::Rendered {
+            cell: FormCell::Static,
+            row_height: label_h.max(value_h).max(FORM_ROW_HEIGHT),
+        }
+    }
+
+    fn add_control_label(&self, mtm: MainThreadMarker, label: &str, layout: RowLayout) -> CGFloat {
+        self.add_label(mtm, label, 12.0, FORM_HMARGIN, layout.y, FORM_LABEL_WIDTH)
     }
 
     fn clear_rows(&self) {
@@ -1126,6 +1284,19 @@ fn parse_rgb_triple(s: &str) -> Option<[u8; 3]> {
     let g = parts[1].trim().parse::<u8>().ok()?;
     let b = parts[2].trim().parse::<u8>().ok()?;
     Some([r, g, b])
+}
+
+fn choice_starting_index(prefill: Option<&str>, choices: &[String], default: usize) -> usize {
+    // Saved values are integer indices, but legacy paths may have
+    // stored the literal choice label. Accept both shapes so a
+    // downgrade doesn't lose state.
+    match prefill {
+        Some(s) => match s.parse::<usize>() {
+            Ok(idx) if idx < choices.len() => idx,
+            _ => choices.iter().position(|c| c == s).unwrap_or(default),
+        },
+        None => default,
+    }
 }
 
 /// Render a float as the minimum reasonable string we can feed back to
