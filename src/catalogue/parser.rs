@@ -322,21 +322,22 @@ fn is_gmic_qt_only(command: &str) -> bool {
     command.starts_with("gmic_qt_") || command.starts_with("_gmic_qt_") || command.starts_with('_')
 }
 
-fn parse_kind(decl: &str) -> ParamKind {
+struct KindDecl<'a> {
+    head: &'a str,
+    inner: &'a str,
+}
+
+fn split_kind_decl(decl: &str) -> Option<KindDecl<'_>> {
     // G'MIC accepts either `kind(args)` or `kind{args}` as the
-    // grouping syntax — the brace form is used when the args contain
-    // unbalanced parens (typical for `note{"...(see §4)..."}` and
-    // `text{"cos(x)"}`). Choose whichever opener appears first so we
-    // don't latch onto a `(` that's *inside* the brace body
-    // (otherwise `note{"(Set to 0...)"}` parses as `note{"` followed
-    // by an unsupported sea of comma-separated junk).
+    // grouping syntax. Choose whichever opener appears first so we do
+    // not latch onto a `(` inside a brace body such as `note{"(...)"}`.
     let paren = decl.find('(');
     let brace = decl.find('{');
     let (open_idx, open_ch, close_ch) = match (paren, brace) {
         (Some(p), Some(b)) if b < p => (b, '{', '}'),
         (Some(p), _) => (p, '(', ')'),
         (None, Some(b)) => (b, '{', '}'),
-        (None, None) => return ParamKind::Unknown(sanitize_display(decl)),
+        (None, None) => return None,
     };
     let (head, rest) = decl.split_at(open_idx);
     let inner = rest
@@ -344,38 +345,42 @@ fn parse_kind(decl: &str) -> ParamKind {
         .and_then(|s| s.rsplit_once(close_ch))
         .map(|(args, _)| args)
         .unwrap_or("");
-    // G'MIC type-name modifier prefixes:
-    //   `~kind(...)`  — advanced (gmic-qt collapses under a triangle).
-    //   `_kind(...)`  — silent (no UI in gmic-qt; default is sent to
-    //                    the filter as-is). We surface them as normal
-    //                    interactive controls so the user can still
-    //                    inspect / override what's being sent.
-    // Stripping both prefixes makes ~400 extra catalogue params
-    // resolvable. Losing the "advanced/silent" UI flags is acceptable
-    // until we have a polished accordion + read-only-row affordance.
-    let head_trim = head.trim().trim_start_matches(['~', '_']);
-    match head_trim {
-        "int" => parse_int(inner),
-        "float" => parse_float(inner),
-        "bool" => parse_bool(inner),
-        "choice" => parse_choice(inner),
-        "color" => parse_color(inner),
-        "text" => parse_text(inner),
+    Some(KindDecl { head, inner })
+}
+
+fn normalized_kind_head(head: &str) -> &str {
+    // `~kind(...)` marks gmic-qt "advanced"; `_kind(...)` marks silent.
+    // We surface both as ordinary controls for now.
+    head.trim().trim_start_matches(['~', '_'])
+}
+
+fn parse_kind(decl: &str) -> ParamKind {
+    let Some(kind) = split_kind_decl(decl) else {
+        return ParamKind::Unknown(sanitize_display(decl));
+    };
+
+    match normalized_kind_head(kind.head) {
+        "int" => parse_int(kind.inner),
+        "float" => parse_float(kind.inner),
+        "bool" => parse_bool(kind.inner),
+        "choice" => parse_choice(kind.inner),
+        "color" => parse_color(kind.inner),
+        "text" => parse_text(kind.inner),
         // Note bodies routinely embed HTML markup like
         // `<small><b>Author: ...</b></small>` — sanitise so the form
         // never renders raw tags.
-        "note" => ParamKind::Note(sanitize_display(strip_quotes(inner))),
+        "note" => ParamKind::Note(sanitize_display(strip_quotes(kind.inner))),
         "separator" => ParamKind::Separator,
-        "link" => parse_link(inner),
+        "link" => parse_link(kind.inner),
         // T-after-T10: parse new gmic kinds into existing UI controls
         // so the picker stops rendering them as "(unsupported: ...)"
         // — see `src/bin/audit-unsupported.rs` for the prioritisation
         // matrix.
-        "point" => parse_point(inner),
-        "value" => parse_internal("value", inner),
-        "button" => parse_internal("button", inner),
-        "file" | "filein" | "fileout" => parse_path(inner),
-        "folder" => parse_path(inner),
+        "point" => parse_point(kind.inner),
+        "value" => parse_internal("value", kind.inner),
+        "button" => parse_internal("button", kind.inner),
+        "file" | "filein" | "fileout" => parse_path(kind.inner),
+        "folder" => parse_path(kind.inner),
         _ => ParamKind::Unknown(sanitize_display(decl)),
     }
 }
