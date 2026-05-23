@@ -38,6 +38,9 @@ use ps_types::{
 use std::ffi::c_void;
 
 #[cfg(feature = "live")]
+use catalogue::ChosenFilter;
+
+#[cfg(feature = "live")]
 use ps_types::{FilterRecord, VRect, USER_CANCEL};
 
 /// Photoshop-compatible filter entry point.
@@ -207,31 +210,9 @@ unsafe fn parameters_selector(data: *mut isize) -> i16 {
 /// menu item) and run the gmic pipeline against it.
 #[cfg(feature = "live")]
 unsafe fn continue_selector(fr: &mut FilterRecord, data: *mut isize) -> i16 {
-    use crate::catalogue::ChosenFilter;
-
-    let chosen_owned: Option<ChosenFilter> = crate::ps_data::borrow::<ChosenFilter>(data).cloned();
-
-    let chosen = match chosen_owned {
-        Some(c) => c,
-        None => {
-            let settings = crate::settings::Settings::load();
-            match settings.last {
-                Some(last) => ChosenFilter {
-                    command: last.command,
-                    args: last.args,
-                },
-                None => {
-                    crate::ui::alert::alert_error(
-                        &crate::ui::alert::NsAlertSink,
-                        "G'MIC",
-                        "No previous G'MIC filter to repeat. Pick one from Filters > Plugins > G'MIC > G'MIC….",
-                        false,
-                    );
-                    log("CONTINUE: no *data, no settings.last — USER_CANCEL");
-                    return USER_CANCEL;
-                }
-            }
-        }
+    let Some(chosen) = chosen_filter_for_continue(data) else {
+        alert_no_previous_filter();
+        return USER_CANCEL;
     };
 
     log(&format!(
@@ -244,67 +225,101 @@ unsafe fn continue_selector(fr: &mut FilterRecord, data: *mut isize) -> i16 {
     match gmic::run_filter_with(fr, &chosen) {
         Ok(()) => {
             log("CONTINUE: gmic::run_filter_with returned OK");
-            fr.in_rect = VRect {
-                top: 0,
-                left: 0,
-                bottom: 0,
-                right: 0,
-            };
-            fr.out_rect = VRect {
-                top: 0,
-                left: 0,
-                bottom: 0,
-                right: 0,
-            };
+            clear_filter_rects(fr);
             NO_ERR
         }
         Err(e) => {
-            // T14 NSAlert matrix — translate the GmicError variant
-            // into a user-actionable message. Everything also goes to
-            // the log for support diagnosis.
-            let sink = &crate::ui::alert::NsAlertSink;
-            match &e {
-                gmic::GmicError::NotFound => {
-                    crate::ui::alert::alert_error(
-                        sink,
-                        "G'MIC",
-                        "G'MIC isn't installed. Install it with: brew install gmic and try again.",
-                        false,
-                    );
-                }
-                gmic::GmicError::Failed { status } => {
-                    let status_str = status
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| "signal".into());
-                    crate::ui::alert::alert_error(
-                        sink,
-                        "G'MIC",
-                        &format!(
-                            "G'MIC reported an error running `{}` (exit {}).",
-                            chosen.command, status_str,
-                        ),
-                        true,
-                    );
-                }
-                gmic::GmicError::Tiff(_) => {
-                    crate::ui::alert::alert_error(
-                        sink,
-                        "G'MIC",
-                        "G'MIC produced an image we couldn't read back.",
-                        true,
-                    );
-                }
-                _ => {
-                    crate::ui::alert::alert_error(
-                        sink,
-                        "G'MIC",
-                        &format!("G'MIC pipeline failed: {e}"),
-                        true,
-                    );
-                }
-            }
+            alert_gmic_error(&chosen, &e);
             log(&format!("CONTINUE: gmic failed: {e}"));
             USER_CANCEL
+        }
+    }
+}
+
+#[cfg(feature = "live")]
+unsafe fn chosen_filter_for_continue(data: *mut isize) -> Option<ChosenFilter> {
+    crate::ps_data::borrow::<ChosenFilter>(data)
+        .cloned()
+        .or_else(last_filter_from_settings)
+}
+
+#[cfg(feature = "live")]
+fn last_filter_from_settings() -> Option<ChosenFilter> {
+    crate::settings::Settings::load()
+        .last
+        .map(|last| ChosenFilter {
+            command: last.command,
+            args: last.args,
+        })
+}
+
+#[cfg(feature = "live")]
+fn alert_no_previous_filter() {
+    crate::ui::alert::alert_error(
+        &crate::ui::alert::NsAlertSink,
+        "G'MIC",
+        "No previous G'MIC filter to repeat. Pick one from Filters > Plugins > G'MIC > G'MIC….",
+        false,
+    );
+    log("CONTINUE: no *data, no settings.last — USER_CANCEL");
+}
+
+#[cfg(feature = "live")]
+fn clear_filter_rects(fr: &mut FilterRecord) {
+    let empty = VRect {
+        top: 0,
+        left: 0,
+        bottom: 0,
+        right: 0,
+    };
+    fr.in_rect = empty;
+    fr.out_rect = empty;
+}
+
+#[cfg(feature = "live")]
+fn alert_gmic_error(chosen: &ChosenFilter, error: &gmic::GmicError) {
+    // T14 NSAlert matrix — translate the GmicError variant into a
+    // user-actionable message. Everything also goes to the log for
+    // support diagnosis.
+    let sink = &crate::ui::alert::NsAlertSink;
+    match error {
+        gmic::GmicError::NotFound => {
+            crate::ui::alert::alert_error(
+                sink,
+                "G'MIC",
+                "G'MIC isn't installed. Install it with: brew install gmic and try again.",
+                false,
+            );
+        }
+        gmic::GmicError::Failed { status } => {
+            let status_str = status
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "signal".into());
+            crate::ui::alert::alert_error(
+                sink,
+                "G'MIC",
+                &format!(
+                    "G'MIC reported an error running `{}` (exit {}).",
+                    chosen.command, status_str,
+                ),
+                true,
+            );
+        }
+        gmic::GmicError::Tiff(_) => {
+            crate::ui::alert::alert_error(
+                sink,
+                "G'MIC",
+                "G'MIC produced an image we couldn't read back.",
+                true,
+            );
+        }
+        _ => {
+            crate::ui::alert::alert_error(
+                sink,
+                "G'MIC",
+                &format!("G'MIC pipeline failed: {error}"),
+                true,
+            );
         }
     }
 }
