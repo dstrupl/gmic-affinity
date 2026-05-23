@@ -166,10 +166,14 @@ if [ -z "$TAP_OWNER_REPO" ] || [ "$TAP_OWNER_REPO" = "$TAP_REPO_URL" ]; then
 fi
 if ! gh repo view "$TAP_OWNER_REPO" >/dev/null 2>&1; then
   die "tap repo '$TAP_OWNER_REPO' is unreachable. Either it doesn't exist yet
-       (you / dstrupl needs to bootstrap it — see release/homebrew-tap/PUBLISHING.md)
-       or your gh auth has no read access to it."
+       or your gh auth has no read access to it. If the repo exists, check
+       that the collaboration invite was accepted."
 fi
-ok "tap repo $TAP_OWNER_REPO reachable"
+if ! git ls-remote --exit-code "$TAP_REPO_URL" HEAD >/dev/null 2>&1; then
+  die "tap repo URL '$TAP_REPO_URL' is not clone-readable from this machine.
+       Check SSH keys, HTTPS credentials, or override TAP_REPO_URL in .env.local."
+fi
+ok "tap repo $TAP_OWNER_REPO reachable via gh and git"
 
 # -------- 8. release/tag state is safe --------
 #

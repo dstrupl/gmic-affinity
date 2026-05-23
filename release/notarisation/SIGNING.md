@@ -133,7 +133,7 @@ You need push access to two repos under the `dstrupl` GitHub account:
 Authenticate `gh` with the account that has push access to both:
 
 ```bash
-gh auth login          # follow the prompts; pick HTTPS or SSH
+gh auth login          # follow the prompts
 gh auth status          # confirm
 gh repo view dstrupl/gmic-affinity              # should print metadata
 gh repo view dstrupl/homebrew-gmic-affinity     # should also print metadata
@@ -226,8 +226,10 @@ DEVELOPER_ID_APP_SIGNATURE = Developer ID Application: Your Name (TEAMID)
 # NOTARYTOOL_KEYCHAIN_PROFILE = gmic-affinity-notary
 
 # Optional: tap repo URL. Defaults to the dstrupl/homebrew-gmic-affinity
-# SSH URL. Override only if you've forked the tap.
+# SSH URL. Override if you need HTTPS instead of SSH, or if you've
+# forked the tap.
 # TAP_REPO_URL = git@github.com:dstrupl/homebrew-gmic-affinity.git
+# TAP_REPO_URL = https://github.com/dstrupl/homebrew-gmic-affinity.git
 EOF
 ```
 
@@ -268,17 +270,23 @@ safe to run standalone:
 ```bash
 ./scripts/release-preflight.sh \
     v0.0.0 \
-    "$(grep -E '^DEVELOPER_ID_APP_SIGNATURE' .env.local | sed -E 's/.*=\s*//' | sed -E 's/[[:space:]]+$//')" \
+    "Developer ID Application: Your Name (TEAMID)" \
     gmic-affinity-notary \
     git@github.com:dstrupl/homebrew-gmic-affinity.git
 ```
+
+Use the exact `DEVELOPER_ID_APP_SIGNATURE` value you put in
+`.env.local` for the second argument. Use the exact tap URL that
+`make release` will use for the fourth argument; the default shown
+above is SSH, so switch it to the HTTPS URL if that's what you put in
+`.env.local`.
 
 `v0.0.0` is a valid semver-shaped tag that should never exist as a
 real project release, so the script can exercise the setup-sensitive
 preflight without requiring the repo's package metadata to be bumped:
 working-tree state, signing identity, notary creds, gh auth, tap-repo
-reachability, tag/release availability, and release inputs. Everything
-should pass cleanly.
+API access and clone reachability, tag/release availability, and
+release inputs. Everything should pass cleanly.
 
 If anything fails here, fix it now. The actual release is not the
 time to debug keychain auth.
