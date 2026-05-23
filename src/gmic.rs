@@ -158,20 +158,26 @@ fn validate_filter_string(s: &str) -> Result<(), GmicError> {
 }
 
 /// Build the full argv to hand to `Command::new(gmic_path).args(...)`.
-/// Format: `[<input.tif>, <filter tokens...>, -output, <output.tif>]`.
+/// Format:
+/// `[<input.tif>, <filter tokens...>, <color-mode>, -output, <output.tif>]`.
 ///
 /// We deliberately *don't* try to force the output pixel type via the
 /// `,uchar` (or any other) suffix on `-output`. The set of accepted
 /// type names in `output_tiff` is undocumented across gmic versions
 /// (3.7.6 verbose-logs the value back but then rejects 'uchar' at
-/// write time, for instance), so the only portable choice is to let
-/// gmic write whatever it wants and convert in `tiff_io::read_tiff`.
-/// That also means our pipeline transparently works with any future
-/// gmic filter, not just the ones that happen to stay in 8-bit.
+/// write time, for instance).
+///
+/// We do force the output colour model to match the host plane count.
+/// Some filters, notably `fx_ghost`, return float gray+alpha TIFFs
+/// (`BlackIsZero` with two 32-bit samples), which the `tiff` crate
+/// rejects before handing us samples. Normalising to Gray/RGB/RGBA
+/// preserves the existing flexible bit-depth readback while avoiding
+/// unsupported two-channel TIFF layouts.
 pub fn build_argv(
     input: &Path,
     output: &Path,
     filter_cmd: &str,
+    output_planes: u32,
 ) -> Result<Vec<OsString>, GmicError> {
     let mut args: Vec<OsString> = Vec::with_capacity(8);
     args.push(input.as_os_str().to_owned());
@@ -188,8 +194,7 @@ pub fn build_argv(
         }
     }
 
-    args.push(OsString::from("-output"));
-    args.push(output.as_os_str().to_owned());
+    append_output_args(&mut args, output, output_planes)?;
     Ok(args)
 }
 
@@ -394,7 +399,7 @@ fn run_with_tokens(fr: &mut FilterRecord, tokens: &[String]) -> Result<(), GmicE
         buf.in_row_bytes as u32,
     )?;
 
-    let argv = build_argv_from_tokens(&in_path, &out_path, tokens)?;
+    let argv = build_argv_from_tokens(&in_path, &out_path, tokens, buf.planes as u32)?;
     run_subprocess(&gmic, &argv, dir.path())?;
 
     read_tiff(
@@ -417,6 +422,7 @@ fn build_argv_from_tokens(
     input: &Path,
     output: &Path,
     tokens: &[String],
+    output_planes: u32,
 ) -> Result<Vec<OsString>, GmicError> {
     if tokens.is_empty() {
         return Err(GmicError::InvalidCharsInConfig);
@@ -432,9 +438,28 @@ fn build_argv_from_tokens(
         }
         args.push(OsString::from(tok));
     }
+    append_output_args(&mut args, output, output_planes)?;
+    Ok(args)
+}
+
+fn append_output_args(
+    args: &mut Vec<OsString>,
+    output: &Path,
+    output_planes: u32,
+) -> Result<(), GmicError> {
+    args.push(OsString::from(output_color_mode_command(output_planes)?));
     args.push(OsString::from("-output"));
     args.push(output.as_os_str().to_owned());
-    Ok(args)
+    Ok(())
+}
+
+fn output_color_mode_command(output_planes: u32) -> Result<&'static str, GmicError> {
+    match output_planes {
+        1 => Ok("-to_gray"),
+        3 => Ok("-to_rgb"),
+        4 => Ok("-to_rgba"),
+        _ => Err(GmicError::Tiff(TiffError::UnsupportedPlanes(output_planes))),
+    }
 }
 
 #[cfg(test)]
@@ -472,7 +497,7 @@ mod tests {
     fn argv_layout_is_input_filter_output() {
         let in_p = PathBuf::from("/tmp/a/in.tif");
         let out_p = PathBuf::from("/tmp/a/out.tif");
-        let argv = build_argv(&in_p, &out_p, "-blur 3 -sharpen 2").unwrap();
+        let argv = build_argv(&in_p, &out_p, "-blur 3 -sharpen 2", 4).unwrap();
         let strs: Vec<&str> = argv.iter().map(|s| s.to_str().unwrap()).collect();
         assert_eq!(
             strs,
@@ -482,6 +507,7 @@ mod tests {
                 "3",
                 "-sharpen",
                 "2",
+                "-to_rgba",
                 "-output",
                 "/tmp/a/out.tif",
             ]
@@ -490,9 +516,9 @@ mod tests {
 
     #[test]
     fn argv_collapses_extra_whitespace() {
-        let argv = build_argv(Path::new("a"), Path::new("b"), "  -blur   3   ").unwrap();
+        let argv = build_argv(Path::new("a"), Path::new("b"), "  -blur   3   ", 3).unwrap();
         let strs: Vec<&str> = argv.iter().map(|s| s.to_str().unwrap()).collect();
-        assert_eq!(strs, vec!["a", "-blur", "3", "-output", "b"]);
+        assert_eq!(strs, vec!["a", "-blur", "3", "-to_rgb", "-output", "b"]);
     }
 
     #[test]
@@ -502,7 +528,7 @@ mod tests {
             .collect::<Vec<_>>()
             .join(" ");
         assert!(matches!(
-            build_argv(Path::new("a"), Path::new("b"), &many),
+            build_argv(Path::new("a"), Path::new("b"), &many, 4),
             Err(GmicError::TooManyArgs(_))
         ));
     }
@@ -511,8 +537,16 @@ mod tests {
     fn argv_rejects_arg_too_long() {
         let big = "x".repeat(MAX_ARG_BYTES + 1);
         assert!(matches!(
-            build_argv(Path::new("a"), Path::new("b"), &big),
+            build_argv(Path::new("a"), Path::new("b"), &big, 4),
             Err(GmicError::ArgTooLong(_))
+        ));
+    }
+
+    #[test]
+    fn argv_rejects_unsupported_output_planes() {
+        assert!(matches!(
+            build_argv(Path::new("a"), Path::new("b"), "-blur 3", 2),
+            Err(GmicError::Tiff(TiffError::UnsupportedPlanes(2)))
         ));
     }
 
@@ -534,12 +568,13 @@ mod tests {
                 "3 5".to_string(), // contains whitespace; must not be re-split
                 "-sharpen".to_string(),
             ],
+            1,
         )
         .unwrap();
         let strs: Vec<&str> = argv.iter().map(|s| s.to_str().unwrap()).collect();
         assert_eq!(
             strs,
-            vec!["/in.tif", "-blur", "3 5", "-sharpen", "-output", "/out.tif"]
+            vec!["/in.tif", "-blur", "3 5", "-sharpen", "-to_gray", "-output", "/out.tif"]
         );
     }
 
@@ -547,7 +582,7 @@ mod tests {
     fn argv_from_tokens_rejects_too_many() {
         let many: Vec<String> = (0..MAX_FILTER_ARGS + 5).map(|i| i.to_string()).collect();
         assert!(matches!(
-            build_argv_from_tokens(Path::new("a"), Path::new("b"), &many),
+            build_argv_from_tokens(Path::new("a"), Path::new("b"), &many, 4),
             Err(GmicError::TooManyArgs(_))
         ));
     }
@@ -556,9 +591,46 @@ mod tests {
     fn argv_from_tokens_rejects_oversized() {
         let big = "x".repeat(MAX_ARG_BYTES + 1);
         assert!(matches!(
-            build_argv_from_tokens(Path::new("a"), Path::new("b"), &["-blur".into(), big]),
+            build_argv_from_tokens(Path::new("a"), Path::new("b"), &["-blur".into(), big], 4),
             Err(GmicError::ArgTooLong(_))
         ));
+    }
+
+    #[test]
+    #[ignore = "requires Homebrew gmic at /opt/homebrew/bin or /usr/local/bin"]
+    fn fx_ghost_rgba_output_reads_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let in_path = dir.path().join("in.tif");
+        let out_path = dir.path().join("out.tif");
+        let (w, h, planes) = (64_u32, 64_u32, 4_u32);
+        let row_bytes = w * planes;
+        let mut input = vec![0_u8; (row_bytes * h) as usize];
+        for y in 0..h as usize {
+            for x in 0..w as usize {
+                let i = y * row_bytes as usize + x * planes as usize;
+                input[i] = (x * 3) as u8;
+                input[i + 1] = (y * 3) as u8;
+                input[i + 2] = ((x + y) * 2) as u8;
+                input[i + 3] = 255;
+            }
+        }
+
+        crate::tiff_io::write_tiff(&in_path, &input, w, h, planes, row_bytes).unwrap();
+        let argv = build_argv_from_tokens(
+            &in_path,
+            &out_path,
+            &["-fx_ghost".into(), "200,2,2,1,3,16,0".into()],
+            planes,
+        )
+        .unwrap();
+        run_subprocess(&locate_gmic().unwrap(), &argv, dir.path()).unwrap();
+
+        let mut output = vec![0_u8; input.len()];
+        crate::tiff_io::read_tiff(&out_path, &mut output, w, h, planes, row_bytes).unwrap();
+        assert!(
+            output.iter().any(|&b| b != 0),
+            "fx_ghost output should decode into RGBA bytes"
+        );
     }
 }
 

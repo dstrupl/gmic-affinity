@@ -213,10 +213,13 @@ at write time with:
 Rather than chase per-version syntax, [`src/tiff_io.rs`](./src/tiff_io.rs)
 accepts `U8`, `U16`, `U32`, `F32` and `F64` decoded results and quantises
 each to `u8` (clamp + round for floats, high-byte for unsigned ints).
-This is bulletproof across gmic versions and the entire filter catalogue,
-at the cost of being lossy if the user ever sends a 16-bit document
-through — which is fine because the PiPL `EnableInfo` greys the filter
-out for non-8-bit documents anyway.
+Before `-output`, [`src/gmic.rs`](./src/gmic.rs) also asks gmic to match
+the host plane count (`-to_gray`, `-to_rgb`, or `-to_rgba`). This avoids
+two-channel grey+alpha float TIFFs such as the `fx_ghost` output that the
+`tiff` crate rejects as `BlackIsZero` with two 32-bit samples. The
+pipeline is still lossy if the user ever sends a 16-bit document through
+— which is fine because the PiPL `EnableInfo` greys the filter out for
+non-8-bit documents anyway.
 
 The `tiff` crate's default `Limits` are also lifted to
 `Limits::unlimited()`; the defaults are too strict for full-resolution
