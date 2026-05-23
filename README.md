@@ -4,10 +4,10 @@ A Rust-based Photoshop-compatible filter plugin (`.plugin`) for macOS that bridg
 [G'MIC](https://gmic.eu/) into [Affinity Photo 2](https://affinity.serif.com/photo/)
 and later versions (including Affinity by Canva v3).
 
-Status: **v0.1 release in progress.** The plugin loads in Affinity Photo 2,
+Status: **v0.1 released.** The plugin loads in Affinity Photo 2,
 appears as `Filters → Plugins → G'MIC → G'MIC...`, hands pixels through gmic
-end-to-end and writes the result back inline. v0.1 ships universal,
-ad-hoc-signed, for both Affinity Photo 2 and Affinity Photo v3.
+end-to-end and writes the result back inline. Current public releases ship
+universal, ad-hoc-signed zips for both Affinity Photo 2 and Affinity Photo v3.
 
 Documentation set:
 
@@ -64,9 +64,9 @@ Developer ID signing, notarisation, GitHub Release publishing, and
 Homebrew tap bump from their Mac. The setup and per-release runbook
 live in [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md).
 
-Until the first signed stable release is cut and the tap is published,
+Until the first signed stable release is cut and the tap cask is bumped,
 the manual zip + `install.command` path lands the same files in the
-same places that brew would.
+same places that brew will.
 
 ## What it does
 

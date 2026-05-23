@@ -72,7 +72,7 @@ Homebrew `gmic` present:
 
 | # | Acceptance criterion                                                                                                  | Status |
 |---|------------------------------------------------------------------------------------------------------------------------|--------|
-| 1 | Bundle copied to `~/Library/Application Support/Affinity Photo 2/Plugins/` and/or `~/Library/Application Support/Affinity/Plugins/` is discovered after Affinity Photo 2 / Affinity Photo v3 restart. | ✅ (v2 verified; v3 pending Phase 0 of [release design](./docs/design/2026-05-18-release-v0.1-distribution.md)) |
+| 1 | Bundle copied to `~/Library/Application Support/Affinity Photo 2/Plugins/` and/or `~/Library/Application Support/Affinity/Plugins/` is discovered after Affinity Photo 2 / Affinity Photo v3 restart. | ✅ (v2 and v3 verified; see Phase 0 of [release design](./docs/design/2026-05-18-release-v0.1-distribution.md)) |
 | 2 | Bundle appears in **Preferences → Photoshop Plugins → Detected** (Unknown status is acceptable).                       | ✅     |
 | 3 | A filter entry `G'MIC...` exists under **Filters → Plugins → G'MIC**.                                                  | ✅     |
 | 4 | Invoking the filter on an 8-bit RGB document produces a visibly transformed image in-place (no separate file dialog).  | ✅     |
@@ -102,7 +102,7 @@ Homebrew `gmic` present:
 | Affinity Photo 2 loads and lists the plugin       | ✅ shipped              |
 | Affinity Photo v3 loads and lists the plugin      | ✅ shipped (Phase 0 step 2 PASS on 2026-05-19; see release design doc §3) |
 | Distributed via GitHub release zip + `install.command` | ✅ shipped (universal `.plugin` zip, double-clickable installer; see [release design doc](./docs/design/2026-05-18-release-v0.1-distribution.md)) |
-| Distributed via Homebrew cask                     | 🟡 v0.2 (cask + tap repo scaffolded under [`release/homebrew-tap/`](./release/homebrew-tap/) but unpublished. Signed-release path is documented in [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md); remaining work is first collaborator-run release + tap publication) |
+| Distributed via Homebrew cask                     | 🟡 v0.2 (tap repo exists at `dstrupl/homebrew-gmic-affinity`, with cask still held behind the first collaborator-run signed/notarised release. Signed-release path is documented in [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md)) |
 | Filter runs end-to-end on a real image            | ✅ shipped              |
 | Universal binary (arm64 + x86\_64)                | ✅ shipped              |
 | 8-bit RGB / RGBA / Greyscale                      | ✅ shipped              |
@@ -145,7 +145,7 @@ Homebrew `gmic` present:
 | ~~Parameter UI~~                  | ~~Either a native sheet via `filterSelectorParameters`, or launching `gmic_qt` standalone for filter picking.~~ Shipped in v2 via native Cocoa picker + dynamic parameter form. |
 | 16/32-bit support                 | Promote `tiff_io` to those depths, update PiPL `EnableInfo`. |
 | Tiled processing                  | Required to handle gigapixel images without OOM. |
-| Notarised cask distribution       | Run the collaborator-driven `make release RELEASE_VERSION=vX.Y.Z` pipeline from [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md), then publish the cask in [`release/homebrew-tap/`](./release/homebrew-tap/) to `dstrupl/homebrew-gmic-affinity`. The signing/notarisation process exists; the remaining v0.2 work is the first signed release and tap publication. |
+| Notarised cask distribution       | Run the collaborator-driven `make release RELEASE_VERSION=vX.Y.Z` pipeline from [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md). The signing/notarisation process and tap repo exist; the remaining v0.2 work is the first signed release and automated cask bump. |
 | Affinity v3 scripting integration | The v3 MCP/Scripts panel could invoke this plugin programmatically. |
 | Bundled `gmic`                    | Optional — could ship a vendored gmic binary so users do not need Homebrew. |
 

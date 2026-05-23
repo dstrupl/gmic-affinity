@@ -4,12 +4,13 @@ Homebrew tap for [`gmic-affinity`](https://github.com/dstrupl/gmic-affinity) —
 a Photoshop-compatible filter plugin that bridges
 [G'MIC](https://gmic.eu/) into Affinity Photo on macOS.
 
-## Status: not yet published
+## Status: tap repo exists, first signed bump pending
 
 This tap is **scaffolding for v0.2**. The cask file passes
-`brew style` and is shape-locked, but it is not installable today
-and the GitHub repo backing the tap (`dstrupl/homebrew-gmic-affinity`)
-has not been created.
+`brew style` and is shape-locked, but it is not installable today.
+The GitHub repo backing the tap (`dstrupl/homebrew-gmic-affinity`)
+exists; the cask still waits for the first Developer ID-signed and
+notarised release artifact.
 
 The reason is upstream-Homebrew policy, not anything specific to this
 project: starting **2026-09-01**, Homebrew ends support for casks

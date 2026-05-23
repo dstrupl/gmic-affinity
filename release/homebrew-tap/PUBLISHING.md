@@ -3,60 +3,36 @@
 This directory is staging for the `dstrupl/homebrew-gmic-affinity`
 GitHub repo.
 
-## Status (2026-05-20): one-time bootstrap pending, then automated
+## Status (2026-05-23): tap repo bootstrapped, first signed bump pending
 
-The tap repo does not yet exist on GitHub. The project lead needs to
-bootstrap it **once**, _before_ the signing collaborator runs
-`make release` for the first stable v0.2 release. After that the
-release pipeline (`scripts/release-bump-cask.sh`, called from
-`make release-bump-cask`) takes over: every subsequent release just
-clones, bumps `version` + `sha256`, runs `brew style`, commits, and
-pushes.
+The tap repo now exists at `dstrupl/homebrew-gmic-affinity` and is
+reachable via `gh repo view dstrupl/homebrew-gmic-affinity`. The
+remaining first-release work is access coordination plus the first
+collaborator-run signed release.
 
-In other words: the tap repo is a one-time `gh repo create` + initial
-push from the project lead, and from then on it's effectively a
-write-only target of the release pipeline.
-
-The bootstrap should happen just before the first collaborator-run
-signed release (see
-[`release/notarisation/SIGNING.md`](../notarisation/SIGNING.md)). The
-first push to the tap repo should be a working notarised cask, not
-unpublishable scaffolding. Bootstrapping early would just leave a
-broken cask sitting on GitHub.
+From here the release pipeline (`scripts/release-bump-cask.sh`, called
+from `make release-bump-cask`) takes over: it clones the tap, bumps
+`version` + `sha256`, runs `brew style`, commits, and pushes. The cask
+still contains a "not yet published" deferral block and placeholder
+sha256 until that first signed release bump lands.
 
 The cask file's v0.2-deferral comment block is stripped automatically
 on the first stable bump by `scripts/release-bump-cask.sh`'s Python
 mutator — you don't need to remove it by hand. Same for `version` /
 `sha256`: those get filled in from the release zip on each run.
 
-## One-time bootstrap (project lead, before the friend's first `make release`)
+## One-time access check (project lead, before the friend's first `make release`)
 
-Do this once, after the signing collaborator confirms they are ready
-to run the signed-release pipeline (see
-`release/notarisation/SIGNING.md` §setup) but before they run
-`make release` for `v0.2.0`.
+Do this after the signing collaborator confirms they are ready to run
+the signed-release pipeline (see `release/notarisation/SIGNING.md`
+§setup) but before they run `make release` for `v0.2.0`.
 
 ```bash
-# 1. Create the repo on GitHub. The `homebrew-` prefix is mandatory
-#    for `brew tap dstrupl/gmic-affinity` to discover it.
-gh repo create dstrupl/homebrew-gmic-affinity --public \
-  --description "Homebrew tap for gmic-affinity"
+# 1. Confirm the tap repo exists and is reachable from your account.
+gh repo view dstrupl/homebrew-gmic-affinity
 
-# 2. Stage the tap contents from this project repo and push them
-#    as the initial commit. The contents come straight out of
-#    release/homebrew-tap/ — anything in there gets pushed verbatim,
-#    so make sure that directory is the version you want shipped.
-TAP_DIR=$(mktemp -d)
-cp -R release/homebrew-tap/. "$TAP_DIR/"
-cd "$TAP_DIR"
-git init -b main
-git add .
-git commit -m "Initial commit: gmic-affinity tap (cask waits for first release bump)"
-git remote add origin git@github.com:dstrupl/homebrew-gmic-affinity.git
-git push -u origin main
-
-# 3. Grant the signing collaborator push access to the tap repo.
-#    They already have push to dstrupl/gmic-affinity; they need the
+# 2. Grant the signing collaborator push access to the tap repo.
+#    They already need push to dstrupl/gmic-affinity; they need the
 #    same on dstrupl/homebrew-gmic-affinity so release-bump-cask can
 #    `git push origin HEAD` from their machine. The recommended
 #    grant is a direct collaborator role with write permission:
@@ -69,15 +45,16 @@ gh api \
 # at https://github.com/dstrupl/homebrew-gmic-affinity/invitations.
 ```
 
-Verify from a fresh shell that the friend would also see it as
-reachable (this is what `release-preflight` checks):
+After they accept the invite, have them verify from a fresh shell that
+the repo is reachable (this is what `release-preflight` checks):
 
 ```bash
 gh repo view dstrupl/homebrew-gmic-affinity
 ```
 
-You're done. The friend can now run `make release RELEASE_VERSION=v0.2.0`
-and the pipeline will auto-bump the cask in this repo on success.
+You're done. The collaborator can now run
+`make release RELEASE_VERSION=v0.2.0` and the pipeline will auto-bump
+the cask in this repo on success.
 
 ## After each release (automated)
 
@@ -111,12 +88,11 @@ This directory remains in the project repo because:
   `release-bump-cask.sh` strips on the first stable release — the
   block is the only place the deferral rationale is captured in
   Cask DSL form, useful as a paper trail.
-- The tap-repo CI (`.github/workflows/audit.yml` in this directory)
-  is staged here for the bootstrap step to copy in.
+- The tap-repo CI and initial cask history were staged from here.
 
-After the bootstrap push, edits to the cask should happen in the tap
-repo directly (or via `release-bump-cask.sh`), not by editing files
-in this directory and re-bootstrapping. If you ever need to change
+Now that the tap repo exists, edits to the live cask should happen in
+the tap repo directly (or via `release-bump-cask.sh`), not by editing
+files in this directory and trying to re-bootstrap. If you ever need to change
 cask DSL substantively (e.g. add a new artifact stanza, change
 `depends_on`), edit `dstrupl/homebrew-gmic-affinity` directly and let
 the next release bump pick up the new structure with refreshed

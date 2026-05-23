@@ -542,29 +542,33 @@ the project is ready for a stable release.
 
 1. 👤 Pick the version (`vX.Y.Z`) and confirm `main` at HEAD is the
    commit you want to release.
-2. 🤖 Make sure `main` is fully pushed:
+2. 🤖 Bump release metadata to match the chosen version before the
+   handoff: `Cargo.toml` `package.version` and
+   `Info.plist` `CFBundleShortVersionString` must equal `X.Y.Z`.
+   `release-preflight` enforces this for real releases.
+3. 🤖 Make sure `main` is fully pushed:
    `git push origin main`.
-3. 👤 Ping the signing collaborator with:
+4. 👤 Ping the signing collaborator with:
    - The version string (e.g. `v0.2.0`).
    - A link to the latest green `ci.yml` run on `main`.
    - A link to the most recent successful RC release (so they know
      this isn't a cold first attempt).
-4. 👤 (collaborator) Runs `make release RELEASE_VERSION=vX.Y.Z` per
+5. 👤 (collaborator) Runs `make release RELEASE_VERSION=vX.Y.Z` per
    `release/notarisation/SIGNING.md`. Wall-clock time: ~5–10 minutes.
    On success they tell you the GitHub release is live and the cask
    was bumped.
-5. 🤖 Verify the GitHub release exists:
+6. 🤖 Verify the GitHub release exists:
    ```bash
    gh release view vX.Y.Z
    ```
    Confirm the asset is `GmicFilter-vX.Y.Z.zip` and that the release
    is _not_ marked as prerelease.
-6. 🤖 Verify the cask was bumped on the tap:
+7. 🤖 Verify the cask was bumped on the tap:
    ```bash
    gh api repos/dstrupl/homebrew-gmic-affinity/contents/Casks/gmic-affinity.rb --jq '.content' | base64 -D | head -10
    ```
    The `version "X.Y.Z"` line should match the new release.
-7. 👤 Smoke-test on a fresh user account or a clean macOS VM:
+8. 👤 Smoke-test on a fresh user account or a clean macOS VM:
    ```bash
    brew tap dstrupl/gmic-affinity
    brew install --cask gmic-affinity
@@ -573,7 +577,7 @@ the project is ready for a stable release.
    The cask install path skips `install.command` entirely — the
    notarised bundle loads through Gatekeeper directly, no quarantine
    stripping needed.
-8. 👤 Announce / update changelog / close milestone as you would for
+9. 👤 Announce / update changelog / close milestone as you would for
    any release.
 
 ### Roll-back

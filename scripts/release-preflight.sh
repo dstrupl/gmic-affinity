@@ -59,6 +59,30 @@ if [[ ! "$RELEASE_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 ok "RELEASE_VERSION=$RELEASE_VERSION"
 
+# -------- 1b. version metadata matches --------
+#
+# The zip/cask version comes from RELEASE_VERSION, but the bundle also
+# carries Info.plist metadata and the Rust crate has its own package
+# version. For real releases, keep those in sync so users and crash
+# reports don't see a stale version inside a newer signed artifact.
+# v0.0.0 is reserved for the setup dry run documented in SIGNING.md.
+if [ "$RELEASE_VERSION" != "v0.0.0" ]; then
+  BARE_VERSION=${RELEASE_VERSION#v}
+  CARGO_VERSION=$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -1)
+  PLIST_VERSION=$(plutil -extract CFBundleShortVersionString raw Info.plist 2>/dev/null || true)
+  if [ "$CARGO_VERSION" != "$BARE_VERSION" ]; then
+    die "Cargo.toml version is '$CARGO_VERSION', expected '$BARE_VERSION' for $RELEASE_VERSION.
+       Bump Cargo.toml before releasing."
+  fi
+  if [ "$PLIST_VERSION" != "$BARE_VERSION" ]; then
+    die "Info.plist CFBundleShortVersionString is '$PLIST_VERSION', expected '$BARE_VERSION' for $RELEASE_VERSION.
+       Bump Info.plist before releasing."
+  fi
+  ok "Cargo.toml and Info.plist version metadata match $BARE_VERSION"
+else
+  ok "version metadata check skipped for setup dry run"
+fi
+
 # -------- 2. clean working tree --------
 #
 # A dirty tree means the binary we're about to sign and ship doesn't
@@ -147,18 +171,45 @@ if ! gh repo view "$TAP_OWNER_REPO" >/dev/null 2>&1; then
 fi
 ok "tap repo $TAP_OWNER_REPO reachable"
 
-# -------- 8. release tag doesn't already exist --------
+# -------- 8. release/tag state is safe --------
 #
-# Re-releasing the same tag would either fail (if it points at a
-# different commit) or silently overwrite a published GitHub release
-# (if forced). Both outcomes are bad; we refuse and require an explicit
-# tag bump.
+# Re-releasing the same GitHub release would either fail or silently
+# replace a published artifact. Both outcomes are bad; require an
+# explicit version bump or manual cleanup.
 if gh release view "$RELEASE_VERSION" --repo "$(gh repo view --json nameWithOwner -q .nameWithOwner)" >/dev/null 2>&1; then
   die "GitHub release $RELEASE_VERSION already exists.
        Pick a new RELEASE_VERSION (semver bump) or, if you really mean to
        replace it, delete it first via 'gh release delete $RELEASE_VERSION'."
 fi
-ok "release tag $RELEASE_VERSION is free"
+
+# If the project lead pre-created a signed annotated tag, it must point
+# at exactly the commit we just checked against upstream. Otherwise
+# `gh release create` would publish release metadata for one commit
+# while the local zip was built from another.
+LOCAL_TAG_SHA=$(git rev-parse -q --verify "refs/tags/$RELEASE_VERSION^{}" 2>/dev/null || true)
+REMOTE_TAG_LINES=$(git ls-remote --tags origin "refs/tags/$RELEASE_VERSION" "refs/tags/$RELEASE_VERSION^{}" 2>/dev/null || true)
+REMOTE_TAG_SHA=$(echo "$REMOTE_TAG_LINES" | awk '/\^\{\}$/ {print $1; found=1} END {if (!found) exit 1}' 2>/dev/null || true)
+if [ -z "$REMOTE_TAG_SHA" ]; then
+  REMOTE_TAG_SHA=$(echo "$REMOTE_TAG_LINES" | awk '{print $1; exit}' 2>/dev/null || true)
+fi
+
+if [ -n "$LOCAL_TAG_SHA" ] && [ -z "$REMOTE_TAG_SHA" ]; then
+  die "local tag $RELEASE_VERSION exists but is not on origin.
+       Push the tag first if it is intentional, or delete the local tag before releasing."
+fi
+if [ -n "$REMOTE_TAG_SHA" ] && [ "$REMOTE_TAG_SHA" != "$LOCAL_HEAD" ]; then
+  die "origin tag $RELEASE_VERSION points at $REMOTE_TAG_SHA, but HEAD is $LOCAL_HEAD.
+       Move to the tagged commit or choose a new RELEASE_VERSION."
+fi
+if [ -n "$LOCAL_TAG_SHA" ] && [ "$LOCAL_TAG_SHA" != "$LOCAL_HEAD" ]; then
+  die "local tag $RELEASE_VERSION points at $LOCAL_TAG_SHA, but HEAD is $LOCAL_HEAD.
+       Move to the tagged commit or choose a new RELEASE_VERSION."
+fi
+if [ -n "$REMOTE_TAG_SHA" ]; then
+  ok "existing tag $RELEASE_VERSION points at HEAD"
+else
+  ok "release tag $RELEASE_VERSION is free"
+fi
 
 # -------- 9. install.command + release/README.txt + cask present --------
 [ -f install.command ] || die "install.command missing at repo root."

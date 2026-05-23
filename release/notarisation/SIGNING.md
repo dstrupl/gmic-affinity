@@ -265,16 +265,17 @@ safe to run standalone:
 
 ```bash
 ./scripts/release-preflight.sh \
-    v0.0.0-preflight-test \
+    v0.0.0 \
     "$(grep -E '^DEVELOPER_ID_APP_SIGNATURE' .env.local | sed -E 's/.*=\s*//' | sed -E 's/[[:space:]]+$//')" \
     gmic-affinity-notary \
     git@github.com:dstrupl/homebrew-gmic-affinity.git
 ```
 
-It will fail fast on the first check (the version string isn't a
-real semver) — that's expected; we just want to exercise checks 4–9
-to confirm signing identity, notary creds, gh auth, and tap-repo
-reachability all work _before_ a real release. Everything else
+`v0.0.0` is a valid semver-shaped tag that should never exist as a
+real project release, so the script can exercise the setup-sensitive
+preflight without requiring the repo's package metadata to be bumped:
+working-tree state, signing identity, notary creds, gh auth, tap-repo
+reachability, tag/release availability, and release inputs. Everything
 should pass cleanly.
 
 If anything fails here, fix it now. The actual release is not the
