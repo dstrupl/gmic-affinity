@@ -88,13 +88,19 @@ pub fn write_tiff(
     planes: u32,
     row_bytes: u32,
 ) -> Result<(), TiffError> {
-    if width == 0 || height == 0 || width > MAX_EDGE as u32 || height > MAX_EDGE as u32 {
-        return Err(TiffError::DimensionTooLarge(width.max(height)));
-    }
-    if !(planes == 1 || planes == 3 || planes == 4) {
-        return Err(TiffError::UnsupportedPlanes(planes));
-    }
+    validate_image_shape(width, height, planes)?;
 
+    let packed = pack_strided_pixels(buf, width, height, planes, row_bytes)?;
+    write_packed_tiff(path, &packed, width, height, planes)
+}
+
+fn pack_strided_pixels(
+    buf: &[u8],
+    width: u32,
+    height: u32,
+    planes: u32,
+    row_bytes: u32,
+) -> Result<Vec<u8>, TiffError> {
     let row_len = (width as usize) * (planes as usize);
     let row_stride = row_bytes as usize;
     if row_stride < row_len {
@@ -103,6 +109,7 @@ pub fn write_tiff(
             want: row_len,
         });
     }
+
     let expected_len = row_stride
         .checked_mul(height as usize)
         .ok_or(TiffError::DimensionTooLarge(width.max(height)))?;
@@ -118,13 +125,22 @@ pub fn write_tiff(
         let start = y * row_stride;
         packed.extend_from_slice(&buf[start..start + row_len]);
     }
+    Ok(packed)
+}
 
+fn write_packed_tiff(
+    path: &Path,
+    packed: &[u8],
+    width: u32,
+    height: u32,
+    planes: u32,
+) -> Result<(), TiffError> {
     let file = File::create(path)?;
     let mut enc = TiffEncoder::new(file)?;
     match planes {
-        1 => enc.write_image::<colortype::Gray8>(width, height, &packed)?,
-        3 => enc.write_image::<colortype::RGB8>(width, height, &packed)?,
-        4 => enc.write_image::<colortype::RGBA8>(width, height, &packed)?,
+        1 => enc.write_image::<colortype::Gray8>(width, height, packed)?,
+        3 => enc.write_image::<colortype::RGB8>(width, height, packed)?,
+        4 => enc.write_image::<colortype::RGBA8>(width, height, packed)?,
         _ => unreachable!(),
     };
     Ok(())
