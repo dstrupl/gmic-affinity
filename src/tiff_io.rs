@@ -141,54 +141,85 @@ pub fn read_tiff(
     planes: u32,
     row_bytes: u32,
 ) -> Result<(), TiffError> {
-    if width == 0 || height == 0 || width > MAX_EDGE as u32 || height > MAX_EDGE as u32 {
-        return Err(TiffError::DimensionTooLarge(width.max(height)));
-    }
-    if !(planes == 1 || planes == 3 || planes == 4) {
-        return Err(TiffError::UnsupportedPlanes(planes));
-    }
+    validate_image_shape(width, height, planes)?;
 
     let file = File::open(path)?;
     let mut dec = Decoder::new(BufReader::new(file))?.with_limits(decoder_limits());
     let (w, h) = dec.dimensions()?;
-    if w > MAX_EDGE as u32 || h > MAX_EDGE as u32 {
-        return Err(TiffError::DimensionTooLarge(w.max(h)));
-    }
+    validate_dimensions(w, h)?;
 
+    let pixels = decode_image_to_u8(&mut dec)?;
+    let pixels = fit_pixels_to_expected_size(pixels, (w, h), (width, height), planes);
+    copy_pixels_to_strided_buffer(&pixels, out_buf, width, height, planes, row_bytes)
+}
+
+fn validate_image_shape(width: u32, height: u32, planes: u32) -> Result<(), TiffError> {
+    validate_dimensions(width, height)?;
+    if !(planes == 1 || planes == 3 || planes == 4) {
+        return Err(TiffError::UnsupportedPlanes(planes));
+    }
+    Ok(())
+}
+
+fn validate_dimensions(width: u32, height: u32) -> Result<(), TiffError> {
+    if width == 0 || height == 0 || width > MAX_EDGE as u32 || height > MAX_EDGE as u32 {
+        return Err(TiffError::DimensionTooLarge(width.max(height)));
+    }
+    Ok(())
+}
+
+fn decode_image_to_u8(dec: &mut Decoder<BufReader<File>>) -> Result<Vec<u8>, TiffError> {
     // gmic promotes images to its internal `float` type for almost any
-    // non-trivial operation (blur, convolution, fft, colour-space
-    // conversions, …) and then writes the result back in whatever
-    // pixel type matches that internal representation. The set of
-    // accepted `,type` strings on `-output` is undocumented across
-    // gmic versions, so the safe path is to accept anything the tiff
-    // crate can decode and quantise it back to 8-bit ourselves. We
-    // assume the host gave us an 8-bit buffer (validated in
-    // `validate_filter_record`) so 0..255 is the target range.
-    let mut pixels: Vec<u8> = match dec.read_image()? {
-        DecodingResult::U8(v) => v,
-        DecodingResult::U16(v) => quantize_u16_to_u8(&v),
-        DecodingResult::U32(v) => quantize_u32_to_u8(&v),
-        DecodingResult::F32(v) => quantize_f32_to_u8(&v),
-        DecodingResult::F64(v) => quantize_f64_to_u8(&v),
-        _ => return Err(TiffError::UnsupportedBitDepth),
-    };
+    // non-trivial operation and then writes the result back in whatever
+    // pixel type matches that internal representation. Accept anything
+    // the tiff crate can decode and quantise it back to 8-bit ourselves.
+    match dec.read_image()? {
+        DecodingResult::U8(v) => Ok(v),
+        DecodingResult::U16(v) => Ok(quantize_u16_to_u8(&v)),
+        DecodingResult::U32(v) => Ok(quantize_u32_to_u8(&v)),
+        DecodingResult::F32(v) => Ok(quantize_f32_to_u8(&v)),
+        DecodingResult::F64(v) => Ok(quantize_f64_to_u8(&v)),
+        _ => Err(TiffError::UnsupportedBitDepth),
+    }
+}
 
+fn fit_pixels_to_expected_size(
+    pixels: Vec<u8>,
+    got: (u32, u32),
+    want: (u32, u32),
+    planes: u32,
+) -> Vec<u8> {
     // Dimension-mismatch handling (T12-C): many gmic filters change
-    // image dimensions (crop, rotate, scale, multi-frame output).
-    // Today's pipeline assumes `output_dims == input_dims` because
-    // we don't negotiate a new size with the host via the
-    // `imageSize` selector yet (v2 will). For v1, resize the gmic
-    // output back to the input dims with nearest-neighbour and log a
-    // one-line warning so the user knows the result was rescaled.
-    if (w, h) != (width, height) {
-        crate::logging::log(&format!(
-            "tiff: gmic returned {}x{}, expected {}x{}; resampling nearest-neighbour",
-            w, h, width, height,
-        ));
-        pixels = resample_nearest_to_u8(&pixels, w, h, width, height, planes);
+    // image dimensions. For v1, resize back to the input dims with
+    // nearest-neighbour and log a one-line warning.
+    if got == want {
+        return pixels;
     }
 
+    crate::logging::log(&format!(
+        "tiff: gmic returned {}x{}, expected {}x{}; resampling nearest-neighbour",
+        got.0, got.1, want.0, want.1,
+    ));
+    resample_nearest_to_u8(&pixels, got.0, got.1, want.0, want.1, planes)
+}
+
+fn copy_pixels_to_strided_buffer(
+    pixels: &[u8],
+    out_buf: &mut [u8],
+    width: u32,
+    height: u32,
+    planes: u32,
+    row_bytes: u32,
+) -> Result<(), TiffError> {
     let row_len = (width as usize) * (planes as usize);
+    let row_stride = row_bytes as usize;
+    if row_stride < row_len {
+        return Err(TiffError::SizeMismatch {
+            got: row_stride,
+            want: row_len,
+        });
+    }
+
     let want = row_len * height as usize;
     if pixels.len() != want {
         return Err(TiffError::SizeMismatch {
@@ -196,7 +227,8 @@ pub fn read_tiff(
             want,
         });
     }
-    let need_out = (row_bytes as usize) * (height as usize);
+
+    let need_out = row_stride * height as usize;
     if out_buf.len() < need_out {
         return Err(TiffError::BufferTooSmall {
             have: out_buf.len(),
@@ -206,7 +238,7 @@ pub fn read_tiff(
 
     for y in 0..height as usize {
         let src = y * row_len;
-        let dst = y * (row_bytes as usize);
+        let dst = y * row_stride;
         out_buf[dst..dst + row_len].copy_from_slice(&pixels[src..src + row_len]);
     }
     Ok(())
