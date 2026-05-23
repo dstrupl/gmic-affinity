@@ -126,8 +126,9 @@ You need push access to two repos under the `dstrupl` GitHub account:
    asset is created here.
 2. **`dstrupl/homebrew-gmic-affinity`** — the Homebrew tap. The
    release pipeline clones this, bumps the cask file, and pushes
-   back. The project lead bootstraps this repo once before your
-   first run; see [`release/homebrew-tap/PUBLISHING.md`](../homebrew-tap/PUBLISHING.md).
+   back. This repo already exists; the project lead only needs to
+   grant you push access before your first run. See
+   [`release/homebrew-tap/PUBLISHING.md`](../homebrew-tap/PUBLISHING.md).
 
 Authenticate `gh` with the account that has push access to both:
 
@@ -139,8 +140,9 @@ gh repo view dstrupl/homebrew-gmic-affinity     # should also print metadata
 ```
 
 If `gh repo view dstrupl/homebrew-gmic-affinity` fails with "404 not
-found", the tap repo hasn't been bootstrapped yet — let the project
-lead know before continuing.
+found", either your GitHub account does not have access yet or the
+collaboration invite has not been accepted. Let the project lead know
+before continuing.
 
 ## One-time setup
 
@@ -150,9 +152,9 @@ section) afterwards.
 ### 1. Clone the project repo
 
 ```bash
-git clone git@github.com:dstrupl/gmic-affinity.git
+gh repo clone dstrupl/gmic-affinity
 cd gmic-affinity
-git lfs pull   # pulls assets/gmic-catalogue.gmic.gz; LFS smudge happens on the next checkout
+git lfs pull   # pulls assets/gmic-catalogue.gmic.gz if checkout did not hydrate it
 ```
 
 ### 2. Verify your Developer ID Application certificate is installed
@@ -243,7 +245,7 @@ warming the cache here means the first real `make release` doesn't
 spend 10 minutes fetching dependencies. Pick whichever:
 
 ```bash
-make universal      # full release build of the unsigned bundle
+make universal FEATURES=live      # full unsigned build of the release-flavour bundle
 # or, faster, just resolve and download deps:
 cargo fetch
 ```
