@@ -261,8 +261,11 @@ on a new SDK version.
 
 Local development uses ad-hoc signing (`codesign --force --deep --sign -`).
 Affinity Photo 2 accepts ad-hoc-signed bundles for local use; no Apple
-Developer ID is required. Distribution will need a real Developer ID
-cert and notarisation via `notarytool`.
+Developer ID is required. Stable distribution is handled by the
+collaborator-run release pipeline in
+[`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md),
+which signs with Developer ID, notarises via `notarytool`, staples, and
+verifies Gatekeeper acceptance before publishing.
 
 ### Cargo crate type recap
 

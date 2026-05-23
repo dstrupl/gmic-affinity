@@ -57,15 +57,16 @@ Homebrew is in the middle of a security tightening that retired the
 cask-side workaround unsigned plugins like this one needed, and is
 ending support for any cask that fails Apple Gatekeeper checks on
 **2026-09-01** (see [Homebrew/brew#20755](https://github.com/homebrew/brew/issues/20755)).
-Without Apple Developer-ID code-signing + notarisation, brew is no
-longer a viable distribution path.
 
-v0.2 will add the cask back once the produced bundle is properly
-signed and notarised. The cask scaffolding under
-[`release/homebrew-tap/`](./release/homebrew-tap/) is preserved for
-that work. Until then, the manual zip + `install.command` path lands
-the same files in the same places that brew would, and is unaffected
-by the upcoming Homebrew policy change.
+The project now has the required signed-release path: a signing
+collaborator with an Apple Developer Program membership runs the
+Developer ID signing, notarisation, GitHub Release publishing, and
+Homebrew tap bump from their Mac. The setup and per-release runbook
+live in [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md).
+
+Until the first signed stable release is cut and the tap is published,
+the manual zip + `install.command` path lands the same files in the
+same places that brew would.
 
 ## What it does
 
@@ -242,14 +243,14 @@ See [PRD.md](./PRD.md) §7 for the full PRD-side build and install procedure.
 
 ## Releasing
 
-Tag a green commit on `main` with `vX.Y.Z` (or `vX.Y.Z-rc.N`) and push
-the tag. The `release` GitHub Actions workflow builds the universal
-zip and publishes it as a GitHub Release. That zip is the v0.1
-shipping artifact — no further publishing step is required.
+Pre-release tags (`vX.Y.Z-rc.N`, `vX.Y.Z-beta.N`) are CI-driven: push
+the tag and the `release` GitHub Actions workflow builds an
+ad-hoc-signed universal zip for testing.
 
-The `release/homebrew-tap/` directory carries the cask file plus tap
-CI for the future v0.2 brew-cask channel; it is not published in v0.1
-(see the design doc §12 for why). Full runbook:
-[IMPLEMENTATION_NOTES.md](./IMPLEMENTATION_NOTES.md) §11 and the
-design doc
-[`docs/design/2026-05-18-release-v0.1-distribution.md`](./docs/design/2026-05-18-release-v0.1-distribution.md).
+Stable tags (`vX.Y.Z`) are collaborator-driven: ask the signing
+collaborator to run `make release RELEASE_VERSION=vX.Y.Z` from a clean
+checkout. That local pipeline signs with Developer ID, notarises,
+staples, verifies Gatekeeper acceptance, publishes the GitHub Release,
+and bumps the Homebrew tap cask. Full runbook:
+[IMPLEMENTATION_NOTES.md](./IMPLEMENTATION_NOTES.md) §11 and
+[`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md).

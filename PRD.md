@@ -102,7 +102,7 @@ Homebrew `gmic` present:
 | Affinity Photo 2 loads and lists the plugin       | ✅ shipped              |
 | Affinity Photo v3 loads and lists the plugin      | ✅ shipped (Phase 0 step 2 PASS on 2026-05-19; see release design doc §3) |
 | Distributed via GitHub release zip + `install.command` | ✅ shipped (universal `.plugin` zip, double-clickable installer; see [release design doc](./docs/design/2026-05-18-release-v0.1-distribution.md)) |
-| Distributed via Homebrew cask                     | 🟡 v0.2 (cask + tap repo scaffolded under [`release/homebrew-tap/`](./release/homebrew-tap/) but unpublished. Blocked on Apple Developer ID + notarisation; see release design doc §12 for the late-2025 Homebrew Cask DSL changes that triggered this deferral) |
+| Distributed via Homebrew cask                     | 🟡 v0.2 (cask + tap repo scaffolded under [`release/homebrew-tap/`](./release/homebrew-tap/) but unpublished. Signed-release path is documented in [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md); remaining work is first collaborator-run release + tap publication) |
 | Filter runs end-to-end on a real image            | ✅ shipped              |
 | Universal binary (arm64 + x86\_64)                | ✅ shipped              |
 | 8-bit RGB / RGBA / Greyscale                      | ✅ shipped              |
@@ -111,7 +111,7 @@ Homebrew `gmic` present:
 | 16-bit / 32-bit per-channel modes                 | ⛔ v2                   |
 | Parameter UI (catalogue picker + dynamic form)    | ✅ shipped (v2 — see `docs/design/2026-05-17-gmic-picker-dialog.md`) |
 | Tiled / chunked processing                        | ⛔ v2                   |
-| Notarised distribution / Apple Developer ID       | ⛔ post-v1              |
+| Notarised distribution / Apple Developer ID       | 🟡 release path ready   |
 | G'MIC-Qt interactive GUI launch                   | ⛔ post-v1              |
 
 ---
@@ -128,8 +128,10 @@ Homebrew `gmic` present:
   the picker dialog now exposes the full catalogue with per-filter
   parameter editing; user state is persisted to
   `~/Library/Application Support/gmic-affinity/settings.json`.
-- **Ad-hoc signing only.** Sufficient for local use; redistribution will
-  require an Apple Developer ID and notarisation.
+- **Ad-hoc manual zips until the first signed stable release.** Local
+  development and pre-release zips use ad-hoc signing; stable
+  distribution uses the collaborator-run Developer ID + notarisation
+  pipeline in `release/notarisation/SIGNING.md`.
 - **External binary dependency.** The plugin shells out to a Homebrew-
   installed `gmic`; if the binary is missing the filter fails cleanly
   rather than embedding gmic itself.
@@ -143,7 +145,7 @@ Homebrew `gmic` present:
 | ~~Parameter UI~~                  | ~~Either a native sheet via `filterSelectorParameters`, or launching `gmic_qt` standalone for filter picking.~~ Shipped in v2 via native Cocoa picker + dynamic parameter form. |
 | 16/32-bit support                 | Promote `tiff_io` to those depths, update PiPL `EnableInfo`. |
 | Tiled processing                  | Required to handle gigapixel images without OOM. |
-| Notarised cask distribution       | Apple Developer ID signing + `notarytool` notarisation + stapler, then publish the cask in [`release/homebrew-tap/`](./release/homebrew-tap/) to `dstrupl/homebrew-gmic-affinity`. v0.1 ships unnotarised via the GitHub-release zip + `install.command`; the cask is gated on this work and is the headline of v0.2. Hard external deadline: 2026-09-01 — Homebrew sunsets all casks that fail Gatekeeper checks regardless of workarounds. See [release design doc §7 + §12](./docs/design/2026-05-18-release-v0.1-distribution.md). |
+| Notarised cask distribution       | Run the collaborator-driven `make release RELEASE_VERSION=vX.Y.Z` pipeline from [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md), then publish the cask in [`release/homebrew-tap/`](./release/homebrew-tap/) to `dstrupl/homebrew-gmic-affinity`. The signing/notarisation process exists; the remaining v0.2 work is the first signed release and tap publication. |
 | Affinity v3 scripting integration | The v3 MCP/Scripts panel could invoke this plugin programmatically. |
 | Bundled `gmic`                    | Optional — could ship a vendored gmic binary so users do not need Homebrew. |
 

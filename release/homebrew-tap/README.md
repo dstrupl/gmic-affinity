@@ -20,10 +20,11 @@ brew offered as a workaround for unsigned bundles was removed in
 late 2025. Together those changes make this cask infeasible for
 v0.1, where the bundle is only ad-hoc-signed.
 
-The cask becomes immediately viable once the bundle is signed with an
-Apple Developer ID and notarised, at which point Gatekeeper accepts
-the load and brew lays it down without any quarantine workaround.
-That work is v0.2.
+The cask becomes viable with the collaborator-run signed release:
+Developer ID signing, notarisation, stapling, and tap bump are already
+covered by the upstream runbook in
+[`release/notarisation/SIGNING.md`](../notarisation/SIGNING.md). The
+remaining work is the first signed release and tap publication.
 
 Until then, install gmic-affinity via the GitHub release zip:
 <https://github.com/dstrupl/gmic-affinity/releases/latest>.

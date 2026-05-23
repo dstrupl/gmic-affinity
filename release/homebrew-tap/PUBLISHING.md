@@ -17,9 +17,9 @@ In other words: the tap repo is a one-time `gh repo create` + initial
 push from the project lead, and from then on it's effectively a
 write-only target of the release pipeline.
 
-The bootstrap is gated on Apple Developer enrolment of the signing
-collaborator landing first (see
-[`release/notarisation/SIGNING.md`](../notarisation/SIGNING.md)) — the
+The bootstrap should happen just before the first collaborator-run
+signed release (see
+[`release/notarisation/SIGNING.md`](../notarisation/SIGNING.md)). The
 first push to the tap repo should be a working notarised cask, not
 unpublishable scaffolding. Bootstrapping early would just leave a
 broken cask sitting on GitHub.
@@ -31,9 +31,10 @@ mutator — you don't need to remove it by hand. Same for `version` /
 
 ## One-time bootstrap (project lead, before the friend's first `make release`)
 
-Do this once, after the signing collaborator confirms their Apple
-Developer setup is done (see `release/notarisation/SIGNING.md` §setup)
-but before they run `make release` for `v0.2.0`.
+Do this once, after the signing collaborator confirms they are ready
+to run the signed-release pipeline (see
+`release/notarisation/SIGNING.md` §setup) but before they run
+`make release` for `v0.2.0`.
 
 ```bash
 # 1. Create the repo on GitHub. The `homebrew-` prefix is mandatory

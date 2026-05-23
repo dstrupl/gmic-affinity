@@ -26,7 +26,7 @@ cask "gmic-affinity" do
   depends_on macos: :big_sur
 
   # ============================================================
-  # NOT YET PUBLISHED — held back pending notarisation (v0.2).
+  # NOT YET PUBLISHED — held for the first signed release (v0.2).
   # ============================================================
   # Phase 0 step 3 (2026-05-19) confirmed empirically that both
   # Affinity Photo 2 and Affinity Photo v3 (3.2.1) reject this bundle
@@ -48,11 +48,12 @@ cask "gmic-affinity" do
   # v0.1 ships only via the manual zip + install.command path
   # (see docs/design/2026-05-18-release-v0.1-distribution.md §4.4),
   # which strips the quarantine bit user-side via `xattr -dr` and is
-  # unaffected by the Homebrew deprecation. v0.2 work covers Apple
-  # Developer enrolment + signing + notarisation; once the produced
-  # bundle is notarised, this cask becomes immediately viable
-  # (Gatekeeper accepts the load, no `quarantine false` knob needed)
-  # and we publish the tap repo from `release/homebrew-tap/`.
+  # unaffected by the Homebrew deprecation. v0.2 uses the
+  # collaborator-run release pipeline from release/notarisation to
+  # produce a Developer ID-signed and notarised bundle. Once that
+  # bundle exists, this cask is immediately viable (Gatekeeper
+  # accepts the load, no `quarantine false` knob needed) and we
+  # publish the tap repo from `release/homebrew-tap/`.
   #
   # Until then this file is staged-but-unpublished scaffolding. It
   # passes `brew style` so the future tap-repo bring-up is one bump
