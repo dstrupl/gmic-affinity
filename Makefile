@@ -143,7 +143,7 @@ REZ_FLAGS := \
   -d "PRAGMA_ONCE=0" \
   -useDF
 
-.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy help pipl check-lfs refresh-catalogue picker-example audit-unsupported \
+.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy quality-metrics help pipl check-lfs refresh-catalogue picker-example audit-unsupported \
         release release-unsigned release-preflight release-build-signed \
         release-notarize release-staple release-verify release-publish release-bump-cask
 
@@ -175,6 +175,7 @@ help:
 	@echo "  make test               Run cargo test under both default and --features live."
 	@echo "  make clippy             Run cargo clippy --all-targets --all-features -D warnings."
 	@echo "  make fmt                Run cargo fmt."
+	@echo "  make quality-metrics    Report Rust function length + complexity guardrails."
 	@echo "  make release            Full signed + notarised release pipeline (publishes a GitHub"
 	@echo "                          release and bumps the homebrew tap). Requires .env.local +"
 	@echo "                          Apple Developer ID setup; see release/notarisation/SIGNING.md."
@@ -373,6 +374,9 @@ fmt:
 
 clippy:
 	cargo clippy --all-targets --all-features -- -D warnings
+
+quality-metrics:
+	python3 scripts/quality-metrics.py --check
 
 clean:
 	cargo clean

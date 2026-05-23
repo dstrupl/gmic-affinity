@@ -190,6 +190,7 @@ make picker-example     # open the picker standalone (no Affinity install needed
 make refresh-catalogue  # regenerate assets/gmic-catalogue.* from local gmic
 make test               # cargo test under both default and --features live
 make clippy             # cargo clippy --all-targets --all-features -D warnings
+make quality-metrics    # report Rust function length + complexity guardrails
 make help               # full list of targets
 ```
 

@@ -59,6 +59,9 @@ jobs:
       - name: cargo clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      - name: quality metrics
+        run: make quality-metrics
+
       - name: cargo test (default features)
         run: cargo test --locked
 

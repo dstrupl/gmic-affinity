@@ -37,7 +37,7 @@ use crate::ui::picker_actions::{
     sel_on_cancel, sel_on_double_click, sel_on_ok, sel_on_reset, PickerActions,
 };
 use crate::ui::picker_catalogue_data_source::CatalogueDataSource;
-use crate::ui::picker_form::{build_form_pane, FormPane};
+use crate::ui::picker_form::{build_form_pane, FormController, FormPane};
 use crate::ui::runloop::run_modal_window;
 
 /// Height reserved at the top of the panel for the search field.
@@ -95,57 +95,7 @@ pub fn show_picker(
 ) -> Option<ChosenFilter> {
     let mtm = MainThreadMarker::new()?;
 
-    // Initial content rect used only if no autosaved frame exists.
-    let initial_rect = CGRect {
-        origin: CGPoint { x: 0.0, y: 0.0 },
-        size: CGSize {
-            width: 720.0,
-            height: 520.0,
-        },
-    };
-    let style =
-        NSWindowStyleMask::Titled | NSWindowStyleMask::Closable | NSWindowStyleMask::Resizable;
-
-    let panel: Retained<NSPanel> = unsafe {
-        NSPanel::initWithContentRect_styleMask_backing_defer(
-            mtm.alloc(),
-            initial_rect,
-            style,
-            NSBackingStoreType::NSBackingStoreBuffered,
-            false,
-        )
-    };
-    let window: Retained<NSWindow> = Retained::into_super(panel);
-    window.setTitle(&NSString::from_str("G'MIC Filters"));
-    // Centre the window first; if a saved frame exists, the next
-    // call's autosave-restore will overwrite this position. Without
-    // it, NSPanel created at `origin=(0,0)` lands at the bottom-left
-    // of the screen (hidden behind the Dock).
-    window.center();
-    let fr = window.frame();
-    let wid = unsafe { window.windowNumber() };
-    crate::logging::log(&format!(
-        "picker: windowNumber={} frame after center = {}x{} at ({},{})",
-        wid, fr.size.width, fr.size.height, fr.origin.x, fr.origin.y
-    ));
-    // Persist window frame across sessions. AppKit stores this under
-    // the host app's preferences ("Affinity Photo 2"), keyed by the
-    // autosave name; subsequent opens come up at the user's last size
-    // and position. IMPORTANT: this call may resize the contentView
-    // synchronously to whatever was last saved, so we must read the
-    // contentView's *current* bounds AFTER this call to size our
-    // subviews — using the initial 720×520 here is what was leaving
-    // a grey gap at the top of larger restored windows.
-    unsafe {
-        window.setFrameAutosaveName(&NSString::from_str("GmicPickerPanel"));
-    }
-    // Stop the user from dragging the panel down to nothing while
-    // they're trying to resize it. ~520x360 still shows a useful
-    // amount of the tree plus the search field.
-    window.setMinSize(NSSize {
-        width: 520.0,
-        height: 360.0,
-    });
+    let window = build_picker_window(mtm);
 
     let delegate = ModalCloseDelegate::new(mtm);
     window.setDelegate(Some(ProtocolObject::from_ref(&*delegate)));
@@ -160,13 +110,7 @@ pub fn show_picker(
     // each subview then handle every subsequent live resize.
     let content_view = window.contentView()?;
     let content_bounds = content_view.bounds();
-    crate::logging::log(&format!(
-        "picker: contentView bounds = {}x{} (origin {},{})",
-        content_bounds.size.width,
-        content_bounds.size.height,
-        content_bounds.origin.x,
-        content_bounds.origin.y,
-    ));
+    log_content_bounds(content_bounds);
 
     let outline = build_outline_view(mtm);
     unsafe {
@@ -200,33 +144,8 @@ pub fn show_picker(
     // Bottom button bar: Reset Defaults (leading) + Cancel/OK (trailing).
     let buttons = build_button_bar(mtm, content_bounds);
 
-    unsafe {
-        // NOTE: do NOT set `wantsLayer` on the contentView here. It
-        // breaks AppKit's autoresizing of immediate subviews (search
-        // field stops pinning to the top, scroll view loses its
-        // scroller) — confirmed by manual QA on the second T8 pass.
-        // Layer-backing the scroll view directly (see
-        // `build_scroll_view`) is both safe and sufficient.
-        content_view.addSubview(&search);
-        content_view.addSubview(&split);
-        let reset_view: &NSView = &buttons.reset;
-        let cancel_view: &NSView = &buttons.cancel;
-        let ok_view: &NSView = &buttons.ok;
-        content_view.addSubview(reset_view);
-        content_view.addSubview(cancel_view);
-        content_view.addSubview(ok_view);
-    }
-
-    // Wire keyboard equivalents directly on the buttons. AppKit
-    // dispatches both the keystroke and the click through the same
-    // target/action, so nothing else has to special-case them.
-    unsafe {
-        buttons.ok.setKeyEquivalent(&NSString::from_str("\r"));
-        // Escape: U+001B in Cocoa's "key equivalent" string.
-        buttons
-            .cancel
-            .setKeyEquivalent(&NSString::from_str("\u{1B}"));
-    }
+    attach_picker_views(&content_view, &search, &split, &buttons);
+    configure_button_shortcuts(&buttons);
     // OK is disabled until a leaf row is selected. The action
     // controller flips this every time the outline view's selection
     // changes (see `FormController::outlineViewSelectionDidChange:` →
@@ -237,30 +156,9 @@ pub fn show_picker(
     // controller holds strong refs to the outline view, form
     // controller, data source, and OK button so they all stay alive
     // until we drop `actions` after the modal pump exits.
-    let actions = PickerActions::new(
-        mtm,
-        outline.clone(),
-        form_controller.clone(),
-        data_source.clone(),
-        buttons.ok.clone(),
-    );
+    let actions = build_picker_actions(mtm, &outline, &form_controller, &data_source, &buttons);
     form_controller.set_actions(actions.clone());
-    let actions_obj: &AnyObject = &actions;
-    unsafe {
-        let ok_ctrl: &objc2_app_kit::NSControl = &buttons.ok;
-        let cancel_ctrl: &objc2_app_kit::NSControl = &buttons.cancel;
-        let reset_ctrl: &objc2_app_kit::NSControl = &buttons.reset;
-        ok_ctrl.setTarget(Some(actions_obj));
-        ok_ctrl.setAction(Some(sel_on_ok()));
-        cancel_ctrl.setTarget(Some(actions_obj));
-        cancel_ctrl.setAction(Some(sel_on_cancel()));
-        reset_ctrl.setTarget(Some(actions_obj));
-        reset_ctrl.setAction(Some(sel_on_reset()));
-
-        let outline_ctrl: &objc2_app_kit::NSControl = &outline;
-        outline_ctrl.setTarget(Some(actions_obj));
-        outline.setDoubleAction(Some(sel_on_double_click()));
-    }
+    wire_picker_actions(&outline, &buttons, &actions);
 
     // The search field receives focus immediately so typing filters
     // the tree without an extra click.
@@ -274,38 +172,8 @@ pub fn show_picker(
         .ok()
         .or_else(|| last_choice.map(|l| l.command.clone()));
 
-    if let Some(cmd) = preselect_command.as_deref() {
-        if let Some(row) = data_source.expand_to_filter(&outline, cmd) {
-            unsafe {
-                let indexes = NSIndexSet::indexSetWithIndex(row as usize);
-                outline.selectRowIndexes_byExtendingSelection(&indexes, false);
-                outline.scrollRowToVisible(row);
-            }
-            // `selectRowIndexes:` posts an
-            // `NSOutlineViewSelectionDidChangeNotification`, so the
-            // form controller's delegate has already populated the
-            // right pane with the prefilled values.
-            crate::logging::log(&format!("picker: pre-selected '{cmd}' at row {row}",));
-        } else {
-            crate::logging::log(&format!(
-                "picker: pre-select '{cmd}' missing from catalogue, skipping"
-            ));
-        }
-    }
-
-    let sf2 = search.frame();
-    let spf = split.frame();
-    crate::log(&format!(
-        "picker: after addSubview, search={}x{}@({},{}), split={}x{}@({},{})",
-        sf2.size.width,
-        sf2.size.height,
-        sf2.origin.x,
-        sf2.origin.y,
-        spf.size.width,
-        spf.size.height,
-        spf.origin.x,
-        spf.origin.y,
-    ));
+    preselect_filter(&data_source, &outline, preselect_command.as_deref());
+    log_picker_layout(&search, &split);
 
     let response = run_modal_window(&window);
 
@@ -345,8 +213,189 @@ pub fn show_picker(
     drop(form_controller);
     drop(data_source);
 
-    let _ = settings; // moved-from token; silences any future warning
     chosen
+}
+
+fn build_picker_window(mtm: MainThreadMarker) -> Retained<NSWindow> {
+    // Initial content rect used only if no autosaved frame exists.
+    let initial_rect = CGRect {
+        origin: CGPoint { x: 0.0, y: 0.0 },
+        size: CGSize {
+            width: 720.0,
+            height: 520.0,
+        },
+    };
+    let style =
+        NSWindowStyleMask::Titled | NSWindowStyleMask::Closable | NSWindowStyleMask::Resizable;
+
+    let panel: Retained<NSPanel> = unsafe {
+        NSPanel::initWithContentRect_styleMask_backing_defer(
+            mtm.alloc(),
+            initial_rect,
+            style,
+            NSBackingStoreType::NSBackingStoreBuffered,
+            false,
+        )
+    };
+    let window: Retained<NSWindow> = Retained::into_super(panel);
+    window.setTitle(&NSString::from_str("G'MIC Filters"));
+    // Centre the window first; if a saved frame exists, the next
+    // call's autosave-restore will overwrite this position. Without
+    // it, NSPanel created at `origin=(0,0)` lands at the bottom-left
+    // of the screen (hidden behind the Dock).
+    window.center();
+
+    let fr = window.frame();
+    let wid = unsafe { window.windowNumber() };
+    crate::logging::log(&format!(
+        "picker: windowNumber={} frame after center = {}x{} at ({},{})",
+        wid, fr.size.width, fr.size.height, fr.origin.x, fr.origin.y
+    ));
+
+    // Persist window frame across sessions. AppKit stores this under
+    // the host app's preferences ("Affinity Photo 2"), keyed by the
+    // autosave name; subsequent opens come up at the user's last size
+    // and position. IMPORTANT: this call may resize the contentView
+    // synchronously to whatever was last saved, so we must read the
+    // contentView's *current* bounds AFTER this call to size our
+    // subviews.
+    unsafe {
+        window.setFrameAutosaveName(&NSString::from_str("GmicPickerPanel"));
+    }
+    // Stop the user from dragging the panel down to nothing while
+    // they're trying to resize it. ~520x360 still shows a useful
+    // amount of the tree plus the search field.
+    window.setMinSize(NSSize {
+        width: 520.0,
+        height: 360.0,
+    });
+
+    window
+}
+
+fn log_content_bounds(content_bounds: CGRect) {
+    crate::logging::log(&format!(
+        "picker: contentView bounds = {}x{} (origin {},{})",
+        content_bounds.size.width,
+        content_bounds.size.height,
+        content_bounds.origin.x,
+        content_bounds.origin.y,
+    ));
+}
+
+fn attach_picker_views(
+    content_view: &NSView,
+    search: &Retained<NSSearchField>,
+    split: &Retained<NSSplitView>,
+    buttons: &ButtonBar,
+) {
+    unsafe {
+        // NOTE: do NOT set `wantsLayer` on the contentView here. It
+        // breaks AppKit's autoresizing of immediate subviews (search
+        // field stops pinning to the top, scroll view loses its
+        // scroller). Layer-backing the scroll view directly is both
+        // safe and sufficient.
+        content_view.addSubview(search);
+        content_view.addSubview(split);
+        let reset_view: &NSView = &buttons.reset;
+        let cancel_view: &NSView = &buttons.cancel;
+        let ok_view: &NSView = &buttons.ok;
+        content_view.addSubview(reset_view);
+        content_view.addSubview(cancel_view);
+        content_view.addSubview(ok_view);
+    }
+}
+
+fn configure_button_shortcuts(buttons: &ButtonBar) {
+    // AppKit dispatches both keystrokes and clicks through the same
+    // target/action, so nothing else has to special-case them.
+    unsafe {
+        buttons.ok.setKeyEquivalent(&NSString::from_str("\r"));
+        buttons
+            .cancel
+            .setKeyEquivalent(&NSString::from_str("\u{1B}"));
+    }
+}
+
+fn build_picker_actions(
+    mtm: MainThreadMarker,
+    outline: &Retained<NSOutlineView>,
+    form_controller: &Retained<FormController>,
+    data_source: &Retained<CatalogueDataSource>,
+    buttons: &ButtonBar,
+) -> Retained<PickerActions> {
+    PickerActions::new(
+        mtm,
+        outline.clone(),
+        form_controller.clone(),
+        data_source.clone(),
+        buttons.ok.clone(),
+    )
+}
+
+fn wire_picker_actions(
+    outline: &Retained<NSOutlineView>,
+    buttons: &ButtonBar,
+    actions: &Retained<PickerActions>,
+) {
+    let actions_obj: &AnyObject = actions;
+    unsafe {
+        let ok_ctrl: &objc2_app_kit::NSControl = &buttons.ok;
+        let cancel_ctrl: &objc2_app_kit::NSControl = &buttons.cancel;
+        let reset_ctrl: &objc2_app_kit::NSControl = &buttons.reset;
+        ok_ctrl.setTarget(Some(actions_obj));
+        ok_ctrl.setAction(Some(sel_on_ok()));
+        cancel_ctrl.setTarget(Some(actions_obj));
+        cancel_ctrl.setAction(Some(sel_on_cancel()));
+        reset_ctrl.setTarget(Some(actions_obj));
+        reset_ctrl.setAction(Some(sel_on_reset()));
+
+        let outline_ctrl: &objc2_app_kit::NSControl = outline;
+        outline_ctrl.setTarget(Some(actions_obj));
+        outline.setDoubleAction(Some(sel_on_double_click()));
+    }
+}
+
+fn preselect_filter(
+    data_source: &Retained<CatalogueDataSource>,
+    outline: &Retained<NSOutlineView>,
+    command: Option<&str>,
+) {
+    let Some(cmd) = command else {
+        return;
+    };
+
+    if let Some(row) = data_source.expand_to_filter(outline, cmd) {
+        unsafe {
+            let indexes = NSIndexSet::indexSetWithIndex(row as usize);
+            outline.selectRowIndexes_byExtendingSelection(&indexes, false);
+            outline.scrollRowToVisible(row);
+        }
+        // `selectRowIndexes:` posts an
+        // `NSOutlineViewSelectionDidChangeNotification`, so the form
+        // controller's delegate has already populated the right pane.
+        crate::logging::log(&format!("picker: pre-selected '{cmd}' at row {row}",));
+    } else {
+        crate::logging::log(&format!(
+            "picker: pre-select '{cmd}' missing from catalogue, skipping"
+        ));
+    }
+}
+
+fn log_picker_layout(search: &Retained<NSSearchField>, split: &Retained<NSSplitView>) {
+    let sf2 = search.frame();
+    let spf = split.frame();
+    crate::log(&format!(
+        "picker: after addSubview, search={}x{}@({},{}), split={}x{}@({},{})",
+        sf2.size.width,
+        sf2.size.height,
+        sf2.origin.x,
+        sf2.origin.y,
+        spf.size.width,
+        spf.size.height,
+        spf.origin.x,
+        spf.origin.y,
+    ));
 }
 
 /// Wrapper around [`show_picker`] kept for the standalone
