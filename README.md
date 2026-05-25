@@ -4,10 +4,12 @@ A Rust-based Photoshop-compatible filter plugin (`.plugin`) for macOS that bridg
 [G'MIC](https://gmic.eu/) into [Affinity Photo 2](https://affinity.serif.com/photo/)
 and later versions (including Affinity by Canva v3).
 
-Status: **v0.1 released.** The plugin loads in Affinity Photo 2,
+Status: **v0.2.0 released.** The plugin loads in Affinity Photo 2,
 appears as `Filters → Plugins → G'MIC → G'MIC...`, hands pixels through gmic
 end-to-end and writes the result back inline. Current public releases ship
-universal, ad-hoc-signed zips for both Affinity Photo 2 and Affinity Photo v3.
+universal Developer ID-signed and notarised zips for both Affinity Photo 2 and
+Affinity Photo v3. The Homebrew cask is live at
+`dstrupl/gmic-affinity/gmic-affinity`.
 
 Documentation set:
 
@@ -21,10 +23,30 @@ Documentation set:
 
 ## Install
 
+### Homebrew install
+
+Recommended for v0.2.0 and later:
+
+```bash
+brew tap dstrupl/gmic-affinity
+brew install --cask gmic-affinity
+```
+
+The cask installs the `gmic` formula dependency and copies
+`GmicFilter.plugin` into every Affinity plugin folder it finds on your
+machine (Affinity Photo 2 and/or Affinity Photo v3).
+
+Restart Affinity Photo and look for **Filters → Plugins → G'MIC →
+G'MIC…**.
+
+If the plugin is not detected, open
+**Affinity → Settings → Photoshop Plugins** and tick
+*"Allow unknown plugins to be used"*.
+
 ### Manual install (zip)
 
-This is the only install path for v0.1 — see "Why no Homebrew yet?"
-below.
+The signed release zip remains available for users who do not want to
+install through Homebrew.
 
 1. Make sure the `gmic` CLI is installed: `brew install gmic`. The
    plugin shells out to it; the Cocoa picker dialog is built in.
@@ -49,24 +71,18 @@ If the plugin is not detected, open
 **Affinity → Settings → Photoshop Plugins** and tick
 *"Allow unknown plugins to be used"*.
 
-### Why no Homebrew yet?
+### Distribution status
 
-The original v0.1 plan included a private Homebrew tap
-(`brew install --cask gmic-affinity`) as a one-liner alternative.
-Homebrew is in the middle of a security tightening that retired the
-cask-side workaround unsigned plugins like this one needed, and is
-ending support for any cask that fails Apple Gatekeeper checks on
-**2026-09-01** (see [Homebrew/brew#20755](https://github.com/homebrew/brew/issues/20755)).
+v0.1 shipped only as an ad-hoc-signed manual zip because Homebrew
+removed the `quarantine false` cask workaround and is ending support
+for casks that fail Apple Gatekeeper checks on **2026-09-01** (see
+[Homebrew/brew#20755](https://github.com/homebrew/brew/issues/20755)).
 
-The project now has the required signed-release path: a signing
-collaborator with an Apple Developer Program membership runs the
-Developer ID signing, notarisation, GitHub Release publishing, and
-Homebrew tap bump from their Mac. The setup and per-release runbook
-live in [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md).
-
-Until the first signed stable release is cut and the tap cask is bumped,
-the manual zip + `install.command` path lands the same files in the
-same places that brew will.
+v0.2.0 resolved that by moving stable releases to the collaborator-run
+Developer ID signing and notarisation pipeline documented in
+[`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md).
+The resulting Homebrew cask install path has been smoke-tested with
+Affinity Photo 2.
 
 ## What it does
 

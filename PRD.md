@@ -1,9 +1,10 @@
 # PRD: gmic-affinity — A Rust Photoshop Filter Plugin Bridging G'MIC and Affinity Photo
 
-**Version:** 0.1
-**Status:** **MVP shipped — 2026-05-17.** End-to-end pipeline working in
-Affinity Photo 2 (Serif store build, Apple Silicon, macOS 14+). Universal
-binary, ad-hoc signed, no Developer ID required for local use.
+**Version:** 0.2
+**Status:** **v0.2.0 shipped — 2026-05-25.** End-to-end pipeline working in
+Affinity Photo 2 and Affinity Photo v3. Stable releases are universal,
+Developer ID-signed, notarised, and distributed through both GitHub Releases
+and the `dstrupl/gmic-affinity` Homebrew tap.
 **Target platform:** macOS (Apple Silicon + Intel), Affinity Photo 2 and
 later (including Affinity by Canva v3).
 
@@ -102,7 +103,7 @@ Homebrew `gmic` present:
 | Affinity Photo 2 loads and lists the plugin       | ✅ shipped              |
 | Affinity Photo v3 loads and lists the plugin      | ✅ shipped (Phase 0 step 2 PASS on 2026-05-19; see release design doc §3) |
 | Distributed via GitHub release zip + `install.command` | ✅ shipped (universal `.plugin` zip, double-clickable installer; see [release design doc](./docs/design/2026-05-18-release-v0.1-distribution.md)) |
-| Distributed via Homebrew cask                     | 🟡 v0.2 (tap repo exists at `dstrupl/homebrew-gmic-affinity`, with cask still held behind the first collaborator-run signed/notarised release. Signed-release path is documented in [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md)) |
+| Distributed via Homebrew cask                     | ✅ shipped in v0.2.0 (`brew tap dstrupl/gmic-affinity && brew install --cask gmic-affinity`; signed/notarised release path documented in [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md)) |
 | Filter runs end-to-end on a real image            | ✅ shipped              |
 | Universal binary (arm64 + x86\_64)                | ✅ shipped              |
 | 8-bit RGB / RGBA / Greyscale                      | ✅ shipped              |
@@ -111,7 +112,7 @@ Homebrew `gmic` present:
 | 16-bit / 32-bit per-channel modes                 | ⛔ v2                   |
 | Parameter UI (catalogue picker + dynamic form)    | ✅ shipped (v2 — see `docs/design/2026-05-17-gmic-picker-dialog.md`) |
 | Tiled / chunked processing                        | ⛔ v2                   |
-| Notarised distribution / Apple Developer ID       | 🟡 release path ready   |
+| Notarised distribution / Apple Developer ID       | ✅ shipped in v0.2.0    |
 | G'MIC-Qt interactive GUI launch                   | ⛔ post-v1              |
 
 ---
@@ -128,8 +129,7 @@ Homebrew `gmic` present:
   the picker dialog now exposes the full catalogue with per-filter
   parameter editing; user state is persisted to
   `~/Library/Application Support/gmic-affinity/settings.json`.
-- **Ad-hoc manual zips until the first signed stable release.** Local
-  development and pre-release zips use ad-hoc signing; stable
+- **Ad-hoc signing remains for development and pre-releases.** Stable
   distribution uses the collaborator-run Developer ID + notarisation
   pipeline in `release/notarisation/SIGNING.md`.
 - **External binary dependency.** The plugin shells out to a Homebrew-
@@ -145,7 +145,7 @@ Homebrew `gmic` present:
 | ~~Parameter UI~~                  | ~~Either a native sheet via `filterSelectorParameters`, or launching `gmic_qt` standalone for filter picking.~~ Shipped in v2 via native Cocoa picker + dynamic parameter form. |
 | 16/32-bit support                 | Promote `tiff_io` to those depths, update PiPL `EnableInfo`. |
 | Tiled processing                  | Required to handle gigapixel images without OOM. |
-| Notarised cask distribution       | Run the collaborator-driven `make release RELEASE_VERSION=vX.Y.Z` pipeline from [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md). The signing/notarisation process and tap repo exist; the remaining v0.2 work is the first signed release and automated cask bump. |
+| Official `homebrew-cask` submission | Optional next distribution step after the private tap has a clean release history. |
 | Affinity v3 scripting integration | The v3 MCP/Scripts panel could invoke this plugin programmatically. |
 | Bundled `gmic`                    | Optional — could ship a vendored gmic binary so users do not need Homebrew. |
 

@@ -500,6 +500,12 @@ collaborator's machine and intentionally never reaches CI. See
 for the friend-facing setup and per-release walkthrough; design doc
 §12 for the rationale.
 
+**Current stable status.** `v0.2.0` shipped on 2026-05-25 through the
+stable pipeline. The GitHub release is signed/notarised, the Homebrew
+tap cask was bumped to `0.2.0`, `brew install --cask gmic-affinity`
+installs successfully, and Affinity Photo 2 has been smoke-tested
+against the cask-installed plugin.
+
 **Tagging.** Use semver. Stable tags are bare (`v0.2.0`); pre-release
 tags use a hyphenated suffix (`v0.2.0-rc.1`, `v0.2.0-beta.2`). Prefer
 signed annotated tags (`git tag -s vX.Y.Z -m "vX.Y.Z"`). The release
@@ -601,14 +607,14 @@ If a stable release is broken:
 is recoverable by re-running the install path from a known-good
 release.
 
-### Hard external deadline
+### Homebrew Gatekeeper deadline
 
 Homebrew ends support for casks that fail Gatekeeper checks on
 **2026-09-01**
 ([Homebrew/brew#20755](https://github.com/homebrew/brew/issues/20755)).
-The first stable signed release (v0.2.0) needs to ship before that,
-or the cask path is gone for good. The zip channel is unaffected and
-remains a working fallback. Full context: design doc §12.
+`v0.2.0` shipped before that deadline, so the private tap path is now
+viable. The manual zip channel remains a working fallback. Full
+context: design doc §12.
 
 ---
 
