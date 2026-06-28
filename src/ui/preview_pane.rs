@@ -130,31 +130,42 @@ impl PreviewView {
     /// Show the preview for `command` (or a placeholder if none exists)
     /// and the filter `description` as the caption.
     pub(crate) fn show(&self, command: &str, description: Option<&str>) {
-        match preview_path_for(command) {
+        let has_image = match preview_path_for(command) {
             Some(path) => self.set_image_from(&path),
-            None => unsafe { self.image.setImage(None) },
-        }
-        // The caption shows the description when one exists, otherwise
-        // a "no preview" hint. A nil image + this caption reads as
-        // "no preview" to the user.
-        match description {
-            Some(text) if !text.trim().is_empty() => unsafe {
-                self.caption.setStringValue(&NSString::from_str(text));
-            },
-            _ => unsafe {
-                self.caption
-                    .setStringValue(&NSString::from_str("No preview available"));
-            },
+            None => {
+                unsafe { self.image.setImage(None) };
+                false
+            }
+        };
+        // Caption priority: the filter's description when it has one;
+        // otherwise the "No preview available" hint, but only when there
+        // is no image (a visible preview with no description shows a
+        // blank caption rather than a contradictory "no preview" line).
+        let caption = match description {
+            Some(text) if !text.trim().is_empty() => text,
+            _ if has_image => "",
+            _ => "No preview available",
+        };
+        unsafe {
+            self.caption.setStringValue(&NSString::from_str(caption));
         }
     }
 
-    fn set_image_from(&self, path: &std::path::Path) {
+    /// Load and display the PNG at `path`. Returns whether an image was
+    /// actually set (false if the file failed to decode).
+    fn set_image_from(&self, path: &std::path::Path) -> bool {
         let ns = NSString::from_str(&path.to_string_lossy());
         let img: Option<Retained<NSImage>> =
             unsafe { NSImage::initWithContentsOfFile(NSImage::alloc(), &ns) };
         match img {
-            Some(image) => unsafe { self.image.setImage(Some(&image)) },
-            None => unsafe { self.image.setImage(None) },
+            Some(image) => {
+                unsafe { self.image.setImage(Some(&image)) };
+                true
+            }
+            None => {
+                unsafe { self.image.setImage(None) };
+                false
+            }
         }
     }
 
