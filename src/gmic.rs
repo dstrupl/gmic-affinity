@@ -118,6 +118,43 @@ impl From<std::io::Error> for GmicError {
     }
 }
 
+/// Resolve the actual gmic output file for an expected single-image
+/// output path. gmic writes `<stem>.<ext>` when the image list has
+/// exactly one image, but `<stem>_000000.<ext>`, `_000001`, … when a
+/// filter leaves multiple images (animations, or result+passthrough
+/// filters). Affinity accepts one image, so we use frame 0: prefer the
+/// exact path, else fall back to the `_000000` sibling.
+///
+/// Using frame 0 is a heuristic, not an invariant: it was chosen by
+/// inspecting a sample of multi-output filters, where frame 0 held the
+/// meaningful result (and the untouched original, when present, was a
+/// later frame). A filter that instead places the original at frame 0
+/// would yield the unprocessed input. See
+/// `docs/feature-requests/animation-import.md` for the fuller picture
+/// and the planned picker-level handling.
+pub(crate) fn resolve_output_path(expected: &Path) -> Option<PathBuf> {
+    if expected.exists() {
+        return Some(expected.to_path_buf());
+    }
+
+    // Construct frame-0 sibling: insert _000000 before the extension
+    let parent = expected.parent()?;
+    let stem = expected.file_stem()?.to_str()?;
+    let frame0_stem = format!("{}_000000", stem);
+
+    let frame0_path = if let Some(ext) = expected.extension() {
+        parent.join(format!("{}.{}", frame0_stem, ext.to_str()?))
+    } else {
+        parent.join(frame0_stem)
+    };
+
+    if frame0_path.exists() {
+        Some(frame0_path)
+    } else {
+        None
+    }
+}
+
 /// Find the Homebrew-installed `gmic`, preferring Apple Silicon's
 /// `/opt/homebrew/bin/gmic` over Intel's `/usr/local/bin/gmic`. The path is
 /// canonicalised so we don't follow surprise symlinks elsewhere.
@@ -475,8 +512,25 @@ fn run_with_tokens(fr: &mut FilterRecord, tokens: &[String]) -> Result<(), GmicE
     let argv = build_argv_from_tokens(&in_path, &out_path, tokens, buf.planes as u32)?;
     run_subprocess(&gmic, &argv, dir.path())?;
 
+    // Resolve the actual output path: gmic writes out.tif for single-image
+    // results, but out_000000.tif, out_000001.tif, … for multi-output filters.
+    // We use frame 0 as the single-image result for Affinity.
+    let actual_output = resolve_output_path(&out_path).ok_or_else(|| {
+        GmicError::Tiff(TiffError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("gmic produced no output at {}", out_path.display()),
+        )))
+    })?;
+
+    if actual_output != out_path {
+        log(&format!(
+            "multi-output filter: using frame 0 at {}",
+            actual_output.display()
+        ));
+    }
+
     read_tiff(
-        &out_path,
+        &actual_output,
         out_slice,
         buf.width as u32,
         buf.height as u32,
@@ -507,7 +561,26 @@ pub fn render_with_tokens(
     tmpdir: &Path,
 ) -> Result<(), GmicError> {
     let argv = build_argv_from_tokens(input, output, tokens, output_planes)?;
-    run_subprocess(gmic, &argv, tmpdir)
+    run_subprocess(gmic, &argv, tmpdir)?;
+
+    // Multi-output filters write output_000000.ext instead of output.ext.
+    // Promote frame 0 to the expected path so the caller's contract holds.
+    if !output.exists() {
+        if let Some(frame0) = resolve_output_path(output) {
+            if frame0 != output {
+                log(&format!(
+                    "multi-output filter: promoting {} to {}",
+                    frame0.display(),
+                    output.display()
+                ));
+                // Both files are in the same tmpdir, so rename should work
+                fs::rename(&frame0, output)?;
+            }
+        }
+        // If neither exists, leave as-is (caller treats absent output as skip)
+    }
+
+    Ok(())
 }
 
 fn reject_known_expensive_filter(
@@ -838,6 +911,76 @@ mod tests {
             output.iter().any(|&b| b != 0),
             "fx_ghost output should decode into RGBA bytes"
         );
+    }
+
+    #[test]
+    fn resolve_output_path_returns_exact_when_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let exact = dir.path().join("out.tif");
+        std::fs::write(&exact, b"fake").unwrap();
+
+        let result = resolve_output_path(&exact);
+        assert_eq!(result, Some(exact));
+    }
+
+    #[test]
+    fn resolve_output_path_returns_frame0_when_exact_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let exact = dir.path().join("out.tif");
+        let frame0 = dir.path().join("out_000000.tif");
+        std::fs::write(&frame0, b"fake").unwrap();
+
+        let result = resolve_output_path(&exact);
+        assert_eq!(result, Some(frame0));
+    }
+
+    #[test]
+    fn resolve_output_path_returns_none_when_neither_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let exact = dir.path().join("out.tif");
+
+        let result = resolve_output_path(&exact);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn resolve_output_path_handles_no_extension() {
+        let dir = tempfile::tempdir().unwrap();
+        let exact = dir.path().join("out");
+        let frame0 = dir.path().join("out_000000");
+        std::fs::write(&frame0, b"fake").unwrap();
+
+        let result = resolve_output_path(&exact);
+        assert_eq!(result, Some(frame0));
+    }
+
+    #[test]
+    #[ignore = "requires gmic"]
+    fn multi_output_filter_promotes_frame0() {
+        let gmic = locate_gmic().expect("gmic installed for this test");
+        let dir = tempfile::tempdir().unwrap();
+        // Create a tiny input image with gmic itself
+        let input = dir.path().join("in.tif");
+        let seed_argv: Vec<std::ffi::OsString> = vec![
+            "64,64,1,3".into(),
+            "-to_rgb".into(),
+            "-output".into(),
+            input.clone().into_os_string(),
+        ];
+        run_subprocess(&gmic, &seed_argv, dir.path()).unwrap();
+
+        // Run a multi-output filter (cl_colorWheel produces 2 images)
+        let output = dir.path().join("out.tif");
+        let tokens = filter_tokens("cl_colorWheel", &[]);
+        render_with_tokens(&gmic, &input, &output, &tokens, 3, dir.path()).unwrap();
+
+        // After the fix, render_with_tokens should have promoted frame 0
+        // to the expected output path
+        assert!(
+            output.exists(),
+            "output path should exist after multi-output filter"
+        );
+        assert!(std::fs::metadata(&output).unwrap().len() > 0);
     }
 }
 
