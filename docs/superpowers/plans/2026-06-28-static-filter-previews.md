@@ -1222,10 +1222,12 @@ mod tests {
     }
 
     #[test]
-    fn preview_filename_uses_sanitise_key() {
-        // The filename half must match what the generator wrote.
-        let key = sanitise_key("fx_oldphoto");
-        assert!(format!("{key}.png").ends_with(".png"));
+    fn preview_filename_stem_is_path_safe() {
+        // The filename stem the loader builds must contain no separators
+        // that would escape the previews dir — sanitise_key guarantees
+        // this and it's the contract the loader relies on.
+        let key = sanitise_key("foo/../bar baz");
+        assert!(!key.contains('/') && !key.contains('\\') && !key.contains(".."));
     }
 }
 ```
