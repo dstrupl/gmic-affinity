@@ -60,7 +60,7 @@ pub enum ParamKind {
         default: usize,
     },
     Color {
-        default_rgb: [u8; 3],
+        default_rgba: [u8; 4],
     },
     Text {
         default: String,

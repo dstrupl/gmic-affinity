@@ -91,9 +91,9 @@ fn default_cli_args(filter: &Filter) -> Vec<String> {
             ParamKind::Float { default, .. } => Some(format_float(*default)),
             ParamKind::Bool { default } => Some(if *default { "1" } else { "0" }.to_string()),
             ParamKind::Choice { default, .. } => Some(default.to_string()),
-            ParamKind::Color { default_rgb } => Some(format!(
-                "{},{},{}",
-                default_rgb[0], default_rgb[1], default_rgb[2]
+            ParamKind::Color { default_rgba } => Some(format!(
+                "{},{},{},{}",
+                default_rgba[0], default_rgba[1], default_rgba[2], default_rgba[3]
             )),
             ParamKind::Text { default } => Some(default.clone()),
             ParamKind::Internal { default, .. } => Some(default.clone()),

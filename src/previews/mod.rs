@@ -36,8 +36,11 @@ pub fn param_aligned_defaults(params: &[Param]) -> Vec<String> {
             ParamKind::Float { default, min, max } => format_float(default.clamp(*min, *max)),
             ParamKind::Bool { default } => if *default { "1" } else { "0" }.to_string(),
             ParamKind::Choice { default, .. } => default.to_string(),
-            ParamKind::Color { default_rgb } => {
-                format!("{},{},{}", default_rgb[0], default_rgb[1], default_rgb[2])
+            ParamKind::Color { default_rgba } => {
+                format!(
+                    "{},{},{},{}",
+                    default_rgba[0], default_rgba[1], default_rgba[2], default_rgba[3]
+                )
             }
             ParamKind::Text { default } => default.clone(),
             ParamKind::Internal { default, .. } => default.clone(),
@@ -50,21 +53,31 @@ pub fn param_aligned_defaults(params: &[Param]) -> Vec<String> {
 }
 
 /// Convert param-aligned values into the argv that gmic expects. Drops
-/// silent params (Note/Separator/Link/Unknown); passes value params
-/// through. In COMMIT 1, colors stay as one `"r,g,b"` token (COMMIT 2
-/// will expand them to 4 separate RGBA entries).
+/// silent params (Note/Separator/Link/Unknown); expands Color values
+/// from one `"r,g,b,a"` token into 4 separate argv entries; passes other
+/// value params through unchanged.
 pub fn values_to_argv(params: &[Param], values: &[String]) -> Vec<String> {
-    params
-        .iter()
-        .zip(values.iter())
-        .filter_map(|(param, value)| match &param.kind {
+    let mut argv = Vec::new();
+    for (param, value) in params.iter().zip(values.iter()) {
+        match &param.kind {
             ParamKind::Note(_)
             | ParamKind::Separator
             | ParamKind::Link { .. }
-            | ParamKind::Unknown(_) => None,
-            _ => Some(value.clone()),
-        })
-        .collect()
+            | ParamKind::Unknown(_) => {
+                // Silent params contribute nothing
+            }
+            ParamKind::Color { .. } => {
+                // COMMIT 2: expand "r,g,b,a" into 4 separate argv entries
+                for channel in value.split(',') {
+                    argv.push(channel.to_string());
+                }
+            }
+            _ => {
+                argv.push(value.clone());
+            }
+        }
+    }
+    argv
 }
 
 /// Build the argv the picker would send to gmic for `params` with
@@ -185,11 +198,12 @@ mod argv_tests {
     }
 
     #[test]
-    fn color_is_rgb_bytes() {
+    fn color_expands_to_four_channels() {
+        // COMMIT 2: Color expands to 4 separate argv entries
         let out = default_argv(&[p(ParamKind::Color {
-            default_rgb: [10, 20, 30],
+            default_rgba: [10, 20, 30, 40],
         })]);
-        assert_eq!(out, vec!["10,20,30"]);
+        assert_eq!(out, vec!["10", "20", "30", "40"]);
     }
 
     #[test]
@@ -372,5 +386,93 @@ mod commit1_tests {
         // Reconcile should preserve param-aligned structure
         assert_eq!(reconciled.len(), params.len());
         assert_eq!(reconciled, vec!["10", "", "1", "", "text"]);
+    }
+}
+
+#[cfg(test)]
+mod commit2_tests {
+    use super::{param_aligned_defaults, values_to_argv};
+    use crate::catalogue::{Param, ParamKind};
+
+    fn p(kind: ParamKind) -> Param {
+        Param {
+            label: "x".into(),
+            kind,
+        }
+    }
+
+    #[test]
+    fn color_value_expands_to_four_argv_entries() {
+        // COMMIT 2: Color "r,g,b,a" expands to 4 separate argv entries
+        let params = vec![
+            p(ParamKind::Int {
+                default: 1,
+                min: 0,
+                max: 10,
+            }),
+            p(ParamKind::Color {
+                default_rgba: [100, 150, 200, 250],
+            }),
+            p(ParamKind::Bool { default: true }),
+        ];
+        let values = vec!["5".into(), "10,20,30,40".into(), "1".into()];
+        let argv = values_to_argv(&params, &values);
+        // Int + 4 color channels + Bool = 6 entries
+        assert_eq!(argv, vec!["5", "10", "20", "30", "40", "1"]);
+    }
+
+    #[test]
+    fn param_aligned_defaults_color_is_four_values() {
+        // Color default in param-aligned form is "r,g,b,a"
+        let params = vec![p(ParamKind::Color {
+            default_rgba: [10, 20, 30, 40],
+        })];
+        let defaults = param_aligned_defaults(&params);
+        assert_eq!(defaults, vec!["10,20,30,40"]);
+    }
+
+    #[test]
+    fn multiple_colors_each_expand_to_four() {
+        let params = vec![
+            p(ParamKind::Color {
+                default_rgba: [1, 2, 3, 4],
+            }),
+            p(ParamKind::Int {
+                default: 99,
+                min: 0,
+                max: 100,
+            }),
+            p(ParamKind::Color {
+                default_rgba: [5, 6, 7, 8],
+            }),
+        ];
+        let values = vec!["11,12,13,14".into(), "50".into(), "21,22,23,24".into()];
+        let argv = values_to_argv(&params, &values);
+        // First color (4) + Int (1) + Second color (4) = 9 entries
+        assert_eq!(
+            argv,
+            vec!["11", "12", "13", "14", "50", "21", "22", "23", "24"]
+        );
+    }
+
+    #[test]
+    fn argv_length_grows_by_three_per_color() {
+        // A filter with N colors increases argv by 3N compared to no expansion
+        // (1 param-aligned token → 4 argv entries, net +3)
+        let params = vec![
+            p(ParamKind::Int {
+                default: 1,
+                min: 0,
+                max: 10,
+            }),
+            p(ParamKind::Color {
+                default_rgba: [0, 0, 0, 0],
+            }),
+            p(ParamKind::Bool { default: false }),
+        ];
+        let defaults = param_aligned_defaults(&params);
+        let argv = values_to_argv(&params, &defaults);
+        // Int (1) + Color (4) + Bool (1) = 6
+        assert_eq!(argv.len(), 6);
     }
 }

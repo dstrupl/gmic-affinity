@@ -219,14 +219,16 @@ unsafe fn continue_selector(fr: &mut FilterRecord, data: *mut isize) -> i16 {
     // Convert param-aligned values to gmic argv. chosen.args is
     // param-aligned (one entry per param, "" for silent params). We
     // look up the filter's params from the catalogue and derive the
-    // argv via values_to_argv (drops silent params; in commit 1 colors
-    // pass through unchanged as one token).
+    // argv via values_to_argv (drops silent params; expands Color
+    // "r,g,b,a" into 4 separate entries per commit 2).
     let cat = catalogue::builtin();
     let argv = if let Some(filter) = catalogue::lookup_filter(cat, &chosen.command) {
         previews::values_to_argv(&filter.params, &chosen.args)
     } else {
         // Filter not found in catalogue (removed / drift). Fall back
-        // to using chosen.args as-is and log it.
+        // to using chosen.args as-is. Note: this fallback cannot expand
+        // color values (we lack param metadata), so it's best-effort for
+        // removed or drifted filters.
         log(&format!(
             "CONTINUE: filter '{}' not in catalogue; using args as-is",
             chosen.command

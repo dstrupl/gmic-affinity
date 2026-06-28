@@ -483,52 +483,72 @@ fn parse_color(s: &str) -> ParamKind {
     let trimmed = s.trim();
     // Hex form (`#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`) is by far
     // the most common in user-contributed filters — `assets/gmic-
-    // catalogue.toc.txt` shows ~950 occurrences in v3.7.6. Alpha is
-    // dropped because our NSColorWell is RGB-only; users who want a
-    // specific alpha can edit it after the fact via the gmic argv
-    // override path.
+    // catalogue.toc.txt` shows ~950 occurrences in v3.7.6. COMMIT 2:
+    // preserve alpha (default to 255 if not present) so gmic receives
+    // the full 4-channel RGBA that gmic-qt sends.
     if let Some(hex) = trimmed.strip_prefix('#') {
-        if let Some(rgb) = parse_hex_rgb(hex) {
-            return ParamKind::Color { default_rgb: rgb };
+        if let Some(rgba) = parse_hex_rgba(hex) {
+            return ParamKind::Color { default_rgba: rgba };
         }
         return ParamKind::Unknown(sanitize_display(&format!("color({s})")));
     }
-    // Comma-separated RGB byte form (`color(255, 128, 0)`).
+    // Comma-separated byte form (`color(255, 128, 0)` or `color(255, 128, 0, 200)`).
     let parts: Vec<&str> = trimmed.split(',').map(str::trim).collect();
     if parts.len() != 3 && parts.len() != 4 {
-        // 3 = RGB, 4 = RGBA (drop alpha as above).
         return ParamKind::Unknown(sanitize_display(&format!("color({s})")));
     }
     match (parts[0].parse(), parts[1].parse(), parts[2].parse()) {
-        (Ok(r), Ok(g), Ok(b)) => ParamKind::Color {
-            default_rgb: [r, g, b],
-        },
+        (Ok(r), Ok(g), Ok(b)) => {
+            let a = if parts.len() == 4 {
+                parts[3].parse().unwrap_or(255)
+            } else {
+                255
+            };
+            ParamKind::Color {
+                default_rgba: [r, g, b, a],
+            }
+        }
         _ => ParamKind::Unknown(sanitize_display(&format!("color({s})"))),
     }
 }
 
 /// Decode `RGB`, `RGBA`, `RRGGBB`, or `RRGGBBAA` hex (case-insensitive,
-/// no leading `#`) into an RGB triple. Alpha is discarded.
-fn parse_hex_rgb(hex: &str) -> Option<[u8; 3]> {
+/// no leading `#`) into an RGBA quad. Alpha defaults to 255 if not present.
+fn parse_hex_rgba(hex: &str) -> Option<[u8; 4]> {
     let hex = hex.trim();
-    let (r, g, b) = match hex.len() {
-        3 | 4 => {
+    let (r, g, b, a) = match hex.len() {
+        3 => {
             // 4-bit-per-channel shorthand: expand each digit (`a` -> `0xaa`).
             let mut chars = hex.chars();
             let r = expand_nibble(chars.next()?)?;
             let g = expand_nibble(chars.next()?)?;
             let b = expand_nibble(chars.next()?)?;
-            (r, g, b)
+            (r, g, b, 255)
         }
-        6 | 8 => {
+        4 => {
+            let mut chars = hex.chars();
+            let r = expand_nibble(chars.next()?)?;
+            let g = expand_nibble(chars.next()?)?;
+            let b = expand_nibble(chars.next()?)?;
+            let a = expand_nibble(chars.next()?)?;
+            (r, g, b, a)
+        }
+        6 => {
             let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
             let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
             let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
-            (r, g, b)
+            (r, g, b, 255)
+        }
+        8 => {
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            let a = u8::from_str_radix(&hex[6..8], 16).ok()?;
+            (r, g, b, a)
         }
         _ => return None,
     };
-    Some([r, g, b])
+    Some([r, g, b, a])
 }
 
 fn expand_nibble(c: char) -> Option<u8> {
@@ -853,7 +873,7 @@ mod tests {
         assert_eq!(
             first_filter(&cat).params[0].kind,
             ParamKind::Color {
-                default_rgb: [255, 0, 128]
+                default_rgba: [255, 0, 128, 255]
             },
         );
     }
@@ -862,19 +882,67 @@ mod tests {
     fn parses_color_hex_with_alpha() {
         // `#RRGGBBAA` is by far the most common color form in
         // community filters (~950 occurrences in the bundled
-        // snapshot); regression-guard the alpha-stripping path.
+        // snapshot); now preserve alpha instead of dropping it.
         let cat = parse("#@gui A\n#@gui F : f\n#@gui : Border = color(#000000ff)\n").unwrap();
         assert_eq!(
             first_filter(&cat).params[0].kind,
             ParamKind::Color {
-                default_rgb: [0, 0, 0]
+                default_rgba: [0, 0, 0, 255]
             },
         );
         let cat = parse("#@gui A\n#@gui F : f\n#@gui : Tint = color(#abc)\n").unwrap();
         assert_eq!(
             first_filter(&cat).params[0].kind,
             ParamKind::Color {
-                default_rgb: [0xaa, 0xbb, 0xcc]
+                default_rgba: [0xaa, 0xbb, 0xcc, 255]
+            },
+        );
+    }
+
+    #[test]
+    fn parses_color_hex_preserves_alpha() {
+        // COMMIT 2: preserve alpha from hex colors
+        let cat = parse("#@gui A\n#@gui F : f\n#@gui : C = color(#ffff007f)\n").unwrap();
+        assert_eq!(
+            first_filter(&cat).params[0].kind,
+            ParamKind::Color {
+                default_rgba: [255, 255, 0, 127]
+            },
+        );
+    }
+
+    #[test]
+    fn parses_color_hex_no_alpha_defaults_255() {
+        // Hex without alpha → alpha=255
+        let cat = parse("#@gui A\n#@gui F : f\n#@gui : C = color(#000000)\n").unwrap();
+        assert_eq!(
+            first_filter(&cat).params[0].kind,
+            ParamKind::Color {
+                default_rgba: [0, 0, 0, 255]
+            },
+        );
+    }
+
+    #[test]
+    fn parses_color_comma_rgba() {
+        // Comma form with 4 parts preserves alpha
+        let cat = parse("#@gui A\n#@gui F : f\n#@gui : C = color(10,20,30,40)\n").unwrap();
+        assert_eq!(
+            first_filter(&cat).params[0].kind,
+            ParamKind::Color {
+                default_rgba: [10, 20, 30, 40]
+            },
+        );
+    }
+
+    #[test]
+    fn parses_color_comma_rgb_defaults_alpha_255() {
+        // Comma form with 3 parts → alpha=255
+        let cat = parse("#@gui A\n#@gui F : f\n#@gui : C = color(10,20,30)\n").unwrap();
+        assert_eq!(
+            first_filter(&cat).params[0].kind,
+            ParamKind::Color {
+                default_rgba: [10, 20, 30, 255]
             },
         );
     }

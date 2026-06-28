@@ -480,9 +480,17 @@ impl FormController {
                     let r = unsafe { rgb.redComponent() };
                     let g = unsafe { rgb.greenComponent() };
                     let b = unsafe { rgb.blueComponent() };
+                    let a = unsafe { rgb.alphaComponent() };
                     let to_byte =
                         |c: CGFloat| -> u8 { (c * 255.0).round().clamp(0.0, 255.0) as u8 };
-                    format!("{},{},{}", to_byte(r), to_byte(g), to_byte(b))
+                    // COMMIT 2: emit RGBA (4 values)
+                    format!(
+                        "{},{},{},{}",
+                        to_byte(r),
+                        to_byte(g),
+                        to_byte(b),
+                        to_byte(a)
+                    )
                 }
                 FormCell::Text { field } => {
                     let s = unsafe { field.stringValue() };
@@ -746,8 +754,8 @@ impl FormController {
             ParamKind::Choice { choices, default } => {
                 self.add_choice_row(mtm, &param.label, layout, prefill, choices, *default)
             }
-            ParamKind::Color { default_rgb } => {
-                self.add_color_row(mtm, &param.label, layout, prefill, *default_rgb)
+            ParamKind::Color { default_rgba } => {
+                self.add_color_row(mtm, &param.label, layout, prefill, *default_rgba)
             }
             ParamKind::Text { default } => {
                 self.add_text_row(mtm, &param.label, layout, prefill, default)
@@ -882,10 +890,10 @@ impl FormController {
         label: &str,
         layout: RowLayout,
         prefill: Option<&str>,
-        default_rgb: [u8; 3],
+        default_rgba: [u8; 4],
     ) -> RowOutcome {
         let label_h = self.add_control_label(mtm, label, layout);
-        let starting = prefill.and_then(parse_rgb_triple).unwrap_or(default_rgb);
+        let starting = prefill.and_then(parse_rgba_quad).unwrap_or(default_rgba);
         let well = self.add_color_well(mtm, layout.cell_x, layout.y, layout.cell_w, starting);
         RowOutcome::Rendered {
             cell: FormCell::Color { well },
@@ -1202,7 +1210,7 @@ impl FormController {
         x: CGFloat,
         y: CGFloat,
         w: CGFloat,
-        default_rgb: [u8; 3],
+        default_rgba: [u8; 4],
     ) -> Retained<NSColorWell> {
         // Color well is square-ish but takes the available width so
         // a divider drag does not squash it against the slider.
@@ -1215,11 +1223,13 @@ impl FormController {
         };
         let well: Retained<NSColorWell> = unsafe { NSColorWell::initWithFrame(mtm.alloc(), frame) };
         unsafe {
+            // COMMIT 2: enable alpha channel support
+            well.setSupportsAlpha(true);
             let color = NSColor::colorWithSRGBRed_green_blue_alpha(
-                default_rgb[0] as CGFloat / 255.0,
-                default_rgb[1] as CGFloat / 255.0,
-                default_rgb[2] as CGFloat / 255.0,
-                1.0,
+                default_rgba[0] as CGFloat / 255.0,
+                default_rgba[1] as CGFloat / 255.0,
+                default_rgba[2] as CGFloat / 255.0,
+                default_rgba[3] as CGFloat / 255.0,
             );
             well.setColor(&color);
             let v: &NSView = &well;
@@ -1277,18 +1287,24 @@ impl FormController {
     }
 }
 
-/// Decode an `"r,g,b"` triple of byte components, returning `None` if
-/// the string isn't well-formed. Whitespace around each component is
-/// allowed because the saved-args file is hand-editable.
-fn parse_rgb_triple(s: &str) -> Option<[u8; 3]> {
+/// Decode an `"r,g,b,a"` quad (or legacy `"r,g,b"` triple) of byte
+/// components, returning `None` if the string isn't well-formed.
+/// Whitespace around each component is allowed because the saved-args
+/// file is hand-editable. Legacy 3-part form defaults alpha to 255.
+fn parse_rgba_quad(s: &str) -> Option<[u8; 4]> {
     let parts: Vec<&str> = s.split(',').collect();
-    if parts.len() != 3 {
+    if parts.len() != 3 && parts.len() != 4 {
         return None;
     }
     let r = parts[0].trim().parse::<u8>().ok()?;
     let g = parts[1].trim().parse::<u8>().ok()?;
     let b = parts[2].trim().parse::<u8>().ok()?;
-    Some([r, g, b])
+    let a = if parts.len() == 4 {
+        parts[3].trim().parse::<u8>().ok()?
+    } else {
+        255
+    };
+    Some([r, g, b, a])
 }
 
 fn choice_starting_index(prefill: Option<&str>, choices: &[String], default: usize) -> usize {
