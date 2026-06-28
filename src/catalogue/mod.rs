@@ -4,6 +4,7 @@
 //! folders containing filters, each filter carrying a `command`, an
 //! optional `description`, and a flat parameter list.
 
+pub mod exclusion;
 pub mod parser;
 pub mod reconcile;
 
