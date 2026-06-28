@@ -92,6 +92,19 @@ pub struct ChosenFilter {
     pub args: Vec<String>,
 }
 
+/// Remove every excluded filter from the tree, then remove folders left
+/// with no children (recursively, so a folder of only-excluded filters
+/// disappears). See [`exclusion::is_excluded`].
+pub(crate) fn prune_excluded(folder: &mut Folder) {
+    folder.children.retain_mut(|child| match child {
+        Node::Filter(f) => !exclusion::is_excluded(&f.command),
+        Node::Folder(sub) => {
+            prune_excluded(sub);
+            !sub.children.is_empty()
+        }
+    });
+}
+
 /// Lazily-decoded bundled catalogue.
 ///
 /// The bytes are pulled in at compile time from
@@ -108,7 +121,9 @@ pub fn builtin() -> &'static Catalogue {
         flate2::read::GzDecoder::new(GZ)
             .read_to_string(&mut text)
             .expect("bundled gmic-catalogue.gmic.gz must decompress");
-        parser::parse(&text).expect("bundled gmic-catalogue.gmic.gz must parse")
+        let mut cat = parser::parse(&text).expect("bundled gmic-catalogue.gmic.gz must parse");
+        prune_excluded(&mut cat.root);
+        cat
     })
 }
 
@@ -244,5 +259,113 @@ mod path_tests {
     fn lookup_filter_returns_none_for_missing() {
         let cat = fixture();
         assert_eq!(lookup_filter(&cat, "fx_does_not_exist"), None);
+    }
+
+    #[test]
+    fn prune_removes_excluded_filters_and_empty_folders() {
+        // A folder containing only an excluded filter disappears; a
+        // folder with a surviving filter is kept (minus the excluded one).
+        let mut root = Folder {
+            name: String::new(),
+            children: vec![
+                Node::Folder(Folder {
+                    name: "OnlyExcluded".to_string(),
+                    children: vec![Node::Filter(Filter {
+                        display_name: "Blend".to_string(),
+                        command: "fx_blend".to_string(), // excluded (heuristic)
+                        description: None,
+                        params: vec![],
+                    })],
+                }),
+                Node::Folder(Folder {
+                    name: "Mixed".to_string(),
+                    children: vec![
+                        Node::Filter(Filter {
+                            display_name: "Old Photo".to_string(),
+                            command: "fx_old_photo".to_string(), // kept
+                            description: None,
+                            params: vec![],
+                        }),
+                        Node::Filter(Filter {
+                            display_name: "Interactive".to_string(),
+                            command: "fx_curves_interactive".to_string(), // excluded
+                            description: None,
+                            params: vec![],
+                        }),
+                    ],
+                }),
+            ],
+        };
+        prune_excluded(&mut root);
+        // OnlyExcluded folder gone; Mixed kept with just fx_old_photo.
+        assert_eq!(root.children.len(), 1);
+        let Node::Folder(mixed) = &root.children[0] else {
+            panic!("expected the Mixed folder to survive");
+        };
+        assert_eq!(mixed.name, "Mixed");
+        assert_eq!(mixed.children.len(), 1);
+        let Node::Filter(f) = &mixed.children[0] else {
+            panic!("expected a filter");
+        };
+        assert_eq!(f.command, "fx_old_photo");
+    }
+
+    #[test]
+    fn builtin_keeps_common_filters() {
+        // Guard: never over-prune the everyday filters.
+        let cat = builtin();
+        assert!(
+            lookup_filter(cat, "fx_old_photo").is_some(),
+            "fx_old_photo must survive pruning",
+        );
+    }
+
+    #[test]
+    #[ignore = "needs full baked list from Task 3"]
+    fn builtin_exclusion_count_is_within_sane_bounds() {
+        // Anti-cripple guardrail. These bounds are DELIBERATE: bump them
+        // CONSCIOUSLY when a catalogue/gmic change legitimately shifts the
+        // numbers — never silently to make a surprised test pass.
+        let pruned = builtin();
+        let kept = count_filters(&pruned.root);
+
+        // Reconstruct the unpruned count by parsing without the prune.
+        let total = unpruned_filter_count();
+        let excluded = total - kept;
+
+        assert!(
+            excluded >= 50,
+            "only {excluded} filters excluded — baked list/heuristics may have failed to load",
+        );
+        assert!(
+            excluded * 5 < total, // excluded < 20% of total
+            "{excluded}/{total} excluded (>=20%) — a change may be over-hiding filters",
+        );
+        assert!(
+            kept > 950,
+            "only {kept} filters kept — too few survived pruning"
+        );
+    }
+
+    fn count_filters(folder: &Folder) -> usize {
+        folder
+            .children
+            .iter()
+            .map(|c| match c {
+                Node::Filter(_) => 1,
+                Node::Folder(f) => count_filters(f),
+            })
+            .sum()
+    }
+
+    fn unpruned_filter_count() -> usize {
+        use std::io::Read;
+        const GZ: &[u8] = include_bytes!("../../assets/gmic-catalogue.gmic.gz");
+        let mut text = String::new();
+        flate2::read::GzDecoder::new(GZ)
+            .read_to_string(&mut text)
+            .expect("decompress");
+        let cat = parser::parse(&text).expect("parse");
+        count_filters(&cat.root)
     }
 }
