@@ -35,7 +35,7 @@ pub fn default_argv(params: &[Param]) -> Vec<String> {
     params
         .iter()
         .filter_map(|param| match &param.kind {
-            ParamKind::Int { default, min, max } => Some(default.clamp(min, max).to_string()),
+            ParamKind::Int { default, min, max } => Some((*default).clamp(*min, *max).to_string()),
             ParamKind::Float { default, min, max } => Some(format_float(default.clamp(*min, *max))),
             ParamKind::Bool { default } => Some(if *default { "1" } else { "0" }.to_string()),
             ParamKind::Choice { default, .. } => Some(default.to_string()),

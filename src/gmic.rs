@@ -493,6 +493,11 @@ fn run_with_tokens(fr: &mut FilterRecord, tokens: &[String]) -> Result<(), GmicE
 /// touches a `FilterRecord`: load `input`, apply `tokens`, force the
 /// colour model from `output_planes`, and write `output`. The argv caps
 /// and subprocess hardening are identical to the in-plugin path.
+///
+/// The dimension-keyed [`reject_known_expensive_filter`] guard is
+/// intentionally omitted here: the caller (the preview generator)
+/// controls the input size by rendering against one small fixed sample
+/// image, and each call is already timeout-bounded by `run_subprocess`.
 pub fn render_with_tokens(
     gmic: &Path,
     input: &Path,
