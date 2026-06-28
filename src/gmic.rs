@@ -124,6 +124,14 @@ impl From<std::io::Error> for GmicError {
 /// filter leaves multiple images (animations, or result+passthrough
 /// filters). Affinity accepts one image, so we use frame 0: prefer the
 /// exact path, else fall back to the `_000000` sibling.
+///
+/// Using frame 0 is a heuristic, not an invariant: it was chosen by
+/// inspecting a sample of multi-output filters, where frame 0 held the
+/// meaningful result (and the untouched original, when present, was a
+/// later frame). A filter that instead places the original at frame 0
+/// would yield the unprocessed input. See
+/// `docs/feature-requests/animation-import.md` for the fuller picture
+/// and the planned picker-level handling.
 pub(crate) fn resolve_output_path(expected: &Path) -> Option<PathBuf> {
     if expected.exists() {
         return Some(expected.to_path_buf());
@@ -949,7 +957,6 @@ mod tests {
     #[test]
     #[ignore = "requires gmic"]
     fn multi_output_filter_promotes_frame0() {
-        use std::io::Write;
         let gmic = locate_gmic().expect("gmic installed for this test");
         let dir = tempfile::tempdir().unwrap();
         // Create a tiny input image with gmic itself
@@ -961,7 +968,6 @@ mod tests {
             input.clone().into_os_string(),
         ];
         run_subprocess(&gmic, &seed_argv, dir.path()).unwrap();
-        let _ = &mut std::io::stderr().flush();
 
         // Run a multi-output filter (cl_colorWheel produces 2 images)
         let output = dir.path().join("out.tif");
