@@ -105,23 +105,37 @@ pub(crate) fn prune_excluded(folder: &mut Folder) {
     });
 }
 
-/// Lazily-decoded bundled catalogue.
+/// Lazily-decoded bundled catalogue (unpruned).
 ///
 /// The bytes are pulled in at compile time from
 /// `assets/gmic-catalogue.gmic.gz` (tracked via Git LFS). On first
 /// call we gunzip + parse once and cache the resulting `Catalogue`
-/// for the life of the process.
-static BUILTIN: OnceLock<Catalogue> = OnceLock::new();
+/// for the life of the process. This version includes ALL filters,
+/// including those marked for exclusion. Used by build tools that need
+/// to see every filter (e.g. the preview generator).
+static BUILTIN_UNPRUNED: OnceLock<Catalogue> = OnceLock::new();
 
-pub fn builtin() -> &'static Catalogue {
-    BUILTIN.get_or_init(|| {
+pub fn builtin_unpruned() -> &'static Catalogue {
+    BUILTIN_UNPRUNED.get_or_init(|| {
         use std::io::Read;
         const GZ: &[u8] = include_bytes!("../../assets/gmic-catalogue.gmic.gz");
         let mut text = String::new();
         flate2::read::GzDecoder::new(GZ)
             .read_to_string(&mut text)
             .expect("bundled gmic-catalogue.gmic.gz must decompress");
-        let mut cat = parser::parse(&text).expect("bundled gmic-catalogue.gmic.gz must parse");
+        parser::parse(&text).expect("bundled gmic-catalogue.gmic.gz must parse")
+    })
+}
+
+/// Lazily-decoded bundled catalogue (pruned).
+///
+/// This version has excluded filters removed via [`prune_excluded`].
+/// UI consumers should use this to avoid showing non-functional filters.
+static BUILTIN: OnceLock<Catalogue> = OnceLock::new();
+
+pub fn builtin() -> &'static Catalogue {
+    BUILTIN.get_or_init(|| {
+        let mut cat = builtin_unpruned().clone();
         prune_excluded(&mut cat.root);
         cat
     })
@@ -321,6 +335,34 @@ mod path_tests {
     }
 
     #[test]
+    fn builtin_unpruned_is_superset_of_builtin() {
+        // Verify that builtin_unpruned() contains MORE filters than builtin()
+        // and that excluded filters only exist in the unpruned version.
+        let unpruned = builtin_unpruned();
+        let pruned = builtin();
+
+        let unpruned_count = count_filters(&unpruned.root);
+        let pruned_count = count_filters(&pruned.root);
+
+        assert!(
+            unpruned_count > pruned_count,
+            "unpruned ({}) should have more filters than pruned ({})",
+            unpruned_count,
+            pruned_count
+        );
+
+        // fx_blur_angular is a known excluded filter
+        assert!(
+            lookup_filter(unpruned, "fx_blur_angular").is_some(),
+            "fx_blur_angular must exist in unpruned"
+        );
+        assert!(
+            lookup_filter(pruned, "fx_blur_angular").is_none(),
+            "fx_blur_angular must be excluded from pruned"
+        );
+    }
+
+    #[test]
     fn builtin_exclusion_count_is_within_sane_bounds() {
         // Anti-cripple guardrail. These bounds are DELIBERATE: bump them
         // CONSCIOUSLY when a catalogue/gmic change legitimately shifts the
@@ -328,8 +370,8 @@ mod path_tests {
         let pruned = builtin();
         let kept = count_filters(&pruned.root);
 
-        // Reconstruct the unpruned count by parsing without the prune.
-        let total = unpruned_filter_count();
+        // Use builtin_unpruned() to get the total count.
+        let total = count_filters(&builtin_unpruned().root);
         let excluded = total - kept;
 
         assert!(
@@ -355,16 +397,5 @@ mod path_tests {
                 Node::Folder(f) => count_filters(f),
             })
             .sum()
-    }
-
-    fn unpruned_filter_count() -> usize {
-        use std::io::Read;
-        const GZ: &[u8] = include_bytes!("../../assets/gmic-catalogue.gmic.gz");
-        let mut text = String::new();
-        flate2::read::GzDecoder::new(GZ)
-            .read_to_string(&mut text)
-            .expect("decompress");
-        let cat = parser::parse(&text).expect("parse");
-        count_filters(&cat.root)
     }
 }

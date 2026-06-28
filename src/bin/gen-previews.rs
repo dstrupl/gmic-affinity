@@ -114,7 +114,7 @@ fn main() {
     let source_hash = sha256_file(&cfg.source).expect("source image must exist");
     let version = gmic_version(&gmic);
 
-    let cat = catalogue::builtin();
+    let cat = catalogue::builtin_unpruned();
     let mut jobs = Vec::new();
     collect_jobs(&cat.root, &mut jobs);
     if let Some(only) = &cfg.only {
@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn collect_jobs_covers_every_filter() {
-        let cat = catalogue::builtin();
+        let cat = catalogue::builtin_unpruned();
         let mut jobs = Vec::new();
         collect_jobs(&cat.root, &mut jobs);
         // Sanity: the bundled catalogue has well over a thousand filters.
