@@ -4,6 +4,7 @@
 //! folders containing filters, each filter carrying a `command`, an
 //! optional `description`, and a flat parameter list.
 
+pub mod exclusion;
 pub mod parser;
 pub mod reconcile;
 
@@ -91,16 +92,31 @@ pub struct ChosenFilter {
     pub args: Vec<String>,
 }
 
-/// Lazily-decoded bundled catalogue.
+/// Remove every excluded filter from the tree, then remove folders left
+/// with no children (recursively, so a folder of only-excluded filters
+/// disappears). See [`exclusion::is_excluded`].
+pub(crate) fn prune_excluded(folder: &mut Folder) {
+    folder.children.retain_mut(|child| match child {
+        Node::Filter(f) => !exclusion::is_excluded(&f.command),
+        Node::Folder(sub) => {
+            prune_excluded(sub);
+            !sub.children.is_empty()
+        }
+    });
+}
+
+/// Lazily-decoded bundled catalogue (unpruned).
 ///
 /// The bytes are pulled in at compile time from
 /// `assets/gmic-catalogue.gmic.gz` (tracked via Git LFS). On first
 /// call we gunzip + parse once and cache the resulting `Catalogue`
-/// for the life of the process.
-static BUILTIN: OnceLock<Catalogue> = OnceLock::new();
+/// for the life of the process. This version includes ALL filters,
+/// including those marked for exclusion. Used by build tools that need
+/// to see every filter (e.g. the preview generator).
+static BUILTIN_UNPRUNED: OnceLock<Catalogue> = OnceLock::new();
 
-pub fn builtin() -> &'static Catalogue {
-    BUILTIN.get_or_init(|| {
+pub fn builtin_unpruned() -> &'static Catalogue {
+    BUILTIN_UNPRUNED.get_or_init(|| {
         use std::io::Read;
         const GZ: &[u8] = include_bytes!("../../assets/gmic-catalogue.gmic.gz");
         let mut text = String::new();
@@ -108,6 +124,20 @@ pub fn builtin() -> &'static Catalogue {
             .read_to_string(&mut text)
             .expect("bundled gmic-catalogue.gmic.gz must decompress");
         parser::parse(&text).expect("bundled gmic-catalogue.gmic.gz must parse")
+    })
+}
+
+/// Lazily-decoded bundled catalogue (pruned).
+///
+/// This version has excluded filters removed via [`prune_excluded`].
+/// UI consumers should use this to avoid showing non-functional filters.
+static BUILTIN: OnceLock<Catalogue> = OnceLock::new();
+
+pub fn builtin() -> &'static Catalogue {
+    BUILTIN.get_or_init(|| {
+        let mut cat = builtin_unpruned().clone();
+        prune_excluded(&mut cat.root);
+        cat
     })
 }
 
@@ -243,5 +273,129 @@ mod path_tests {
     fn lookup_filter_returns_none_for_missing() {
         let cat = fixture();
         assert_eq!(lookup_filter(&cat, "fx_does_not_exist"), None);
+    }
+
+    #[test]
+    fn prune_removes_excluded_filters_and_empty_folders() {
+        // A folder containing only an excluded filter disappears; a
+        // folder with a surviving filter is kept (minus the excluded one).
+        let mut root = Folder {
+            name: String::new(),
+            children: vec![
+                Node::Folder(Folder {
+                    name: "OnlyExcluded".to_string(),
+                    children: vec![Node::Filter(Filter {
+                        display_name: "Blend".to_string(),
+                        command: "fx_blend".to_string(), // excluded (heuristic)
+                        description: None,
+                        params: vec![],
+                    })],
+                }),
+                Node::Folder(Folder {
+                    name: "Mixed".to_string(),
+                    children: vec![
+                        Node::Filter(Filter {
+                            display_name: "Old Photo".to_string(),
+                            command: "fx_old_photo".to_string(), // kept
+                            description: None,
+                            params: vec![],
+                        }),
+                        Node::Filter(Filter {
+                            display_name: "Interactive".to_string(),
+                            command: "fx_curves_interactive".to_string(), // excluded
+                            description: None,
+                            params: vec![],
+                        }),
+                    ],
+                }),
+            ],
+        };
+        prune_excluded(&mut root);
+        // OnlyExcluded folder gone; Mixed kept with just fx_old_photo.
+        assert_eq!(root.children.len(), 1);
+        let Node::Folder(mixed) = &root.children[0] else {
+            panic!("expected the Mixed folder to survive");
+        };
+        assert_eq!(mixed.name, "Mixed");
+        assert_eq!(mixed.children.len(), 1);
+        let Node::Filter(f) = &mixed.children[0] else {
+            panic!("expected a filter");
+        };
+        assert_eq!(f.command, "fx_old_photo");
+    }
+
+    #[test]
+    fn builtin_keeps_common_filters() {
+        // Guard: never over-prune the everyday filters.
+        let cat = builtin();
+        assert!(
+            lookup_filter(cat, "fx_old_photo").is_some(),
+            "fx_old_photo must survive pruning",
+        );
+    }
+
+    #[test]
+    fn builtin_unpruned_is_superset_of_builtin() {
+        // Verify that builtin_unpruned() contains MORE filters than builtin()
+        // and that excluded filters only exist in the unpruned version.
+        let unpruned = builtin_unpruned();
+        let pruned = builtin();
+
+        let unpruned_count = count_filters(&unpruned.root);
+        let pruned_count = count_filters(&pruned.root);
+
+        assert!(
+            unpruned_count > pruned_count,
+            "unpruned ({}) should have more filters than pruned ({})",
+            unpruned_count,
+            pruned_count
+        );
+
+        // fx_blur_angular is a known excluded filter
+        assert!(
+            lookup_filter(unpruned, "fx_blur_angular").is_some(),
+            "fx_blur_angular must exist in unpruned"
+        );
+        assert!(
+            lookup_filter(pruned, "fx_blur_angular").is_none(),
+            "fx_blur_angular must be excluded from pruned"
+        );
+    }
+
+    #[test]
+    fn builtin_exclusion_count_is_within_sane_bounds() {
+        // Anti-cripple guardrail. These bounds are DELIBERATE: bump them
+        // CONSCIOUSLY when a catalogue/gmic change legitimately shifts the
+        // numbers — never silently to make a surprised test pass.
+        let pruned = builtin();
+        let kept = count_filters(&pruned.root);
+
+        // Use builtin_unpruned() to get the total count.
+        let total = count_filters(&builtin_unpruned().root);
+        let excluded = total - kept;
+
+        assert!(
+            excluded >= 50,
+            "only {excluded} filters excluded — baked list/heuristics may have failed to load",
+        );
+        assert!(
+            excluded * 5 < total, // excluded < 20% of total
+            "{excluded}/{total} excluded (>=20%) — a change may be over-hiding filters",
+        );
+        assert!(
+            kept > 950,
+            "only {kept} filters kept — too few survived pruning"
+        );
+    }
+
+    fn count_filters(folder: &Folder) -> usize {
+        folder
+            .children
+            .iter()
+            .map(|c| match c {
+                Node::Filter(_) => 1,
+                Node::Folder(f) => count_filters(f),
+            })
+            .sum()
     }
 }
