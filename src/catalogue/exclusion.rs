@@ -84,8 +84,8 @@ mod tests {
     #[test]
     fn baked_list_parses_ignoring_comments_and_blanks() {
         let set = baked_exclusions();
-        // A known seeded command is present; comments/blank lines are not.
-        assert!(set.contains("fx_blend"));
+        // A known command from the real baked list is present; comments/blank lines are not.
+        assert!(set.contains("fx_blocks3d"));
         assert!(!set.contains(""));
         assert!(!set.iter().any(|c| c.starts_with('#')));
     }
@@ -95,7 +95,7 @@ mod tests {
         // Heuristic-only hit (suffix not necessarily in the baked file).
         assert!(is_excluded("fx_curves_interactive"));
         // Baked-list hit.
-        assert!(is_excluded("fx_blend"));
+        assert!(is_excluded("fx_blocks3d"));
         // Neither.
         assert!(!is_excluded("fx_old_photo"));
     }

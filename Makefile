@@ -145,7 +145,7 @@ REZ_FLAGS := \
   -d "PRAGMA_ONCE=0" \
   -useDF
 
-.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy quality-metrics help pipl check-lfs refresh-catalogue picker-example audit-unsupported previews \
+.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy quality-metrics help pipl check-lfs refresh-catalogue picker-example audit-unsupported previews excluded-filters \
         release release-unsigned release-preflight release-build-signed \
         release-notarize release-staple release-verify release-publish release-bump-cask
 
@@ -628,6 +628,11 @@ refresh-catalogue:
 # when nothing changed is cheap. Requires the gmic CLI.
 previews: check-lfs
 	cargo run --release --bin gen-previews
+
+# Regenerate the committed filter-exclusion list from a preview render
+# pass (structural skips only). Requires the gmic CLI. Commit the result.
+excluded-filters: check-lfs
+	cargo run --release --bin gen-previews -- --emit-exclusions assets/excluded-filters.txt
 
 # Run the standalone Cocoa picker without installing the plugin. Forces
 # `--release` because the picker's manual modal-session pump trips an

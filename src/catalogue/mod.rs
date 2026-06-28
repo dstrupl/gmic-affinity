@@ -321,7 +321,6 @@ mod path_tests {
     }
 
     #[test]
-    #[ignore = "needs full baked list from Task 3"]
     fn builtin_exclusion_count_is_within_sane_bounds() {
         // Anti-cripple guardrail. These bounds are DELIBERATE: bump them
         // CONSCIOUSLY when a catalogue/gmic change legitimately shifts the
