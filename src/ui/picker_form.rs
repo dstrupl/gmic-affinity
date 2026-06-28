@@ -317,6 +317,14 @@ pub(crate) struct FormControllerIvars {
     /// here comes from the `'static` `Catalogue` interned in
     /// [`crate::catalogue::builtin`].
     current_filter: Cell<Option<*const Filter>>,
+    /// Optional handle to the preview pane (third split-view column).
+    /// Updated alongside the form whenever the selection changes so the
+    /// pre-rendered PNG + description track the chosen filter. Stored as
+    /// `Rc` because [`crate::ui::preview_pane::PreviewView`] is a plain
+    /// Rust struct, not an Objective-C object. Initialised to `None`;
+    /// `picker.rs` sets it via [`FormController::set_preview`] after both
+    /// the controller and the preview view have been built.
+    preview: RefCell<Option<std::rc::Rc<crate::ui::preview_pane::PreviewView>>>,
 }
 
 // `NSOutlineViewDelegate` inherits from `NSControlTextEditingDelegate`
@@ -373,12 +381,14 @@ declare_class! {
             let selected_row: isize = unsafe { outline.selectedRow() };
             if selected_row < 0 {
                 self.show_empty_placeholder();
+                self.reset_preview();
                 return;
             }
             let item: Option<Retained<NSObject>> =
                 unsafe { msg_send_id![&outline, itemAtRow: selected_row] };
             let Some(item) = item else {
                 self.show_empty_placeholder();
+                self.reset_preview();
                 return;
             };
             let item_obj: &objc2::runtime::AnyObject = &item;
@@ -390,8 +400,16 @@ declare_class! {
                     // routes through the single source of truth for
                     // prefill values.
                     self.show_filter_with_prefill(filter, None);
+                    // Update the preview pane (third column) to the
+                    // selected leaf's pre-rendered PNG + description.
+                    if let Some(preview) = self.ivars().preview.borrow().as_ref() {
+                        preview.show(&filter.command, filter.description.as_deref());
+                    }
                 }
-                None => self.show_empty_placeholder(),
+                None => {
+                    self.show_empty_placeholder();
+                    self.reset_preview();
+                }
             }
             if let Some(actions) = self.ivars().actions.get() {
                 actions.refresh_ok_enabled();
@@ -416,6 +434,7 @@ impl FormController {
             actions: OnceCell::new(),
             remembered: RefCell::new(remembered),
             current_filter: Cell::new(None),
+            preview: RefCell::new(None),
         });
         unsafe { msg_send_id![super(this), init] }
     }
@@ -425,6 +444,22 @@ impl FormController {
     /// `OnceCell` semantics prevent surprise re-registration.
     pub(crate) fn set_actions(&self, actions: Retained<crate::ui::picker_actions::PickerActions>) {
         let _ = self.ivars().actions.set(actions);
+    }
+
+    /// Wire the preview pane so selection changes update the third
+    /// split-view column. Called once from `picker.rs` after the
+    /// preview view is built. The controller keeps a clone of the `Rc`;
+    /// `picker.rs` keeps another alive until the modal pump exits.
+    pub(crate) fn set_preview(&self, preview: std::rc::Rc<crate::ui::preview_pane::PreviewView>) {
+        self.ivars().preview.replace(Some(preview));
+    }
+
+    /// Reset the preview pane to its placeholder (no image, "No preview
+    /// available" caption). Called for folder/empty selections.
+    fn reset_preview(&self) {
+        if let Some(preview) = self.ivars().preview.borrow().as_ref() {
+            preview.show("", None);
+        }
     }
 
     /// Expose the controller as an `NSOutlineViewDelegate` protocol
