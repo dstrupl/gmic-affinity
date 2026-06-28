@@ -8,7 +8,50 @@
 
 use sha2::{Digest, Sha256};
 
+use crate::catalogue::{Param, ParamKind};
+
 pub mod manifest;
+
+/// Format a float the way the picker's slider readback does: integers
+/// print without a decimal point, fractions keep up to 4 places with
+/// trailing zeros trimmed. Kept identical to the picker so previews
+/// match the argv a real OK click would send.
+pub fn format_float(v: f64) -> String {
+    if (v.round() - v).abs() < 1e-9 {
+        format!("{}", v.round() as i64)
+    } else {
+        let s = format!("{v:.4}");
+        s.trim_end_matches('0').trim_end_matches('.').to_string()
+    }
+}
+
+/// Build the argv the picker would send to gmic for `params` with
+/// every control left at its default. This MUST stay in lock-step with
+/// `FormController::collect_values` in `src/ui/picker_form.rs`: gmic
+/// receives a `Choice` as its selected *index*, a `Bool` as `"1"`/`"0"`,
+/// and presentation-only params (`Note`/`Separator`/`Link`/`Unknown`)
+/// contribute no argv entry at all.
+pub fn default_argv(params: &[Param]) -> Vec<String> {
+    params
+        .iter()
+        .filter_map(|param| match &param.kind {
+            ParamKind::Int { default, min, max } => Some(default.clamp(min, max).to_string()),
+            ParamKind::Float { default, min, max } => Some(format_float(default.clamp(*min, *max))),
+            ParamKind::Bool { default } => Some(if *default { "1" } else { "0" }.to_string()),
+            ParamKind::Choice { default, .. } => Some(default.to_string()),
+            ParamKind::Color { default_rgb } => Some(format!(
+                "{},{},{}",
+                default_rgb[0], default_rgb[1], default_rgb[2]
+            )),
+            ParamKind::Text { default } => Some(default.clone()),
+            ParamKind::Internal { default, .. } => Some(default.clone()),
+            ParamKind::Note(_)
+            | ParamKind::Separator
+            | ParamKind::Link { .. }
+            | ParamKind::Unknown(_) => None,
+        })
+        .collect()
+}
 
 /// Map a gmic command to a stable, filesystem-safe filename stem.
 ///
@@ -67,5 +110,92 @@ mod sanitise_tests {
     #[test]
     fn stable_for_same_input() {
         assert_eq!(sanitise_key("fx_painting"), sanitise_key("fx_painting"));
+    }
+}
+
+#[cfg(test)]
+mod argv_tests {
+    use super::{default_argv, format_float};
+    use crate::catalogue::{Param, ParamKind};
+
+    fn p(kind: ParamKind) -> Param {
+        Param {
+            label: "x".into(),
+            kind,
+        }
+    }
+
+    #[test]
+    fn format_float_trims_zeros() {
+        assert_eq!(format_float(0.5), "0.5");
+        assert_eq!(format_float(2.0), "2");
+        assert_eq!(format_float(1.2500), "1.25");
+    }
+
+    #[test]
+    fn int_is_clamped_default() {
+        let out = default_argv(&[p(ParamKind::Int {
+            default: 5,
+            min: 0,
+            max: 10,
+        })]);
+        assert_eq!(out, vec!["5"]);
+    }
+
+    #[test]
+    fn bool_is_one_or_zero() {
+        let out = default_argv(&[
+            p(ParamKind::Bool { default: true }),
+            p(ParamKind::Bool { default: false }),
+        ]);
+        assert_eq!(out, vec!["1", "0"]);
+    }
+
+    #[test]
+    fn choice_is_index_not_text() {
+        let out = default_argv(&[p(ParamKind::Choice {
+            choices: vec!["A".into(), "B".into(), "C".into()],
+            default: 2,
+        })]);
+        assert_eq!(out, vec!["2"]);
+    }
+
+    #[test]
+    fn color_is_rgb_bytes() {
+        let out = default_argv(&[p(ParamKind::Color {
+            default_rgb: [10, 20, 30],
+        })]);
+        assert_eq!(out, vec!["10,20,30"]);
+    }
+
+    #[test]
+    fn presentation_params_contribute_nothing() {
+        let out = default_argv(&[
+            p(ParamKind::Note("hi".into())),
+            p(ParamKind::Separator),
+            p(ParamKind::Link {
+                label: "L".into(),
+                url: "u".into(),
+            }),
+            p(ParamKind::Unknown("point(1,2)".into())),
+        ]);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn internal_contributes_default_verbatim() {
+        let out = default_argv(&[p(ParamKind::Internal {
+            label: "hidden".into(),
+            default: "0".into(),
+        })]);
+        assert_eq!(out, vec!["0"]);
+    }
+
+    #[test]
+    fn text_is_verbatim() {
+        let out = default_argv(&[p(ParamKind::Text {
+            default: "hello world".into(),
+        })]);
+        assert_eq!(out, vec!["hello world"]);
     }
 }
