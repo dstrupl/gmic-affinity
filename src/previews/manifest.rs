@@ -40,6 +40,52 @@ pub enum Action {
     Keep,
 }
 
+/// Hash exactly the inputs that change a rendered preview. A change in
+/// any of them flips the hash and triggers a recompute; catalogue
+/// folder/display-name moves are deliberately NOT included because they
+/// don't alter the rendered pixels.
+pub fn input_hash(source_hash: &str, gmic_version: &str, command: &str, args: &[String]) -> String {
+    let mut h = Sha256::new();
+    // Length-prefix each field so concatenation can't alias across
+    // boundaries (e.g. "ab"+"c" vs "a"+"bc").
+    for field in [source_hash, gmic_version, command] {
+        h.update((field.len() as u64).to_le_bytes());
+        h.update(field.as_bytes());
+    }
+    h.update((args.len() as u64).to_le_bytes());
+    for a in args {
+        h.update((a.len() as u64).to_le_bytes());
+        h.update(a.as_bytes());
+    }
+    format!("sha256:{:x}", h.finalize())
+}
+
+/// Decide whether a filter's preview must be regenerated.
+pub fn decide(entry: Option<&Entry>, computed_hash: &str, file_exists: bool) -> Action {
+    match entry {
+        None => Action::Recompute,
+        Some(e) if e.input_hash != computed_hash => Action::Recompute,
+        // A recorded success whose PNG vanished must be re-rendered.
+        Some(e) if e.status == EntryStatus::Ok && !file_exists => Action::Recompute,
+        Some(_) => Action::Keep,
+    }
+}
+
+/// Load a manifest, treating a missing or unparseable file as empty so
+/// the next build simply regenerates everything.
+pub fn load(path: &Path) -> Manifest {
+    match std::fs::read(path) {
+        Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_default(),
+        Err(_) => Manifest::default(),
+    }
+}
+
+/// Write the manifest as pretty JSON (stable key order via `BTreeMap`).
+pub fn save(path: &Path, m: &Manifest) -> std::io::Result<()> {
+    let json = serde_json::to_string_pretty(m).expect("manifest serialises");
+    std::fs::write(path, json)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -110,50 +156,4 @@ mod tests {
         let m = load(Path::new("/no/such/manifest.json"));
         assert!(m.entries.is_empty());
     }
-}
-
-/// Hash exactly the inputs that change a rendered preview. A change in
-/// any of them flips the hash and triggers a recompute; catalogue
-/// folder/display-name moves are deliberately NOT included because they
-/// don't alter the rendered pixels.
-pub fn input_hash(source_hash: &str, gmic_version: &str, command: &str, args: &[String]) -> String {
-    let mut h = Sha256::new();
-    // Length-prefix each field so concatenation can't alias across
-    // boundaries (e.g. "ab"+"c" vs "a"+"bc").
-    for field in [source_hash, gmic_version, command] {
-        h.update((field.len() as u64).to_le_bytes());
-        h.update(field.as_bytes());
-    }
-    h.update((args.len() as u64).to_le_bytes());
-    for a in args {
-        h.update((a.len() as u64).to_le_bytes());
-        h.update(a.as_bytes());
-    }
-    format!("sha256:{:x}", h.finalize())
-}
-
-/// Decide whether a filter's preview must be regenerated.
-pub fn decide(entry: Option<&Entry>, computed_hash: &str, file_exists: bool) -> Action {
-    match entry {
-        None => Action::Recompute,
-        Some(e) if e.input_hash != computed_hash => Action::Recompute,
-        // A recorded success whose PNG vanished must be re-rendered.
-        Some(e) if e.status == EntryStatus::Ok && !file_exists => Action::Recompute,
-        Some(_) => Action::Keep,
-    }
-}
-
-/// Load a manifest, treating a missing or unparseable file as empty so
-/// the next build simply regenerates everything.
-pub fn load(path: &Path) -> Manifest {
-    match std::fs::read(path) {
-        Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_default(),
-        Err(_) => Manifest::default(),
-    }
-}
-
-/// Write the manifest as pretty JSON (stable key order via `BTreeMap`).
-pub fn save(path: &Path, m: &Manifest) -> std::io::Result<()> {
-    let json = serde_json::to_string_pretty(m).expect("manifest serialises");
-    std::fs::write(path, json)
 }

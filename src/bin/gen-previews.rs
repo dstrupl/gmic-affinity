@@ -51,26 +51,6 @@ fn collect_jobs_dedup(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn collect_jobs_covers_every_filter() {
-        let cat = catalogue::builtin();
-        let mut jobs = Vec::new();
-        collect_jobs(&cat.root, &mut jobs);
-        // Sanity: the bundled catalogue has well over a thousand filters.
-        assert!(jobs.len() > 1000, "expected >1000 jobs, got {}", jobs.len());
-        // Keys must be unique so no two filters clobber each other's PNG.
-        let mut keys: Vec<&str> = jobs.iter().map(|j| j.key.as_str()).collect();
-        keys.sort_unstable();
-        let before = keys.len();
-        keys.dedup();
-        assert_eq!(before, keys.len(), "preview keys collided");
-    }
-}
-
 struct Config {
     source: PathBuf,
     out: PathBuf,
@@ -253,5 +233,25 @@ fn describe(e: &GmicError) -> String {
         GmicError::TimedOut { seconds } => format!("timeout after {seconds}s"),
         GmicError::Failed { status } => format!("gmic exit {status:?}"),
         other => format!("{other}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn collect_jobs_covers_every_filter() {
+        let cat = catalogue::builtin();
+        let mut jobs = Vec::new();
+        collect_jobs(&cat.root, &mut jobs);
+        // Sanity: the bundled catalogue has well over a thousand filters.
+        assert!(jobs.len() > 1000, "expected >1000 jobs, got {}", jobs.len());
+        // Keys must be unique so no two filters clobber each other's PNG.
+        let mut keys: Vec<&str> = jobs.iter().map(|j| j.key.as_str()).collect();
+        keys.sort_unstable();
+        let before = keys.len();
+        keys.dedup();
+        assert_eq!(before, keys.len(), "preview keys collided");
     }
 }
