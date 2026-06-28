@@ -1,6 +1,6 @@
 [package]
 name        = "gmic-affinity"
-version     = "0.2.0"
+version     = "0.3.0"
 edition     = "2021"
 authors     = ["dstrupl"]
 description = "Photoshop-compatible filter plugin for Affinity Photo on macOS that bridges G'MIC."

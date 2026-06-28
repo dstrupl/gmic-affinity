@@ -26,11 +26,11 @@
   <key>CFBundlePackageType</key>
   <string>8BFM</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.2.0</string>
+  <string>0.3.0</string>
   <key>CFBundleSignature</key>
   <string>8BIM</string>
   <key>CFBundleVersion</key>
-  <string>2</string>
+  <string>3</string>
   <!-- Legacy Carbon flag telling the Resource Manager to memory-map the
        .rsrc fork instead of copying it. We ship our pipl as
        Contents/Resources/GmicFilter.rsrc, and Affinity Photo 2 (which
