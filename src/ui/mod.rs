@@ -21,4 +21,6 @@ pub(crate) mod picker_catalogue_data_source;
 #[cfg(feature = "live")]
 pub(crate) mod picker_form;
 #[cfg(feature = "live")]
+pub(crate) mod preview_pane;
+#[cfg(feature = "live")]
 pub mod runloop;
