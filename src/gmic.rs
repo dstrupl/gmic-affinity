@@ -439,7 +439,7 @@ pub fn filter_tokens(command: &str, args: &[String]) -> Vec<String> {
 ///
 /// gmic accepts the bare form for any value that contains none of:
 ///   - a comma  (would split the parameter list)
-///   - leading or trailing whitespace (gmic trims those)
+///   - any whitespace (gmic splits unquoted args on whitespace)
 ///   - an embedded double quote (would close the quoted form)
 ///
 /// Anything else gets wrapped in `"..."` with internal `"` escaped
@@ -452,10 +452,8 @@ pub fn filter_tokens(command: &str, args: &[String]) -> Vec<String> {
 /// quoting, the embedded comma would silently split a 35-arg filter
 /// into a 36-arg one and shift every subsequent positional value.
 fn quote_gmic_arg(value: &str) -> String {
-    let needs_quoting = value.contains(',')
-        || value.contains('"')
-        || value.starts_with(|c: char| c.is_whitespace())
-        || value.ends_with(|c: char| c.is_whitespace());
+    let needs_quoting =
+        value.contains(',') || value.contains('"') || value.chars().any(|c| c.is_whitespace());
     if !needs_quoting {
         return value.to_string();
     }
@@ -1133,5 +1131,29 @@ mod tests_chosen {
         let mut fr = unsafe { std::mem::zeroed() };
         let err = run_filter_with(&mut fr, &chosen).err();
         assert!(!matches!(err, Some(GmicError::InvalidCharsInConfig)));
+    }
+
+    #[test]
+    fn quote_gmic_arg_with_internal_spaces() {
+        let quoted = quote_gmic_arg("1/2 - 1/4*cos(a)");
+        assert_eq!(quoted, "\"1/2 - 1/4*cos(a)\"");
+    }
+
+    #[test]
+    fn quote_gmic_arg_plain_value_unchanged() {
+        let plain = quote_gmic_arg("blur");
+        assert_eq!(plain, "blur");
+    }
+
+    #[test]
+    fn quote_gmic_arg_with_comma_is_quoted() {
+        let quoted = quote_gmic_arg("5,5");
+        assert_eq!(quoted, "\"5,5\"");
+    }
+
+    #[test]
+    fn quote_gmic_arg_with_embedded_quote_is_escaped() {
+        let quoted = quote_gmic_arg("he said \"hi\"");
+        assert_eq!(quoted, "\"he said \\\"hi\\\"\"");
     }
 }
