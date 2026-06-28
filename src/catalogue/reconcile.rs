@@ -173,4 +173,16 @@ mod tests {
         let out = reconcile(&["1".into()], &params);
         assert_eq!(out, vec!["0".to_string()]);
     }
+
+    #[test]
+    fn legacy_3part_color_value_is_kept() {
+        let params = vec![p(
+            "Color",
+            ParamKind::Color {
+                default_rgba: [0, 0, 0, 255],
+            },
+        )];
+        let out = reconcile(&["10,20,30".into()], &params);
+        assert_eq!(out, vec!["10,20,30".to_string()]);
+    }
 }
