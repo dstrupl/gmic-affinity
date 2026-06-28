@@ -36,6 +36,7 @@ use objc2_foundation::{
 };
 
 use crate::catalogue::{Filter, Param, ParamKind};
+use crate::previews::format_float;
 use crate::ui::picker_catalogue_data_source::CatalogueDataSource;
 
 /// Horizontal margin inside the form pane.
@@ -1296,22 +1297,6 @@ fn choice_starting_index(prefill: Option<&str>, choices: &[String], default: usi
             _ => choices.iter().position(|c| c == s).unwrap_or(default),
         },
         None => default,
-    }
-}
-
-/// Render a float as the minimum reasonable string we can feed back to
-/// `gmic` on the command line. Whole numbers ship as `"3"` (no
-/// gratuitous `".0"`), everything else rounds to four decimal places —
-/// the parser accepts a much wider precision but G'MIC sliders rarely
-/// have enough resolution to matter.
-fn format_float(v: f64) -> String {
-    if (v.round() - v).abs() < 1e-9 {
-        format!("{}", v.round() as i64)
-    } else {
-        let s = format!("{v:.4}");
-        // Trim trailing zeros after the decimal point so 0.5 doesn't
-        // come out as "0.5000".
-        s.trim_end_matches('0').trim_end_matches('.').to_string()
     }
 }
 

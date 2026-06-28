@@ -23,6 +23,7 @@ pub mod catalogue;
 pub mod filter;
 pub mod gmic;
 pub mod logging;
+pub mod previews;
 pub mod ps_data;
 pub mod ps_types;
 pub mod settings;
