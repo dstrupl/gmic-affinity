@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::logging::log;
 
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
 const RECENTS_CAP: usize = 10;
 const REMEMBERED_CAP: usize = 256;
 const FILE_BYTES_CAP: u64 = 256 * 1024;
@@ -183,7 +183,14 @@ fn load_from(path: &Path) -> Option<Settings> {
                 ));
                 return None;
             }
-            if s.version == 0 {
+            // Migrate from old versions: v0 and v1 used a different arg
+            // format (filtered argv with 3-channel colors), incompatible
+            // with the new param-aligned encoding (4-channel colors, one
+            // entry per param). Drop old-format args and let the next pick
+            // repopulate; other fields carry forward.
+            if s.version < 2 {
+                s.last = None;
+                s.remembered_args.clear();
                 s.version = SCHEMA_VERSION;
             }
             Some(s)
@@ -312,5 +319,65 @@ mod tests {
         std::fs::write(&path, r#"{"recent":[]}"#).unwrap();
         let s = load_from(&path).unwrap();
         assert_eq!(s.version, SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn v1_file_clears_args_on_migration() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let v1_json = r#"{
+            "version": 1,
+            "last": {
+                "command": "blur",
+                "args": ["3", "0", "1"],
+                "display_path": "Effects/Blur",
+                "ts": "old-ts"
+            },
+            "recent": [{"command": "blur", "display_path": "Effects/Blur", "ts": "old-ts"}],
+            "remembered_args": {
+                "blur": ["3", "0", "1"],
+                "sharpen": ["150"]
+            }
+        }"#;
+        std::fs::write(&path, v1_json).unwrap();
+        let s = load_from(&path).unwrap();
+        assert_eq!(s.version, 2);
+        assert!(s.last.is_none(), "v1 last should be cleared");
+        assert!(
+            s.remembered_args.is_empty(),
+            "v1 remembered_args should be cleared"
+        );
+        // recent is NOT arg-bearing, should be preserved
+        assert_eq!(s.recent.len(), 1);
+        assert_eq!(s.recent[0].command, "blur");
+    }
+
+    #[test]
+    fn v2_file_preserves_args() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let v2_json = r#"{
+            "version": 2,
+            "last": {
+                "command": "blur",
+                "args": ["3", "", "0,0,0,255"],
+                "display_path": "Effects/Blur",
+                "ts": "new-ts"
+            },
+            "recent": [],
+            "remembered_args": {
+                "blur": ["3", "", "0,0,0,255"]
+            }
+        }"#;
+        std::fs::write(&path, v2_json).unwrap();
+        let s = load_from(&path).unwrap();
+        assert_eq!(s.version, 2);
+        assert!(s.last.is_some(), "v2 last should be preserved");
+        assert_eq!(s.last.unwrap().args, vec!["3", "", "0,0,0,255"]);
+        assert_eq!(s.remembered_args.len(), 1);
+        assert_eq!(
+            s.remembered_args.get("blur").unwrap(),
+            &vec!["3", "", "0,0,0,255"]
+        );
     }
 }

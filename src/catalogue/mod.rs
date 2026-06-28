@@ -60,7 +60,7 @@ pub enum ParamKind {
         default: usize,
     },
     Color {
-        default_rgb: [u8; 3],
+        default_rgba: [u8; 4],
     },
     Text {
         default: String,
@@ -141,6 +141,29 @@ pub fn lookup_display_path(cat: &Catalogue, command: &str) -> Option<String> {
     walk(&cat.root, command, &mut Vec::new())
 }
 
+/// Return a reference to the filter whose `command` matches, or `None`
+/// if no filter has that command. Used by `continue_selector` to convert
+/// param-aligned values to gmic argv.
+pub fn lookup_filter<'a>(cat: &'a Catalogue, command: &str) -> Option<&'a Filter> {
+    fn walk<'a>(folder: &'a Folder, command: &str) -> Option<&'a Filter> {
+        for child in &folder.children {
+            match child {
+                Node::Folder(f) => {
+                    if let Some(found) = walk(f, command) {
+                        return Some(found);
+                    }
+                }
+                Node::Filter(f) if f.command == command => {
+                    return Some(f);
+                }
+                Node::Filter(_) => {}
+            }
+        }
+        None
+    }
+    walk(&cat.root, command)
+}
+
 #[cfg(test)]
 mod path_tests {
     use super::*;
@@ -198,5 +221,27 @@ mod path_tests {
     fn missing_command_returns_none() {
         let cat = fixture();
         assert_eq!(lookup_display_path(&cat, "fx_does_not_exist"), None);
+    }
+
+    #[test]
+    fn lookup_filter_finds_top_level() {
+        let cat = fixture();
+        let filter = lookup_filter(&cat, "fx_painting");
+        assert!(filter.is_some());
+        assert_eq!(filter.unwrap().command, "fx_painting");
+    }
+
+    #[test]
+    fn lookup_filter_finds_nested() {
+        let cat = fixture();
+        let filter = lookup_filter(&cat, "fx_bokeh");
+        assert!(filter.is_some());
+        assert_eq!(filter.unwrap().command, "fx_bokeh");
+    }
+
+    #[test]
+    fn lookup_filter_returns_none_for_missing() {
+        let cat = fixture();
+        assert_eq!(lookup_filter(&cat, "fx_does_not_exist"), None);
     }
 }

@@ -433,32 +433,36 @@ impl FormController {
         ProtocolObject::from_ref(self)
     }
 
-    /// Walk the current rows and produce one CLI string per *interactive*
-    /// parameter, in declaration order. Non-interactive cells (notes,
-    /// separators, links, unknowns) contribute nothing — they don't
-    /// take a value in gmic's argv either.
+    /// Walk the current rows and produce a param-aligned vector of values
+    /// (one entry per parameter in declaration order). Non-interactive
+    /// cells (notes, separators, links, unknowns) contribute `""`.
+    /// Internal params contribute their default verbatim.
+    ///
+    /// The result is what `ChosenFilter.args` carries and what
+    /// `reconcile` expects. To derive the gmic argv, use
+    /// `previews::values_to_argv(params, &values)`.
     ///
     /// Called by the OK button's action handler in T10.
     pub(crate) fn collect_values(&self) -> Vec<String> {
         let cells = self.ivars().cells.borrow();
         cells
             .iter()
-            .filter_map(|cell| match cell {
+            .map(|cell| match cell {
                 FormCell::Int { slider, min, max } => {
                     let v = unsafe { slider.doubleValue() }.round() as i64;
-                    Some(v.clamp(*min, *max).to_string())
+                    v.clamp(*min, *max).to_string()
                 }
                 FormCell::Float { slider, min, max } => {
                     let v = unsafe { slider.doubleValue() }.clamp(*min, *max);
-                    Some(format_float(v))
+                    format_float(v)
                 }
                 FormCell::Bool { button } => {
                     let on = unsafe { button.state() } == NSControlStateValueOn;
-                    Some(if on { "1" } else { "0" }.to_string())
+                    if on { "1" } else { "0" }.to_string()
                 }
                 FormCell::Choice { popup, .. } => {
                     let idx = unsafe { popup.indexOfSelectedItem() }.max(0);
-                    Some(idx.to_string())
+                    idx.to_string()
                 }
                 FormCell::Color { well } => {
                     let raw = unsafe { well.color() };
@@ -476,22 +480,30 @@ impl FormController {
                     let r = unsafe { rgb.redComponent() };
                     let g = unsafe { rgb.greenComponent() };
                     let b = unsafe { rgb.blueComponent() };
+                    let a = unsafe { rgb.alphaComponent() };
                     let to_byte =
                         |c: CGFloat| -> u8 { (c * 255.0).round().clamp(0.0, 255.0) as u8 };
-                    Some(format!("{},{},{}", to_byte(r), to_byte(g), to_byte(b)))
+                    // COMMIT 2: emit RGBA (4 values)
+                    format!(
+                        "{},{},{},{}",
+                        to_byte(r),
+                        to_byte(g),
+                        to_byte(b),
+                        to_byte(a)
+                    )
                 }
                 FormCell::Text { field } => {
                     let s = unsafe { field.stringValue() };
-                    Some(s.to_string())
+                    s.to_string()
                 }
-                FormCell::Static => None,
+                FormCell::Static => String::new(),
                 // Internal params are not user-editable but still need
                 // to appear in argv at their declared position, so we
                 // emit the stored default verbatim. This is how
                 // `value(0)` / `button(2)` filter declarations stay
                 // round-trippable through the picker even though no
                 // NSControl is bound to them.
-                FormCell::Internal { default } => Some(default.clone()),
+                FormCell::Internal { default } => default.clone(),
             })
             .collect()
     }
@@ -742,8 +754,8 @@ impl FormController {
             ParamKind::Choice { choices, default } => {
                 self.add_choice_row(mtm, &param.label, layout, prefill, choices, *default)
             }
-            ParamKind::Color { default_rgb } => {
-                self.add_color_row(mtm, &param.label, layout, prefill, *default_rgb)
+            ParamKind::Color { default_rgba } => {
+                self.add_color_row(mtm, &param.label, layout, prefill, *default_rgba)
             }
             ParamKind::Text { default } => {
                 self.add_text_row(mtm, &param.label, layout, prefill, default)
@@ -878,10 +890,10 @@ impl FormController {
         label: &str,
         layout: RowLayout,
         prefill: Option<&str>,
-        default_rgb: [u8; 3],
+        default_rgba: [u8; 4],
     ) -> RowOutcome {
         let label_h = self.add_control_label(mtm, label, layout);
-        let starting = prefill.and_then(parse_rgb_triple).unwrap_or(default_rgb);
+        let starting = prefill.and_then(parse_rgba_quad).unwrap_or(default_rgba);
         let well = self.add_color_well(mtm, layout.cell_x, layout.y, layout.cell_w, starting);
         RowOutcome::Rendered {
             cell: FormCell::Color { well },
@@ -1198,7 +1210,7 @@ impl FormController {
         x: CGFloat,
         y: CGFloat,
         w: CGFloat,
-        default_rgb: [u8; 3],
+        default_rgba: [u8; 4],
     ) -> Retained<NSColorWell> {
         // Color well is square-ish but takes the available width so
         // a divider drag does not squash it against the slider.
@@ -1211,11 +1223,13 @@ impl FormController {
         };
         let well: Retained<NSColorWell> = unsafe { NSColorWell::initWithFrame(mtm.alloc(), frame) };
         unsafe {
+            // COMMIT 2: enable alpha channel support
+            well.setSupportsAlpha(true);
             let color = NSColor::colorWithSRGBRed_green_blue_alpha(
-                default_rgb[0] as CGFloat / 255.0,
-                default_rgb[1] as CGFloat / 255.0,
-                default_rgb[2] as CGFloat / 255.0,
-                1.0,
+                default_rgba[0] as CGFloat / 255.0,
+                default_rgba[1] as CGFloat / 255.0,
+                default_rgba[2] as CGFloat / 255.0,
+                default_rgba[3] as CGFloat / 255.0,
             );
             well.setColor(&color);
             let v: &NSView = &well;
@@ -1273,18 +1287,24 @@ impl FormController {
     }
 }
 
-/// Decode an `"r,g,b"` triple of byte components, returning `None` if
-/// the string isn't well-formed. Whitespace around each component is
-/// allowed because the saved-args file is hand-editable.
-fn parse_rgb_triple(s: &str) -> Option<[u8; 3]> {
+/// Decode an `"r,g,b,a"` quad (or legacy `"r,g,b"` triple) of byte
+/// components, returning `None` if the string isn't well-formed.
+/// Whitespace around each component is allowed because the saved-args
+/// file is hand-editable. Legacy 3-part form defaults alpha to 255.
+fn parse_rgba_quad(s: &str) -> Option<[u8; 4]> {
     let parts: Vec<&str> = s.split(',').collect();
-    if parts.len() != 3 {
+    if parts.len() != 3 && parts.len() != 4 {
         return None;
     }
     let r = parts[0].trim().parse::<u8>().ok()?;
     let g = parts[1].trim().parse::<u8>().ok()?;
     let b = parts[2].trim().parse::<u8>().ok()?;
-    Some([r, g, b])
+    let a = if parts.len() == 4 {
+        parts[3].trim().parse::<u8>().ok()?
+    } else {
+        255
+    };
+    Some([r, g, b, a])
 }
 
 fn choice_starting_index(prefill: Option<&str>, choices: &[String], default: usize) -> usize {

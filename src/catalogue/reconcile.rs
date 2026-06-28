@@ -33,8 +33,9 @@ fn value_matches_kind(value: &str, kind: &ParamKind) -> bool {
         ParamKind::Bool { .. } => matches!(value, "true" | "false" | "0" | "1"),
         ParamKind::Choice { choices, .. } => choices.iter().any(|c| c == value),
         ParamKind::Color { .. } => {
-            value.split(',').count() == 3
-                && value.split(',').all(|c| c.trim().parse::<u8>().is_ok())
+            // COMMIT 2: accept 3 OR 4 comma-separated u8 parts (RGB or RGBA)
+            let count = value.split(',').count();
+            (count == 3 || count == 4) && value.split(',').all(|c| c.trim().parse::<u8>().is_ok())
         }
         ParamKind::Text { .. } => true,
         ParamKind::Note(_) | ParamKind::Separator | ParamKind::Link { .. } => true,
@@ -55,8 +56,11 @@ fn default_for(kind: &ParamKind) -> String {
         ParamKind::Choice { choices, default } => {
             choices.get(*default).cloned().unwrap_or_default()
         }
-        ParamKind::Color { default_rgb } => {
-            format!("{},{},{}", default_rgb[0], default_rgb[1], default_rgb[2],)
+        ParamKind::Color { default_rgba } => {
+            format!(
+                "{},{},{},{}",
+                default_rgba[0], default_rgba[1], default_rgba[2], default_rgba[3]
+            )
         }
         ParamKind::Text { default } => default.clone(),
         ParamKind::Note(_) | ParamKind::Separator | ParamKind::Link { .. } => String::new(),
@@ -168,5 +172,17 @@ mod tests {
         )];
         let out = reconcile(&["1".into()], &params);
         assert_eq!(out, vec!["0".to_string()]);
+    }
+
+    #[test]
+    fn legacy_3part_color_value_is_kept() {
+        let params = vec![p(
+            "Color",
+            ParamKind::Color {
+                default_rgba: [0, 0, 0, 255],
+            },
+        )];
+        let out = reconcile(&["10,20,30".into()], &params);
+        assert_eq!(out, vec!["10,20,30".to_string()]);
     }
 }

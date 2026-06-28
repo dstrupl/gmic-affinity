@@ -216,21 +216,49 @@ unsafe fn continue_selector(fr: &mut FilterRecord, data: *mut isize) -> i16 {
         return USER_CANCEL;
     };
 
+    // Convert param-aligned values to gmic argv. chosen.args is
+    // param-aligned (one entry per param, "" for silent params). We
+    // look up the filter's params from the catalogue and derive the
+    // argv via values_to_argv (drops silent params; expands Color
+    // "r,g,b,a" into 4 separate entries per commit 2).
+    let cat = catalogue::builtin();
+    let argv = if let Some(filter) = catalogue::lookup_filter(cat, &chosen.command) {
+        previews::values_to_argv(&filter.params, &chosen.args)
+    } else {
+        // Filter not found in catalogue (removed / drift). Fall back
+        // to using chosen.args as-is. Note: this fallback cannot expand
+        // color values (we lack param metadata), so it's best-effort for
+        // removed or drifted filters.
+        log(&format!(
+            "CONTINUE: filter '{}' not in catalogue; using args as-is",
+            chosen.command
+        ));
+        chosen.args.clone()
+    };
+
     log(&format!(
         "CONTINUE: invoking gmic::run_filter_with (cmd={} argc={}) in_data={:p} out_data={:p}",
         chosen.command,
-        chosen.args.len(),
+        argv.len(),
         fr.in_data,
         fr.out_data,
     ));
-    match gmic::run_filter_with(fr, &chosen) {
+
+    // Construct a transient ChosenFilter with the derived argv for the
+    // run. The stored chosen.args remains param-aligned in settings.
+    let chosen_for_run = catalogue::ChosenFilter {
+        command: chosen.command.clone(),
+        args: argv,
+    };
+
+    match gmic::run_filter_with(fr, &chosen_for_run) {
         Ok(()) => {
             log("CONTINUE: gmic::run_filter_with returned OK");
             clear_filter_rects(fr);
             NO_ERR
         }
         Err(e) => {
-            alert_gmic_error(&chosen, &e);
+            alert_gmic_error(&chosen_for_run, &e);
             log(&format!("CONTINUE: gmic failed: {e}"));
             USER_CANCEL
         }
