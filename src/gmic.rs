@@ -368,23 +368,33 @@ pub fn run_filter_with(
     //   Unknown command or filename '1-35'.
     // (The literal '1-35' is fx_paint_with_brush asking for "args
     // 1 through 35" of its declared parameter list.)
-    let command = if chosen.command.starts_with('-') {
-        chosen.command.clone()
+    let tokens = filter_tokens(&chosen.command, &chosen.args);
+    run_with_tokens(fr, &tokens)
+}
+
+/// Build the `[command, comma-joined-quoted-args]` token vector that a
+/// single gmic filter invocation expects. The command gets a leading
+/// `-` if it doesn't already have one; all args become ONE token,
+/// comma-joined with each value run through [`quote_gmic_arg`]. This is
+/// the single source of truth shared by `run_filter_with` (in-plugin)
+/// and the preview generator.
+pub fn filter_tokens(command: &str, args: &[String]) -> Vec<String> {
+    let command = if command.starts_with('-') {
+        command.to_string()
     } else {
-        format!("-{}", chosen.command)
+        format!("-{command}")
     };
-    let mut tokens: Vec<String> = Vec::with_capacity(2);
+    let mut tokens = Vec::with_capacity(2);
     tokens.push(command);
-    if !chosen.args.is_empty() {
-        let joined = chosen
-            .args
+    if !args.is_empty() {
+        let joined = args
             .iter()
             .map(|a| quote_gmic_arg(a))
             .collect::<Vec<_>>()
             .join(",");
         tokens.push(joined);
     }
-    run_with_tokens(fr, &tokens)
+    tokens
 }
 
 /// Quote a single parameter value according to gmic CLI rules so it
@@ -477,6 +487,24 @@ fn run_with_tokens(fr: &mut FilterRecord, tokens: &[String]) -> Result<(), GmicE
     Ok(())
 }
 
+/// Headless render path used by the build-time preview generator.
+///
+/// Unlike [`run_filter_with`], this takes file paths directly and never
+/// touches a `FilterRecord`: load `input`, apply `tokens`, force the
+/// colour model from `output_planes`, and write `output`. The argv caps
+/// and subprocess hardening are identical to the in-plugin path.
+pub fn render_with_tokens(
+    gmic: &Path,
+    input: &Path,
+    output: &Path,
+    tokens: &[String],
+    output_planes: u32,
+    tmpdir: &Path,
+) -> Result<(), GmicError> {
+    let argv = build_argv_from_tokens(input, output, tokens, output_planes)?;
+    run_subprocess(gmic, &argv, tmpdir)
+}
+
 fn reject_known_expensive_filter(
     tokens: &[String],
     width: u32,
@@ -500,7 +528,7 @@ fn reject_known_expensive_filter(
 /// becomes its own argv entry so `chosen.args` with spaces in a single
 /// parameter (text fields!) survive intact across the subprocess
 /// boundary. Same length / size caps as the file-based path.
-fn build_argv_from_tokens(
+pub(crate) fn build_argv_from_tokens(
     input: &Path,
     output: &Path,
     tokens: &[String],
@@ -672,6 +700,64 @@ mod tests {
         let p = locate_gmic().expect("gmic not found");
         assert!(p.exists());
         assert!(p.metadata().unwrap().permissions().mode() & 0o111 != 0);
+    }
+
+    #[test]
+    fn filter_tokens_prefixes_and_joins() {
+        // Bare command gets a leading '-'; all args become ONE comma-joined token.
+        let t = filter_tokens("fx_oldphoto", &["1".into(), "2".into()]);
+        assert_eq!(t, vec!["-fx_oldphoto".to_string(), "1,2".to_string()]);
+        // Already-prefixed command is left alone; no args => no second token.
+        let t2 = filter_tokens("-blur", &[]);
+        assert_eq!(t2, vec!["-blur".to_string()]);
+        // A value containing a comma is quoted so it stays one parameter.
+        let t3 = filter_tokens("fx_x", &["5,5".into(), "3".into()]);
+        assert_eq!(t3, vec!["-fx_x".to_string(), "\"5,5\",3".to_string()]);
+    }
+
+    #[test]
+    fn render_tokens_argv_shape() {
+        let in_p = PathBuf::from("/tmp/a/in.tif");
+        let out_p = PathBuf::from("/tmp/a/out.png");
+        let tokens = filter_tokens("fx_oldphoto", &["1".into()]);
+        let argv = build_argv_from_tokens(&in_p, &out_p, &tokens, 3).unwrap();
+        let strs: Vec<&str> = argv.iter().map(|s| s.to_str().unwrap()).collect();
+        assert_eq!(
+            strs,
+            vec![
+                "/tmp/a/in.tif",
+                "-fx_oldphoto",
+                "1",
+                "-to_rgb",
+                "-output",
+                "/tmp/a/out.png"
+            ],
+        );
+    }
+
+    #[test]
+    #[ignore = "requires gmic installed"]
+    fn render_with_tokens_produces_output() {
+        use std::io::Write;
+        let gmic = crate::gmic::locate_gmic().expect("gmic installed for this test");
+        let dir = tempfile::tempdir().unwrap();
+        // Synthesise a tiny input image with gmic itself so we don't need a fixture.
+        let input = dir.path().join("in.tif");
+        let seed_argv: Vec<std::ffi::OsString> = vec![
+            "64,64,1,3".into(),
+            "-to_rgb".into(),
+            "-output".into(),
+            input.clone().into_os_string(),
+        ];
+        // `64,64,1,3` tells gmic to allocate a 64x64x1x3 image.
+        crate::gmic::run_subprocess(&gmic, &seed_argv, dir.path()).unwrap();
+        let _ = &mut std::io::stderr().flush();
+
+        let output = dir.path().join("out.png");
+        let tokens = crate::gmic::filter_tokens("-blur", &["2".into()]);
+        crate::gmic::render_with_tokens(&gmic, &input, &output, &tokens, 3, dir.path()).unwrap();
+        assert!(output.exists());
+        assert!(std::fs::metadata(&output).unwrap().len() > 0);
     }
 
     #[test]
