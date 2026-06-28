@@ -52,7 +52,7 @@ gmic --version ────────┤
               gen-previews (build time)
                        │  per filter: default args → gmic run → PNG
                        ▼
-   previews/manifest.json + previews/<key>.png   (committed to repo)
+   previews/manifest.json + previews/<key>.png   (gitignored build artifact)
                        │  Makefile copies *.png
                        ▼
    GmicFilter.plugin/Contents/Resources/previews/<key>.png
@@ -101,7 +101,7 @@ run is an isolated subprocess. This is important across ~1200 filters.
 
 ## Manifest & up-to-date check
 
-`previews/manifest.json`, committed to git:
+`previews/manifest.json` (local build artifact, gitignored alongside the PNGs):
 
 ```json
 {
@@ -148,15 +148,23 @@ code. The generator prints `N recomputed, M unchanged, K skipped`.
   filters all render something meaningful. Tracked via Git LFS like the
   catalogue. License + source URL recorded in
   `assets/preview-source.LICENSE.txt`.
-- **Repo storage:** `previews/` at repo root holding `manifest.json` +
-  `<key>.png`. Committed as normal git objects (not LFS) — small PNGs
-  at this size diff well as additions/removals. Can move to LFS later
-  without code changes if size becomes a problem.
+- **Repo storage:** `previews/` is a **gitignored build artifact** —
+  NOT committed. It holds `manifest.json` + `<key>.png` (~200MB for
+  ~1000 PNGs at this size). The previews are fully reproducible from the
+  source image + catalogue + gmic, and `make previews` regenerates them
+  with a per-filter up-to-date check, so committing them would only
+  bloat history. A fresh clone has no previews until `make previews`
+  runs; the picker shows a "No preview available" placeholder for any
+  that are absent, so an un-generated checkout degrades gracefully.
+  (The manifest, living inside the ignored `previews/`, is therefore
+  also local-only: the up-to-date check is a developer-side incremental
+  convenience; a clean clone regenerates the whole set once.)
 - **Bundle layout:** the Makefile copies `previews/*.png` into
   `GmicFilter.plugin/Contents/Resources/previews/`. A `make previews`
   target runs the generator and is wired as a prerequisite ahead of
   `bundle` / `universal`. Because of the manifest check, a no-change
-  build does near-zero work.
+  rebuild does near-zero work; a first build (or fresh clone) generates
+  the full set (~1.5 min on a typical machine).
 
 ## UI integration (three-column layout — Approach A)
 

@@ -182,6 +182,11 @@ fn main() {
 
 /// Render a single filter. On any gmic failure the preview is skipped
 /// and recorded — the build never aborts on one bad filter.
+///
+/// Multi-output filters (animations, multi-frame) may write numbered frames
+/// like <key>_000000.png, <key>_000001.png instead of <key>.png. To prevent
+/// these stray frames from polluting the output directory, we render into
+/// the tempdir and copy only the expected single file to the final location.
 fn render_one(
     gmic: &Path,
     source: &Path,
@@ -195,12 +200,18 @@ fn render_one(
         Ok(d) => d,
         Err(e) => return skip(skipped, hash, format!("tempdir: {e}")),
     };
+    // Render into the tempdir to isolate any extra frames multi-output filters produce.
+    let tmp_out = dir.path().join(png_path.file_name().unwrap());
     // gmic infers RGB(3) output; the sample image is a colour photo.
     // `filter_tokens` reproduces EXACTLY what the picker sends: command
     // prefixed with `-`, args comma-joined into a single quoted token.
     let tokens = gmic::filter_tokens(&job.command, &job.args);
-    match gmic::render_with_tokens(gmic, source, png_path, &tokens, 3, dir.path()) {
-        Ok(()) if png_path.exists() => {
+    match gmic::render_with_tokens(gmic, source, &tmp_out, &tokens, 3, dir.path()) {
+        Ok(()) if tmp_out.exists() => {
+            // Copy the single expected file to the final location.
+            if let Err(e) = std::fs::copy(&tmp_out, png_path) {
+                return skip(skipped, hash, format!("copy output: {e}"));
+            }
             recomputed.fetch_add(1, Ordering::Relaxed);
             Entry {
                 input_hash: hash.to_string(),
@@ -209,12 +220,12 @@ fn render_one(
                 reason: None,
             }
         }
-        Ok(()) => skip(skipped, hash, "gmic produced no output file".to_string()),
-        Err(e) => {
-            // A failed render may have left a partial file; remove it.
-            let _ = std::fs::remove_file(png_path);
-            skip(skipped, hash, describe(&e))
+        Ok(()) => {
+            // Multi-output filter wrote frames under other names (or no output).
+            // Stray frames stay in tempdir and are auto-cleaned.
+            skip(skipped, hash, "gmic produced no output file".to_string())
         }
+        Err(e) => skip(skipped, hash, describe(&e)),
     }
 }
 
@@ -253,5 +264,58 @@ mod tests {
         let before = keys.len();
         keys.dedup();
         assert_eq!(before, keys.len(), "preview keys collided");
+    }
+
+    #[test]
+    #[ignore = "requires gmic"]
+    fn render_single_output_produces_one_file() {
+        // Verify that rendering a single-output filter into a temp output dir
+        // produces exactly one PNG with the expected name, no stray frames.
+        let gmic = match gmic::locate_gmic() {
+            Ok(path) => path,
+            Err(_) => {
+                eprintln!("gmic not found, skipping test");
+                return;
+            }
+        };
+        let source = PathBuf::from("assets/preview-source.tiff");
+        if !source.exists() {
+            eprintln!(
+                "source image not found at {}, skipping test",
+                source.display()
+            );
+            return;
+        }
+
+        let tmp_out_dir = tempfile::Builder::new()
+            .prefix("test-previews")
+            .tempdir()
+            .expect("create temp output dir");
+
+        // Use fx_old_photo, a known single-output filter.
+        let job = Job {
+            command: "fx_old_photo".to_string(),
+            args: vec![],
+            key: sanitise_key("fx_old_photo"),
+        };
+        let hash = "test-hash";
+        let skipped = AtomicUsize::new(0);
+        let recomputed = AtomicUsize::new(0);
+
+        let png_path = tmp_out_dir.path().join(format!("{}.png", job.key));
+        let entry = render_one(&gmic, &source, &png_path, &job, hash, &skipped, &recomputed);
+
+        // Should succeed.
+        assert_eq!(entry.status, EntryStatus::Ok, "render failed: {entry:?}");
+        assert_eq!(recomputed.load(Ordering::Relaxed), 1);
+        assert_eq!(skipped.load(Ordering::Relaxed), 0);
+
+        // Exactly one file in the output dir, named correctly.
+        let entries: Vec<_> = std::fs::read_dir(tmp_out_dir.path())
+            .expect("read output dir")
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(entries.len(), 1, "expected 1 file, found: {entries:?}");
+        assert_eq!(entries[0], format!("{}.png", job.key), "file name mismatch");
     }
 }

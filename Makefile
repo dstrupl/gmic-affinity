@@ -27,6 +27,8 @@ BUNDLE_PIPL   := $(BUNDLE)/Contents/Resources/PiPLs.json
 BUNDLE_RSRC   := $(BUNDLE)/Contents/Resources/GmicFilter.rsrc
 BUNDLE_PKGINFO:= $(BUNDLE)/Contents/PkgInfo
 BUNDLE_LPROJ  := $(BUNDLE)/Contents/Resources/en.lproj
+PREVIEWS_SRC    := previews
+BUNDLE_PREVIEWS := $(BUNDLE)/Contents/Resources/previews
 PLIST         := Info.plist
 PIPL_SRC      := PiPLs.json
 PIPL_RSRC_SRC := GmicFilter.r
@@ -143,7 +145,7 @@ REZ_FLAGS := \
   -d "PRAGMA_ONCE=0" \
   -useDF
 
-.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy quality-metrics help pipl check-lfs refresh-catalogue picker-example audit-unsupported \
+.PHONY: all bundle universal universal-install install uninstall clean test fmt clippy quality-metrics help pipl check-lfs refresh-catalogue picker-example audit-unsupported previews \
         release release-unsigned release-preflight release-build-signed \
         release-notarize release-staple release-verify release-publish release-bump-cask
 
@@ -221,6 +223,8 @@ bundle: check-lfs $(ARM_BUNDLE_BIN) $(PIPL_RSRC_OUT)
 	cp "$(PIPL_RSRC_OUT)" "$(BUNDLE_RSRC)"
 	printf '%s' '$(PKGINFO_TEXT)' > "$(BUNDLE_PKGINFO)"
 	rm -rf "$(BUNDLE_LPROJ)" && cp -R "$(LPROJ_SRC)" "$(BUNDLE_LPROJ)"
+	mkdir -p "$(BUNDLE_PREVIEWS)"
+	cp "$(PREVIEWS_SRC)"/*.png "$(BUNDLE_PREVIEWS)/" 2>/dev/null || true
 	codesign --force --deep --sign - "$(BUNDLE)"
 	@$(MAKE) --no-print-directory verify-bundle
 
@@ -233,6 +237,8 @@ universal: check-lfs $(ARM_BUNDLE_BIN) $(X86_BUNDLE_BIN) $(PIPL_RSRC_OUT)
 	cp "$(PIPL_RSRC_OUT)" "$(BUNDLE_RSRC)"
 	printf '%s' '$(PKGINFO_TEXT)' > "$(BUNDLE_PKGINFO)"
 	rm -rf "$(BUNDLE_LPROJ)" && cp -R "$(LPROJ_SRC)" "$(BUNDLE_LPROJ)"
+	mkdir -p "$(BUNDLE_PREVIEWS)"
+	cp "$(PREVIEWS_SRC)"/*.png "$(BUNDLE_PREVIEWS)/" 2>/dev/null || true
 	codesign --force --deep --sign - "$(BUNDLE)"
 	@$(MAKE) --no-print-directory verify-bundle
 
@@ -616,6 +622,12 @@ refresh-catalogue:
 	cargo test --test catalogue_snapshot
 	@echo ""; echo "refresh-catalogue: changes in assets/:"; \
 	 git status -- assets/
+
+# Regenerate filter previews. The generator does its own per-filter
+# up-to-date check against previews/manifest.json, so re-running this
+# when nothing changed is cheap. Requires the gmic CLI.
+previews: check-lfs
+	cargo run --release --bin gen-previews
 
 # Run the standalone Cocoa picker without installing the plugin. Forces
 # `--release` because the picker's manual modal-session pump trips an

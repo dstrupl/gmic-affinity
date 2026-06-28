@@ -1,0 +1,17 @@
+Preview sample image
+=====================
+File:       preview-source.tiff
+Source URL: https://commons.wikimedia.org/wiki/File:Brunette_woman_near_brick_wall_(Unsplash).jpg
+Origin:     https://unsplash.com/photos/ca9NRoZcSPA
+Author:     Martin Miranda (Unsplash: martinmiranda)
+License:    CC0 1.0 Universal — Public Domain Dedication
+            https://creativecommons.org/publicdomain/zero/1.0/
+Retrieved:  2026-06-28
+
+Original is a 4288x2848 JPEG photograph (Nikon D300). Downscaled to a
+512px max edge (512x340) and converted to RGB TIFF for use as the fixed
+input to build-time G'MIC filter previews. A real photograph is used
+(rather than artwork) so previews show how each filter affects an actual
+photo — skin tones, hair detail, and brick texture give varied content.
+
+See docs/superpowers/plans/2026-06-28-static-filter-previews.md.

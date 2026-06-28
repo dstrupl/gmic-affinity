@@ -8,6 +8,13 @@ Cargo.lock.bak
 # Build artifacts
 *.plugin/
 /dist/
+# Pre-computed filter previews are a build artifact: `make previews`
+# regenerates them (with a per-filter up-to-date check) into previews/,
+# and the bundle build copies them into the .plugin Resources. They are
+# large (~200MB) and reproducible, so they are NOT committed. A fresh
+# clone has none until `make previews` runs; the picker shows a
+# "No preview available" placeholder for any that are absent.
+/previews/
 # NB: GmicFilter.rsrc is NOT in this list. We commit it intentionally
 # so CI (which has no Adobe Photoshop SDK) can still build the bundle.
 # The Makefile re-runs Rez whenever the SDK is available; otherwise it

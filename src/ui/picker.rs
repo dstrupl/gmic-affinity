@@ -74,6 +74,10 @@ const TREE_PANE_MIN_WIDTH: CGFloat = 200.0;
 /// Minimum form-pane width — keeps slider + label rows readable even
 /// when the divider is dragged hard against the right edge.
 const FORM_PANE_MIN_WIDTH: CGFloat = 220.0;
+/// Initial width of the rightmost preview pane, in points.
+const PREVIEW_PANE_WIDTH: CGFloat = 280.0;
+/// Minimum preview-pane width so the image stays legible.
+const PREVIEW_PANE_MIN_WIDTH: CGFloat = 220.0;
 
 /// Open the picker panel and run it modally until the user dismisses it.
 ///
@@ -139,8 +143,22 @@ pub fn show_picker(
         outline.setDelegate(Some(form_controller.as_outline_view_delegate()));
     }
 
+    // Preview (right-most pane). A plain Rust struct wrapped in `Rc`:
+    // the form controller holds one clone and updates it on every
+    // selection change; we keep another clone alive here until after
+    // the modal pump exits so the AppKit views it owns aren't freed
+    // out from under the live panel.
+    let preview = std::rc::Rc::new(crate::ui::preview_pane::build_preview_view(mtm));
+    form_controller.set_preview(preview.clone());
+
     // Split view sits between the search bar and the button bar.
-    let split = build_split_view(mtm, content_bounds, &tree_scroll, &form_scroll);
+    let split = build_split_view(
+        mtm,
+        content_bounds,
+        &tree_scroll,
+        &form_scroll,
+        &preview.root,
+    );
 
     // Bottom button bar: Reset Defaults (leading) + Cancel/OK (trailing).
     let buttons = build_button_bar(mtm, content_bounds);
@@ -211,6 +229,10 @@ pub fn show_picker(
     drop(actions);
     drop(form_controller);
     drop(data_source);
+    // The preview view owns AppKit views still parented in the split
+    // view's hierarchy; drop it only after the modal pump has exited
+    // and the controller (its other `Rc` holder) is gone.
+    drop(preview);
 
     chosen
 }
@@ -220,7 +242,7 @@ fn build_picker_window(mtm: MainThreadMarker) -> Retained<NSWindow> {
     let initial_rect = CGRect {
         origin: CGPoint { x: 0.0, y: 0.0 },
         size: CGSize {
-            width: 720.0,
+            width: 1040.0,
             height: 520.0,
         },
     };
@@ -265,7 +287,7 @@ fn build_picker_window(mtm: MainThreadMarker) -> Retained<NSWindow> {
     // they're trying to resize it. ~520x360 still shows a useful
     // amount of the tree plus the search field.
     window.setMinSize(NSSize {
-        width: 520.0,
+        width: 760.0,
         height: 360.0,
     });
 
@@ -447,6 +469,7 @@ fn build_split_view(
     content_bounds: CGRect,
     tree: &NSScrollView,
     form: &NSScrollView,
+    preview: &NSView,
 ) -> Retained<NSSplitView> {
     // The split view sits between the search bar (top) and the
     // button bar (bottom). Cocoa's coordinate origin is bottom-left,
@@ -484,24 +507,32 @@ fn build_split_view(
         let form_view: &NSView = form;
         split.addSubview(tree_view);
         split.addSubview(form_view);
+        split.addSubview(preview);
         // NSSplitView only lays out its subviews when explicitly
-        // told to. Without this call AppKit leaves both panes at
+        // told to. Without this call AppKit leaves the panes at
         // their initial untouched 0×height frames and the panel
         // looks completely empty.
         split.adjustSubviews();
 
-        // Initial divider position: TREE_PANE_WIDTH_FRACTION of the
-        // split view's width, clamped so neither pane falls below its
-        // minimum.
+        // Three panes, two dividers. The tree takes its fraction of
+        // the width, the preview takes a fixed slice on the right, and
+        // the form gets the remainder — each clamped so no pane falls
+        // below its minimum.
         let total_width = frame.size.width;
-        let mut tree_width = total_width * TREE_PANE_WIDTH_FRACTION;
-        if tree_width < TREE_PANE_MIN_WIDTH {
-            tree_width = TREE_PANE_MIN_WIDTH;
+        let mut tree_width = (total_width * TREE_PANE_WIDTH_FRACTION).max(TREE_PANE_MIN_WIDTH);
+        let preview_width = PREVIEW_PANE_WIDTH
+            .min(total_width - TREE_PANE_MIN_WIDTH - FORM_PANE_MIN_WIDTH)
+            .max(PREVIEW_PANE_MIN_WIDTH);
+        if total_width - tree_width - preview_width < FORM_PANE_MIN_WIDTH {
+            tree_width = total_width - preview_width - FORM_PANE_MIN_WIDTH;
         }
-        if total_width - tree_width < FORM_PANE_MIN_WIDTH {
-            tree_width = total_width - FORM_PANE_MIN_WIDTH;
-        }
+        // Divider 0 between tree and form; divider 1 between form and
+        // preview.
         split.setPosition_ofDividerAtIndex(tree_width, 0);
+        split.setPosition_ofDividerAtIndex(
+            tree_width + (total_width - tree_width - preview_width),
+            1,
+        );
     }
     split
 }
