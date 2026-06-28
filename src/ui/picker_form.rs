@@ -433,32 +433,36 @@ impl FormController {
         ProtocolObject::from_ref(self)
     }
 
-    /// Walk the current rows and produce one CLI string per *interactive*
-    /// parameter, in declaration order. Non-interactive cells (notes,
-    /// separators, links, unknowns) contribute nothing — they don't
-    /// take a value in gmic's argv either.
+    /// Walk the current rows and produce a param-aligned vector of values
+    /// (one entry per parameter in declaration order). Non-interactive
+    /// cells (notes, separators, links, unknowns) contribute `""`.
+    /// Internal params contribute their default verbatim.
+    ///
+    /// The result is what `ChosenFilter.args` carries and what
+    /// `reconcile` expects. To derive the gmic argv, use
+    /// `previews::values_to_argv(params, &values)`.
     ///
     /// Called by the OK button's action handler in T10.
     pub(crate) fn collect_values(&self) -> Vec<String> {
         let cells = self.ivars().cells.borrow();
         cells
             .iter()
-            .filter_map(|cell| match cell {
+            .map(|cell| match cell {
                 FormCell::Int { slider, min, max } => {
                     let v = unsafe { slider.doubleValue() }.round() as i64;
-                    Some(v.clamp(*min, *max).to_string())
+                    v.clamp(*min, *max).to_string()
                 }
                 FormCell::Float { slider, min, max } => {
                     let v = unsafe { slider.doubleValue() }.clamp(*min, *max);
-                    Some(format_float(v))
+                    format_float(v)
                 }
                 FormCell::Bool { button } => {
                     let on = unsafe { button.state() } == NSControlStateValueOn;
-                    Some(if on { "1" } else { "0" }.to_string())
+                    if on { "1" } else { "0" }.to_string()
                 }
                 FormCell::Choice { popup, .. } => {
                     let idx = unsafe { popup.indexOfSelectedItem() }.max(0);
-                    Some(idx.to_string())
+                    idx.to_string()
                 }
                 FormCell::Color { well } => {
                     let raw = unsafe { well.color() };
@@ -478,20 +482,20 @@ impl FormController {
                     let b = unsafe { rgb.blueComponent() };
                     let to_byte =
                         |c: CGFloat| -> u8 { (c * 255.0).round().clamp(0.0, 255.0) as u8 };
-                    Some(format!("{},{},{}", to_byte(r), to_byte(g), to_byte(b)))
+                    format!("{},{},{}", to_byte(r), to_byte(g), to_byte(b))
                 }
                 FormCell::Text { field } => {
                     let s = unsafe { field.stringValue() };
-                    Some(s.to_string())
+                    s.to_string()
                 }
-                FormCell::Static => None,
+                FormCell::Static => String::new(),
                 // Internal params are not user-editable but still need
                 // to appear in argv at their declared position, so we
                 // emit the stored default verbatim. This is how
                 // `value(0)` / `button(2)` filter declarations stay
                 // round-trippable through the picker even though no
                 // NSControl is bound to them.
-                FormCell::Internal { default } => Some(default.clone()),
+                FormCell::Internal { default } => default.clone(),
             })
             .collect()
     }

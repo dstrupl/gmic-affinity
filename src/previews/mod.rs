@@ -25,6 +25,48 @@ pub fn format_float(v: f64) -> String {
     }
 }
 
+/// Build a param-aligned vector of default values (one entry per param
+/// in order). Silent params (Note/Separator/Link/Unknown) become `""`.
+/// This is what `ChosenFilter.args` carries and what `reconcile` expects.
+pub fn param_aligned_defaults(params: &[Param]) -> Vec<String> {
+    params
+        .iter()
+        .map(|param| match &param.kind {
+            ParamKind::Int { default, min, max } => (*default).clamp(*min, *max).to_string(),
+            ParamKind::Float { default, min, max } => format_float(default.clamp(*min, *max)),
+            ParamKind::Bool { default } => if *default { "1" } else { "0" }.to_string(),
+            ParamKind::Choice { default, .. } => default.to_string(),
+            ParamKind::Color { default_rgb } => {
+                format!("{},{},{}", default_rgb[0], default_rgb[1], default_rgb[2])
+            }
+            ParamKind::Text { default } => default.clone(),
+            ParamKind::Internal { default, .. } => default.clone(),
+            ParamKind::Note(_)
+            | ParamKind::Separator
+            | ParamKind::Link { .. }
+            | ParamKind::Unknown(_) => String::new(),
+        })
+        .collect()
+}
+
+/// Convert param-aligned values into the argv that gmic expects. Drops
+/// silent params (Note/Separator/Link/Unknown); passes value params
+/// through. In COMMIT 1, colors stay as one `"r,g,b"` token (COMMIT 2
+/// will expand them to 4 separate RGBA entries).
+pub fn values_to_argv(params: &[Param], values: &[String]) -> Vec<String> {
+    params
+        .iter()
+        .zip(values.iter())
+        .filter_map(|(param, value)| match &param.kind {
+            ParamKind::Note(_)
+            | ParamKind::Separator
+            | ParamKind::Link { .. }
+            | ParamKind::Unknown(_) => None,
+            _ => Some(value.clone()),
+        })
+        .collect()
+}
+
 /// Build the argv the picker would send to gmic for `params` with
 /// every control left at its default. This MUST stay in lock-step with
 /// `FormController::collect_values` in `src/ui/picker_form.rs`: gmic
@@ -32,25 +74,7 @@ pub fn format_float(v: f64) -> String {
 /// and presentation-only params (`Note`/`Separator`/`Link`/`Unknown`)
 /// contribute no argv entry at all.
 pub fn default_argv(params: &[Param]) -> Vec<String> {
-    params
-        .iter()
-        .filter_map(|param| match &param.kind {
-            ParamKind::Int { default, min, max } => Some((*default).clamp(*min, *max).to_string()),
-            ParamKind::Float { default, min, max } => Some(format_float(default.clamp(*min, *max))),
-            ParamKind::Bool { default } => Some(if *default { "1" } else { "0" }.to_string()),
-            ParamKind::Choice { default, .. } => Some(default.to_string()),
-            ParamKind::Color { default_rgb } => Some(format!(
-                "{},{},{}",
-                default_rgb[0], default_rgb[1], default_rgb[2]
-            )),
-            ParamKind::Text { default } => Some(default.clone()),
-            ParamKind::Internal { default, .. } => Some(default.clone()),
-            ParamKind::Note(_)
-            | ParamKind::Separator
-            | ParamKind::Link { .. }
-            | ParamKind::Unknown(_) => None,
-        })
-        .collect()
+    values_to_argv(params, &param_aligned_defaults(params))
 }
 
 /// Map a gmic command to a stable, filesystem-safe filename stem.
@@ -197,5 +221,156 @@ mod argv_tests {
             default: "hello world".into(),
         })]);
         assert_eq!(out, vec!["hello world"]);
+    }
+}
+
+#[cfg(test)]
+mod commit1_tests {
+    use super::{default_argv, param_aligned_defaults, values_to_argv};
+    use crate::catalogue::{Param, ParamKind};
+
+    fn p(kind: ParamKind) -> Param {
+        Param {
+            label: "x".into(),
+            kind,
+        }
+    }
+
+    #[test]
+    fn param_aligned_defaults_produces_one_entry_per_param() {
+        let params = vec![
+            p(ParamKind::Int {
+                default: 5,
+                min: 0,
+                max: 10,
+            }),
+            p(ParamKind::Note("info".into())),
+            p(ParamKind::Bool { default: true }),
+            p(ParamKind::Separator),
+            p(ParamKind::Float {
+                default: 2.5,
+                min: 0.0,
+                max: 10.0,
+            }),
+        ];
+        let defaults = param_aligned_defaults(&params);
+        assert_eq!(defaults.len(), params.len());
+        assert_eq!(defaults, vec!["5", "", "1", "", "2.5"]);
+    }
+
+    #[test]
+    fn values_to_argv_drops_silent_params() {
+        let params = vec![
+            p(ParamKind::Int {
+                default: 10,
+                min: 0,
+                max: 100,
+            }),
+            p(ParamKind::Note("skip".into())),
+            p(ParamKind::Bool { default: false }),
+            p(ParamKind::Separator),
+            p(ParamKind::Text {
+                default: "text".into(),
+            }),
+            p(ParamKind::Link {
+                label: "L".into(),
+                url: "u".into(),
+            }),
+        ];
+        let values = vec![
+            "42".into(),
+            "".into(),
+            "1".into(),
+            "".into(),
+            "hello".into(),
+            "".into(),
+        ];
+        let argv = values_to_argv(&params, &values);
+        // Only Int, Bool, Text should survive
+        assert_eq!(argv, vec!["42", "1", "hello"]);
+    }
+
+    #[test]
+    fn values_to_argv_keeps_order() {
+        let params = vec![
+            p(ParamKind::Int {
+                default: 0,
+                min: 0,
+                max: 10,
+            }),
+            p(ParamKind::Float {
+                default: 0.0,
+                min: 0.0,
+                max: 1.0,
+            }),
+            p(ParamKind::Bool { default: false }),
+            p(ParamKind::Text { default: "".into() }),
+        ];
+        let values = vec!["7".into(), "0.5".into(), "1".into(), "foo".into()];
+        let argv = values_to_argv(&params, &values);
+        assert_eq!(argv, vec!["7", "0.5", "1", "foo"]);
+    }
+
+    #[test]
+    fn default_argv_unchanged_for_no_silent_params() {
+        // A filter with no Note/Separator/Link/Unknown should produce
+        // the same output as before (via the new param_aligned→argv path)
+        let params = vec![
+            p(ParamKind::Int {
+                default: 3,
+                min: 0,
+                max: 10,
+            }),
+            p(ParamKind::Bool { default: true }),
+            p(ParamKind::Choice {
+                choices: vec!["A".into(), "B".into()],
+                default: 1,
+            }),
+        ];
+        let argv = default_argv(&params);
+        assert_eq!(argv, vec!["3", "1", "1"]);
+    }
+
+    #[test]
+    fn default_argv_drops_silent_params() {
+        let params = vec![
+            p(ParamKind::Note("intro".into())),
+            p(ParamKind::Int {
+                default: 5,
+                min: 0,
+                max: 10,
+            }),
+            p(ParamKind::Separator),
+            p(ParamKind::Bool { default: false }),
+        ];
+        let argv = default_argv(&params);
+        // Only Int and Bool
+        assert_eq!(argv, vec!["5", "0"]);
+    }
+
+    #[test]
+    fn round_trip_param_aligned_defaults_through_reconcile_aligned() {
+        use crate::catalogue::reconcile::reconcile;
+
+        let params = vec![
+            p(ParamKind::Int {
+                default: 10,
+                min: 0,
+                max: 100,
+            }),
+            p(ParamKind::Note("skip".into())),
+            p(ParamKind::Bool { default: true }),
+            p(ParamKind::Separator),
+            p(ParamKind::Text {
+                default: "text".into(),
+            }),
+        ];
+
+        let defaults = param_aligned_defaults(&params);
+        let reconciled = reconcile(&defaults, &params);
+
+        // Reconcile should preserve param-aligned structure
+        assert_eq!(reconciled.len(), params.len());
+        assert_eq!(reconciled, vec!["10", "", "1", "", "text"]);
     }
 }
