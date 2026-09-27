@@ -171,6 +171,29 @@ Copy the full quoted string — that's your `DEVELOPER_ID_APP_SIGNATURE`
 in the next step. If nothing matches, generate the certificate via
 Xcode (see prerequisites above) and re-run.
 
+On newer macOS releases, Certificate Assistant can place the private key in
+the data-protection keychain. Keychain Access and Xcode then show the
+certificate and private key, but `security find-identity` and `codesign` report
+that no identity exists. Migrate only that identity into the legacy login
+keychain with the repository helper:
+
+```bash
+scripts/migrate-signing-identity.sh \
+  "Developer ID Application: Your Name (TEAMID)"
+```
+
+The helper creates a private directory under `/private/tmp`, pauses while you
+export the selected private key from Keychain Access to the unique `.p12` path
+in `Downloads` that it prints, moves the encrypted file into the private
+directory immediately, imports it through `security(1)`'s hidden terminal
+password prompt, performs a real disposable signing test, and deletes both
+possible export paths on every exit path. Type the export password when
+prompted; terminal input is not echoed. The password is never passed to the
+script or placed in process arguments. Because APFS snapshots and SSD wear
+levelling make per-file secure overwrites unreliable, the temporary copy is
+protected by PKCS#12 encryption and prompt deletion rather than a misleading
+"secure erase" claim.
+
 ### 3. Save your notary credentials in the keychain
 
 This is the only local place the Apple ID and app-specific password are
