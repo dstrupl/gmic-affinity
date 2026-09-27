@@ -22,7 +22,7 @@
 #   ./scripts/release-bump-cask.sh \
 #     v0.3.1 \
 #     dist/GmicFilter-v0.3.1.zip \
-#     git@github.com:dstrupl/homebrew-gmic-affinity.git
+#     https://github.com/dstrupl/homebrew-gmic-affinity.git
 
 set -euo pipefail
 

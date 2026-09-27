@@ -12,7 +12,7 @@
 #     v0.3.1 \
 #     "Developer ID Application: Your Name (TEAMID)" \
 #     gmic-affinity-notary \
-#     git@github.com:dstrupl/homebrew-gmic-affinity.git
+#     https://github.com/dstrupl/homebrew-gmic-affinity.git
 #
 # Every check is intentionally narrow: each one fails with a single
 # concrete error message pointing at the fix, not a generic "preflight
@@ -193,7 +193,19 @@ if ! git ls-remote --exit-code "$TAP_REPO_URL" HEAD >/dev/null 2>&1; then
   die "tap repo URL '$TAP_REPO_URL' is not clone-readable from this machine.
        Check SSH keys, HTTPS credentials, or override TAP_REPO_URL in .env.local."
 fi
-ok "tap repo $TAP_OWNER_REPO reachable via gh and git"
+
+# Read access is insufficient: an SSH key can clone a public repo while being
+# associated with a GitHub account that cannot push to it. Probe a unique branch
+# with --dry-run so authentication and authorization are exercised without
+# creating a ref or transferring release state.
+TAP_PUSH_PROBE_REF="refs/heads/__gmic_affinity_release_preflight__/$LOCAL_HEAD"
+if ! git push --dry-run --porcelain "$TAP_REPO_URL" \
+     "HEAD:$TAP_PUSH_PROBE_REF" >/dev/null 2>&1; then
+  die "tap repo URL '$TAP_REPO_URL' is readable but not push-authorized.
+       Use an HTTPS URL authenticated by gh, or fix the SSH key/account,
+       then rerun preflight. No remote ref was created by this dry run."
+fi
+ok "tap repo $TAP_OWNER_REPO reachable and push-authorized"
 
 # -------- 8. release/tag state is safe --------
 #

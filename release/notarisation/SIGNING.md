@@ -247,11 +247,11 @@ DEVELOPER_ID_APP_SIGNATURE = Developer ID Application: Your Name (TEAMID)
 # Optional: defaults to gmic-affinity-notary.
 # NOTARYTOOL_KEYCHAIN_PROFILE = gmic-affinity-notary
 
-# Optional: tap repo URL. Defaults to the dstrupl/homebrew-gmic-affinity
-# SSH URL. Override if you need HTTPS instead of SSH, or if you've
-# forked the tap.
-# TAP_REPO_URL = git@github.com:dstrupl/homebrew-gmic-affinity.git
+# Optional: tap repo URL. Defaults to the HTTPS URL authenticated by gh.
+# Override only if you've forked the tap or deliberately use an SSH key that
+# has write access to this repository.
 # TAP_REPO_URL = https://github.com/dstrupl/homebrew-gmic-affinity.git
+# TAP_REPO_URL = git@github.com:dstrupl/homebrew-gmic-affinity.git
 EOF
 ```
 
@@ -294,14 +294,13 @@ safe to run standalone:
     v0.0.0 \
     "Developer ID Application: Your Name (TEAMID)" \
     gmic-affinity-notary \
-    git@github.com:dstrupl/homebrew-gmic-affinity.git
+    https://github.com/dstrupl/homebrew-gmic-affinity.git
 ```
 
 Use the exact `DEVELOPER_ID_APP_SIGNATURE` value you put in
 `.env.local` for the second argument. Use the exact tap URL that
 `make release` will use for the fourth argument; the default shown
-above is SSH, so switch it to the HTTPS URL if that's what you put in
-`.env.local`. Keep `v0.0.0` as-is during setup; do not replace it
+above is HTTPS. Keep `v0.0.0` as-is during setup; do not replace it
 with the real release version here.
 
 `v0.0.0` is a valid semver-shaped tag that should never exist as a
@@ -446,7 +445,7 @@ last step:
 ./scripts/release-bump-cask.sh \
     vX.Y.Z \
     dist/GmicFilter-vX.Y.Z.zip \
-    git@github.com:dstrupl/homebrew-gmic-affinity.git
+    https://github.com/dstrupl/homebrew-gmic-affinity.git
 ```
 
 It's idempotent — safe to re-run.

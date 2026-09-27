@@ -160,7 +160,7 @@ REZ_FLAGS := \
 # (signing identity name, Apple ID) intentionally has no default — the
 # preflight will refuse to run if they're unset.
 NOTARYTOOL_KEYCHAIN_PROFILE ?= gmic-affinity-notary
-TAP_REPO_URL                ?= git@github.com:dstrupl/homebrew-gmic-affinity.git
+TAP_REPO_URL                ?= https://github.com/dstrupl/homebrew-gmic-affinity.git
 
 all: bundle
 

@@ -27,11 +27,15 @@ both the project and tap repositories:
 gh auth status
 gh repo view dstrupl/gmic-affinity --json viewerPermission
 gh repo view dstrupl/homebrew-gmic-affinity --json viewerPermission
-git ls-remote git@github.com:dstrupl/homebrew-gmic-affinity.git HEAD
+git ls-remote https://github.com/dstrupl/homebrew-gmic-affinity.git HEAD
+git push --dry-run https://github.com/dstrupl/homebrew-gmic-affinity.git \
+  HEAD:refs/heads/__gmic_affinity_release_preflight__/manual-check
 ```
 
 The maintainer should have `ADMIN` or `WRITE` permission on both repos.
-The release preflight repeats the reachability checks before building.
+There is no probe ref to remove after the command: `--dry-run` does not create
+it. The release preflight repeats both read and write authorization checks
+before building.
 
 ## After each release (automated)
 

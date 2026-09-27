@@ -595,7 +595,7 @@ If a stable release is broken:
 1. 🤖 `gh release delete vX.Y.Z --yes` so users can't fetch the zip.
 2. 🤖 Revert the tap cask bump:
    ```bash
-   git -C /tmp/tap clone --depth 5 git@github.com:dstrupl/homebrew-gmic-affinity.git
+   git -C /tmp/tap clone --depth 5 https://github.com/dstrupl/homebrew-gmic-affinity.git
    cd /tmp/tap && git revert HEAD && git push origin main
    ```
    `brew upgrade --cask gmic-affinity` on a user's machine then
