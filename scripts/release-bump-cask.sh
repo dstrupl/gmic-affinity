@@ -112,16 +112,34 @@ print(f"  - sha256 \"{sha256}\"")
 # 4. Current Homebrew requires `depends_on :macos`; explicit minimum macOS
 #    versions supported by Homebrew itself are redundant and rejected by
 #    Homebrew/OSDependsOn. The bundle's LSMinimumSystemVersion remains the
-#    authoritative runtime floor. Normalize both historical forms so rerunning
-#    a release against an older live tap remains idempotent.
-text, n_macos = re.subn(
+#    authoritative runtime floor. Normalize the known legacy explanation and
+#    dependency together so comments do not split Homebrew stanza groups.
+LEGACY_MACOS_BLOCK_RE = re.compile(
+    r"  # `:big_sur` \(bare symbol\) is the modern lower-bound form\. brew\n"
+    r"  # style rejects the older `\">= :big_sur\"` string-comparator shape\n"
+    r"  # under Homebrew/OSDependsOn — the bare symbol means \"this macOS or\n"
+    r"  # later\", which is what we want\.\n"
+    r"  depends_on macos: :big_sur"
+)
+CURRENT_MACOS_BLOCK = (
+    "  # Current Homebrew rejects redundant minimum macOS versions under\n"
+    "  # Homebrew/OSDependsOn. The bundle's LSMinimumSystemVersion remains the\n"
+    "  # authoritative macOS 11 runtime floor.\n"
+    "  depends_on :macos"
+)
+text, n_macos_block = LEGACY_MACOS_BLOCK_RE.subn(
+    CURRENT_MACOS_BLOCK, text, count=1
+)
+
+# Also handle casks that have the old dependency without that exact comment.
+text, n_macos_line = re.subn(
     r"^  depends_on macos:\s*(?::big_sur|\">= :big_sur\")\s*$",
     "  depends_on :macos",
     text,
     count=1,
     flags=re.MULTILINE,
 )
-if n_macos:
+if n_macos_block or n_macos_line:
     print("  - normalized macOS dependency for current Homebrew DSL")
 
 Path(cask_path).write_text(text)
