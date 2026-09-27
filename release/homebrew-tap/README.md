@@ -7,11 +7,10 @@ a Photoshop-compatible filter plugin that bridges
 ## Status: live
 
 This tap is live. The v0.2.0 release established the Developer ID-signed,
-notarised, and stapled release path, and v0.3.0 subsequently shipped
-through the same GitHub Release and tap pipeline.
-Local smoke testing confirmed `brew install --cask gmic-affinity`
-installs into both Affinity plugin folders, and Affinity Photo 2 loads
-and runs the plugin.
+notarised, and stapled release path; v0.3.0 and v0.3.1 subsequently shipped
+through the same GitHub Release and tap pipeline. Local smoke testing
+confirmed the cask installs into both Affinity plugin folders, and Affinity
+Photo 2 loads and runs the plugin.
 
 The reason is upstream-Homebrew policy, not anything specific to this
 project: starting **2026-09-01**, Homebrew ends support for casks
@@ -33,17 +32,31 @@ These are the public install / update / uninstall commands users run:
 
 ```bash
 brew tap dstrupl/gmic-affinity
-brew install --cask gmic-affinity
+brew trust --cask dstrupl/gmic-affinity/gmic-affinity
+brew install --cask dstrupl/gmic-affinity/gmic-affinity
 # updates …
-brew upgrade --cask gmic-affinity
+brew update
+brew upgrade --cask dstrupl/gmic-affinity/gmic-affinity
 # removal …
-brew uninstall --cask gmic-affinity
+brew uninstall --cask dstrupl/gmic-affinity/gmic-affinity
 ```
 
-The cask installs `GmicFilter.plugin` into every Affinity Photo
-plugins folder it finds on the user's machine (Affinity Photo 2
-and/or Affinity Photo v3) and declares the runtime `gmic` formula
-as a dependency. Restart Affinity afterwards.
+The cask-specific trust command is narrower than trusting the entire tap.
+
+If the first upgrade from 0.2.0 or 0.3.0 reports `already a Generic
+Artifact`, refresh the corrected cask and force the legacy receipt
+transition once:
+
+```bash
+brew update
+brew upgrade --cask --force dstrupl/gmic-affinity/gmic-affinity
+```
+
+Later upgrades do not need `--force`.
+
+The cask installs `GmicFilter.plugin` into the Affinity Photo 2 and Affinity
+Photo v3 plugin folders and declares the runtime `gmic` formula as a
+dependency. Restart Affinity afterwards.
 
 If `Filters → Plugins → G'MIC` is missing, open
 **Affinity → Settings → Photoshop Plugins** and tick
@@ -62,8 +75,9 @@ GitHub release, it runs `scripts/release-bump-cask.sh`, which:
    ```
 2. Bumps `version` and `sha256` in
    [`Casks/gmic-affinity.rb`](./Casks/gmic-affinity.rb).
-3. Runs `brew style`.
-4. Commits and pushes to the tap.
+3. Rejects duplicate managed artifact sources.
+4. Runs `brew style`.
+5. Commits and pushes to the tap.
 
 Users get the update on their next `brew upgrade --cask`.
 

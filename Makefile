@@ -439,7 +439,8 @@ release: release-preflight release-build-signed release-notarize \
 	@echo ""
 	@echo "Smoke-test on a fresh user account:"
 	@echo "  brew tap dstrupl/gmic-affinity"
-	@echo "  brew install --cask gmic-affinity"
+	@echo "  brew trust --cask dstrupl/gmic-affinity/gmic-affinity"
+	@echo "  brew install --cask dstrupl/gmic-affinity/gmic-affinity"
 
 # Preflight: external script so the (long) check list reads cleanly.
 # Verifies RELEASE_VERSION shape, working tree cleanliness, signing

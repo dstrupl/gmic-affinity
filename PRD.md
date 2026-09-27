@@ -103,7 +103,7 @@ Homebrew `gmic` present:
 | Affinity Photo 2 loads and lists the plugin       | ✅ shipped              |
 | Affinity Photo v3 loads and lists the plugin      | ✅ shipped (Phase 0 step 2 PASS on 2026-05-19; see release design doc §3) |
 | Distributed via GitHub release zip + `install.command` | ✅ shipped (universal `.plugin` zip, double-clickable installer; see [release design doc](./docs/design/2026-05-18-release-v0.1-distribution.md)) |
-| Distributed via Homebrew cask                     | ✅ shipped in v0.2.0 (`brew tap dstrupl/gmic-affinity && brew install --cask gmic-affinity`; signed/notarised release path documented in [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md)) |
+| Distributed via Homebrew cask                     | ✅ shipped in v0.2.0 (`brew tap dstrupl/gmic-affinity`, cask-specific `brew trust`, then fully qualified `brew install --cask`; signed/notarised release path documented in [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md)) |
 | Filter runs end-to-end on a real image            | ✅ shipped              |
 | Universal binary (arm64 + x86\_64)                | ✅ shipped              |
 | 8-bit RGB / RGBA / Greyscale                      | ✅ shipped              |

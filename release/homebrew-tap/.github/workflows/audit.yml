@@ -49,6 +49,8 @@ jobs:
         # URL yet, so an online audit would fail by design. Once
         # release-bump-cask.sh has filled in real version + sha256,
         # this branch is taken and audit runs in earnest.
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if grep -q REPLACE_WITH_RELEASE_ZIP_SHA256 Casks/gmic-affinity.rb; then

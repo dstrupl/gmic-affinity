@@ -504,8 +504,12 @@ for the maintainer setup and per-release walkthrough; design doc
 pipeline and Homebrew distribution on 2026-05-25. `v0.3.0` was published
 on 2026-06-29 and the tap was bumped to `0.3.0`. Releases through v0.3.0
 used the original signing collaborator; from v0.3.1 onward the maintainer
-uses their own Apple Developer Program identity. GitHub release state,
-the tap version, and functional smoke testing remain separate checks.
+uses their own Apple Developer Program identity. `v0.3.1` was published on
+2026-09-27 and exposed an upgrade-only cask defect: two artifacts sharing a
+source collided while Homebrew retired the predecessor. The corrected cask
+uses one managed artifact plus structured postflight copy/removal steps.
+GitHub release state, the tap version, and functional smoke testing remain
+separate checks.
 
 **Tagging.** Use semver. Stable tags are bare (`v0.2.0`); pre-release
 tags use a hyphenated suffix (`v0.2.0-rc.1`, `v0.2.0-beta.2`). Prefer
@@ -579,12 +583,25 @@ the project is ready for a stable release.
 8. 👤 Smoke-test on a fresh user account or a clean macOS VM:
    ```bash
    brew tap dstrupl/gmic-affinity
-   brew install --cask gmic-affinity
+   brew trust --cask dstrupl/gmic-affinity/gmic-affinity
+   brew update
+   brew install --cask dstrupl/gmic-affinity/gmic-affinity
    ```
    Then restart Affinity Photo (both 2 and v3) and run a filter.
    The cask install path skips `install.command` entirely — the
    notarised bundle loads through Gatekeeper directly, no quarantine
    stripping needed.
+
+   For a machine carrying the legacy 0.2.0 or 0.3.0 cask receipt, an
+   `already a Generic Artifact` failure is expected on the first upgrade.
+   After `brew update`, run this transition once:
+
+   ```bash
+   brew upgrade --cask --force dstrupl/gmic-affinity/gmic-affinity
+   ```
+
+   Confirm both plugin destinations contain the new version. Subsequent
+   upgrades must work without `--force`.
 9. 👤 Announce / update changelog / close milestone as you would for
    any release.
 

@@ -386,7 +386,8 @@ The last screenful is:
 
 Smoke-test on a fresh user account:
   brew tap dstrupl/gmic-affinity
-  brew install --cask gmic-affinity
+  brew trust --cask dstrupl/gmic-affinity/gmic-affinity
+  brew install --cask dstrupl/gmic-affinity/gmic-affinity
 ```
 
 That means:
@@ -396,7 +397,7 @@ That means:
   with the notarised zip attached.
 - The Homebrew tap cask was bumped to that version + sha256 and
   pushed to `dstrupl/homebrew-gmic-affinity`.
-- A user running the two `brew` commands now installs your build.
+- A user running the three `brew` commands now installs your build.
 
 Record the GitHub release URL, cask version/SHA, and remaining functional
 smoke-test status.

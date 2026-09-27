@@ -142,6 +142,22 @@ text, n_macos_line = re.subn(
 if n_macos_block or n_macos_line:
     print("  - normalized macOS dependency for current Homebrew DSL")
 
+# 5. A moved Homebrew artifact source may only be declared once. Duplicate
+#    sources appear to work on a first install, but the predecessor uninstall
+#    phase cannot back two targets up to the same Caskroom path during an
+#    upgrade. Secondary copies belong in structured postflight steps.
+artifact_sources = re.findall(r'^\s*artifact\s+"([^"]+)"', text, flags=re.MULTILINE)
+duplicate_sources = sorted(
+    source for source in set(artifact_sources) if artifact_sources.count(source) > 1
+)
+if duplicate_sources:
+    formatted = ", ".join(duplicate_sources)
+    sys.exit(
+        "ERROR: duplicate Homebrew artifact source(s): " + formatted + "\n"
+        "Use one managed artifact and structured postflight/uninstall steps "
+        "for secondary copies."
+    )
+
 Path(cask_path).write_text(text)
 PY
 

@@ -1,8 +1,8 @@
 cask "gmic-affinity" do
-  version "0.2.0"
+  version "0.3.1"
   # Set automatically by the per-release tap bump. To compute locally:
   #   curl -sL https://github.com/dstrupl/gmic-affinity/releases/download/v#{version}/GmicFilter-v#{version}.zip | shasum -a 256
-  sha256 "2288000f1016562e8f10a19b5f38d5b86de48941546289e71415126277cfbc62"
+  sha256 "66ac6b48a76ea1f2a2c7a80fede89a62a6847e2cb543c407d4bc5d5a73b12350"
 
   url "https://github.com/dstrupl/gmic-affinity/releases/download/v#{version}/GmicFilter-v#{version}.zip"
   name "G'MIC for Affinity Photo"
@@ -24,13 +24,26 @@ cask "gmic-affinity" do
   # authoritative macOS 11 runtime floor.
   depends_on :macos
 
-  # Install one source bundle into both Affinity plugin folders. Homebrew
-  # accepts two `artifact` stanzas pointing at the same source path; this
-  # was verified by the v0.2.0 cask install.
+  # Homebrew manages the Photo 2 copy as the bundle artifact. A structured
+  # postflight step makes the independent v3 copy: declaring the same source
+  # twice works on a fresh install but collides while Homebrew backs up the
+  # predecessor cask during an upgrade.
   artifact "GmicFilter-v#{version}/GmicFilter.plugin",
            target: "~/Library/Application Support/Affinity Photo 2/Plugins/GmicFilter.plugin"
-  artifact "GmicFilter-v#{version}/GmicFilter.plugin",
-           target: "~/Library/Application Support/Affinity/Plugins/GmicFilter.plugin"
+
+  postflight_steps do
+    copy "Library/Application Support/Affinity Photo 2/Plugins/GmicFilter.plugin",
+         "Library/Application Support/Affinity/Plugins/GmicFilter.plugin",
+         source_base: :home,
+         target_base: :home,
+         recursive:   true
+  end
+
+  uninstall_postflight_steps do
+    remove "Library/Application Support/Affinity/Plugins/GmicFilter.plugin",
+           base:      :home,
+           recursive: true
+  end
 
   caveats <<~EOS
     G'MIC for Affinity is installed for Affinity Photo 2 and Affinity Photo v3.

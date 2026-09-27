@@ -29,12 +29,37 @@ Recommended for v0.2.0 and later:
 
 ```bash
 brew tap dstrupl/gmic-affinity
-brew install --cask gmic-affinity
+brew trust --cask dstrupl/gmic-affinity/gmic-affinity
+brew install --cask dstrupl/gmic-affinity/gmic-affinity
 ```
 
-The cask installs the `gmic` formula dependency and copies
-`GmicFilter.plugin` into every Affinity plugin folder it finds on your
-machine (Affinity Photo 2 and/or Affinity Photo v3).
+Homebrew requires an explicit trust decision for third-party casks. The
+cask-specific command above trusts only G'MIC for Affinity; trusting the
+whole tap with `brew trust dstrupl/gmic-affinity` is broader and normally
+unnecessary.
+
+The cask installs the `gmic` formula dependency and places
+`GmicFilter.plugin` in the Affinity Photo 2 and Affinity Photo v3 plugin
+folders.
+
+If this tap was already installed, refresh it before upgrading:
+
+```bash
+brew update
+brew upgrade --cask dstrupl/gmic-affinity/gmic-affinity
+```
+
+Users upgrading from cask version 0.2.0 or 0.3.0 may encounter the legacy
+error `already a Generic Artifact`. The old cask recorded one source bundle
+twice. Refresh the corrected cask, then perform this one-time transition:
+
+```bash
+brew update
+brew upgrade --cask --force dstrupl/gmic-affinity/gmic-affinity
+```
+
+The `--force` is needed only to retire the legacy receipt; later upgrades
+use the normal command.
 
 Restart Affinity Photo and look for **Filters → Plugins → G'MIC →
 G'MIC…**.

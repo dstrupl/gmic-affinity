@@ -8,7 +8,8 @@ GitHub repo.
 The tap repo is live at `dstrupl/homebrew-gmic-affinity`. The first
 signed release (`v0.2.0`) completed successfully:
 the release pipeline published the notarised GitHub release artifact
-and bumped the live tap cask. It has subsequently carried v0.3.0.
+and bumped the live tap cask. It has subsequently carried v0.3.0 and
+v0.3.1.
 
 From here the release pipeline (`scripts/release-bump-cask.sh`, called
 from `make release-bump-cask`) takes over: it clones the tap, bumps
@@ -48,10 +49,13 @@ The release pipeline does this for you. Concretely,
    `Casks/gmic-affinity.rb` if present (historical one-time cleanup,
    idempotent).
 4. Updates `version "X.Y.Z"` and `sha256 "<computed>"`.
-5. Runs `brew style Casks/gmic-affinity.rb` to verify clean.
-6. Commits with the message
+5. Rejects duplicate `artifact` source paths. A source may be managed only
+   once; use structured postflight copy/removal steps for secondary install
+   destinations.
+6. Runs `brew style Casks/gmic-affinity.rb` to verify clean.
+7. Commits with the message
    `Bump gmic-affinity to X.Y.Z` + SHA + URL.
-7. `git push origin HEAD`.
+8. `git push origin HEAD`.
 
 If anything fails, the script bails before pushing — safe to re-run.
 The published GitHub release of the project repo at that point is
@@ -73,7 +77,26 @@ This directory remains in the project repo because:
 Now that the tap repo exists, edits to the live cask should happen in
 the tap repo directly (or via `release-bump-cask.sh`), not by editing
 files in this directory and trying to re-bootstrap. If you ever need to change
-cask DSL substantively (e.g. add a new artifact stanza, change
+cask DSL substantively (e.g. add an install destination, change
 `depends_on`), edit `dstrupl/homebrew-gmic-affinity` directly and let
 the next release bump pick up the new structure with refreshed
 `version` / `sha256`.
+
+## Multiple Affinity destinations
+
+The live cask has one managed `artifact`, targeting Affinity Photo 2. Its
+structured `postflight_steps` copy the installed bundle to Affinity Photo
+v3, and `uninstall_postflight_steps` remove that copy. Do not express the
+two destinations as duplicate `artifact` stanzas with the same source.
+That shape installs successfully from scratch but fails on upgrade when
+Homebrew tries to back both predecessor targets up to one Caskroom path.
+
+The corrected shape shipped after v0.3.1 was published. A machine with a
+0.2.0 or 0.3.0 receipt needs one forced transition after refreshing the tap:
+
+```bash
+brew update
+brew upgrade --cask --force dstrupl/gmic-affinity/gmic-affinity
+```
+
+Normal upgrades do not use `--force`.
