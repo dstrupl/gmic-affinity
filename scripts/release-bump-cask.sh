@@ -19,8 +19,8 @@
 #
 # Usage:
 #   ./scripts/release-bump-cask.sh \
-#     v0.2.0 \
-#     dist/GmicFilter-v0.2.0.zip \
+#     v0.3.1 \
+#     dist/GmicFilter-v0.3.1.zip \
 #     git@github.com:dstrupl/homebrew-gmic-affinity.git
 
 set -euo pipefail

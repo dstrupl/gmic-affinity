@@ -1,7 +1,7 @@
 # PRD: gmic-affinity — A Rust Photoshop Filter Plugin Bridging G'MIC and Affinity Photo
 
-**Version:** 0.2
-**Status:** **v0.2.0 shipped — 2026-05-25.** End-to-end pipeline working in
+**Version:** 0.3
+**Status:** **Shipping.** End-to-end pipeline working in
 Affinity Photo 2 and Affinity Photo v3. Stable releases are universal,
 Developer ID-signed, notarised, and distributed through both GitHub Releases
 and the `dstrupl/gmic-affinity` Homebrew tap.
@@ -130,8 +130,10 @@ Homebrew `gmic` present:
   parameter editing; user state is persisted to
   `~/Library/Application Support/gmic-affinity/settings.json`.
 - **Ad-hoc signing remains for development and pre-releases.** Stable
-  distribution uses the collaborator-run Developer ID + notarisation
-  pipeline in `release/notarisation/SIGNING.md`.
+  distribution uses the maintainer-run Developer ID + notarisation pipeline
+  in `release/notarisation/SIGNING.md`. Releases through v0.3.0 used the
+  original signing collaborator; subsequent releases use the maintainer's
+  own Apple Developer Program identity.
 - **External binary dependency.** The plugin shells out to a Homebrew-
   installed `gmic`; if the binary is missing the filter fails cleanly
   rather than embedding gmic itself.

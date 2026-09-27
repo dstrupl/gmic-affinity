@@ -9,7 +9,7 @@
 # arguments. Run standalone for debugging:
 #
 #   ./scripts/release-preflight.sh \
-#     v0.2.0 \
+#     v0.3.1 \
 #     "Developer ID Application: Your Name (TEAMID)" \
 #     gmic-affinity-notary \
 #     git@github.com:dstrupl/homebrew-gmic-affinity.git
@@ -17,7 +17,7 @@
 # Every check is intentionally narrow: each one fails with a single
 # concrete error message pointing at the fix, not a generic "preflight
 # failed" wall of text. See release/notarisation/SIGNING.md for the
-# friend-facing setup instructions and IMPLEMENTATION_NOTES.md §11 for
+# maintainer setup instructions and IMPLEMENTATION_NOTES.md §11 for
 # the operator-side runbook.
 
 set -euo pipefail
@@ -54,7 +54,7 @@ echo ""
 # are also rejected: a release must be a deliberate, named tag.
 if [[ ! "$RELEASE_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   die "RELEASE_VERSION='$RELEASE_VERSION' is not a stable semver tag (vX.Y.Z).
-       Pass it explicitly, e.g.:  make release RELEASE_VERSION=v0.2.0
+       Pass it explicitly, e.g.:  make release RELEASE_VERSION=v0.3.1
        Pre-releases (v*-rc*, v*-beta* ...) go through release-unsigned."
 fi
 ok "RELEASE_VERSION=$RELEASE_VERSION"
@@ -70,6 +70,9 @@ if [ "$RELEASE_VERSION" != "v0.0.0" ]; then
   BARE_VERSION=${RELEASE_VERSION#v}
   CARGO_VERSION=$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -1)
   PLIST_VERSION=$(plutil -extract CFBundleShortVersionString raw Info.plist 2>/dev/null || true)
+  PLIST_INFO=$(plutil -extract CFBundleGetInfoString raw Info.plist 2>/dev/null || true)
+  PLIST_BUILD=$(plutil -extract CFBundleVersion raw Info.plist 2>/dev/null || true)
+  LOCALIZED_INFO=$(sed -nE 's/^[[:space:]]*CFBundleGetInfoString[[:space:]]*=[[:space:]]*"([^"]+)";.*/\1/p' en.lproj/InfoPlist.strings | head -1)
   if [ "$CARGO_VERSION" != "$BARE_VERSION" ]; then
     die "Cargo.toml version is '$CARGO_VERSION', expected '$BARE_VERSION' for $RELEASE_VERSION.
        Bump Cargo.toml before releasing."
@@ -78,7 +81,24 @@ if [ "$RELEASE_VERSION" != "v0.0.0" ]; then
     die "Info.plist CFBundleShortVersionString is '$PLIST_VERSION', expected '$BARE_VERSION' for $RELEASE_VERSION.
        Bump Info.plist before releasing."
   fi
-  ok "Cargo.toml and Info.plist version metadata match $BARE_VERSION"
+  case "$PLIST_INFO" in
+    "$BARE_VERSION "*) ;;
+    *)
+      die "Info.plist CFBundleGetInfoString is '$PLIST_INFO', expected it to start with '$BARE_VERSION '.
+       Bump Info.plist before releasing."
+      ;;
+  esac
+  case "$LOCALIZED_INFO" in
+    "$BARE_VERSION "*) ;;
+    *)
+      die "en.lproj/InfoPlist.strings CFBundleGetInfoString is '$LOCALIZED_INFO', expected it to start with '$BARE_VERSION '.
+       Bump the localized Info.plist metadata before releasing."
+      ;;
+  esac
+  if [[ ! "$PLIST_BUILD" =~ ^[1-9][0-9]*$ ]]; then
+    die "Info.plist CFBundleVersion is '$PLIST_BUILD', expected a positive integer build number."
+  fi
+  ok "Cargo.toml and Info.plist metadata match $BARE_VERSION (build $PLIST_BUILD)"
 else
   ok "version metadata check skipped for setup dry run"
 fi
@@ -186,7 +206,7 @@ if gh release view "$RELEASE_VERSION" --repo "$(gh repo view --json nameWithOwne
        replace it, delete it first via 'gh release delete $RELEASE_VERSION'."
 fi
 
-# If the project lead pre-created a signed annotated tag, it must point
+# If the maintainer pre-created a signed annotated tag, it must point
 # at exactly the commit we just checked against upstream. Otherwise
 # `gh release create` would publish release metadata for one commit
 # while the local zip was built from another.

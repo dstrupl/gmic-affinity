@@ -3,12 +3,12 @@
 This directory is staging for the `dstrupl/homebrew-gmic-affinity`
 GitHub repo.
 
-## Status (2026-05-25): tap repo live
+## Status: tap repo live
 
 The tap repo is live at `dstrupl/homebrew-gmic-affinity`. The first
-collaborator-run signed release (`v0.2.0`) completed successfully:
+signed release (`v0.2.0`) completed successfully:
 the release pipeline published the notarised GitHub release artifact
-and bumped the live tap cask to version `0.2.0`.
+and bumped the live tap cask. It has subsequently carried v0.3.0.
 
 From here the release pipeline (`scripts/release-bump-cask.sh`, called
 from `make release-bump-cask`) takes over: it clones the tap, bumps
@@ -18,40 +18,20 @@ The v0.2-deferral comment block was stripped automatically during the
 v0.2.0 stable bump. Same for `version` / `sha256`: those are filled
 in from the release zip on each run.
 
-## One-time access check (new signing collaborator)
+## Maintainer access check
 
-Do this after the signing collaborator confirms they are ready to run
-the signed-release pipeline (see `release/notarisation/SIGNING.md`
-§setup) but before they run `make release`.
-
-```bash
-# 1. Confirm the tap repo exists and is reachable from your account.
-gh repo view dstrupl/homebrew-gmic-affinity
-
-# 2. Grant the signing collaborator push access to the tap repo.
-#    They already need push to dstrupl/gmic-affinity; they need the
-#    same on dstrupl/homebrew-gmic-affinity so release-bump-cask can
-#    `git push origin HEAD` from their machine. The recommended
-#    grant is a direct collaborator role with write permission:
-gh api \
-  --method PUT \
-  -H "Accept: application/vnd.github+json" \
-  /repos/dstrupl/homebrew-gmic-affinity/collaborators/<their-github-username> \
-  -f permission=push
-# Then have them accept the collaboration invite from their email or
-# at https://github.com/dstrupl/homebrew-gmic-affinity/invitations.
-```
-
-After they accept the invite, have them verify from a fresh shell that
-the repo is reachable (this is what `release-preflight` checks):
+Run this before `make release` to verify the active `gh` account can write
+both the project and tap repositories:
 
 ```bash
-gh repo view dstrupl/homebrew-gmic-affinity
+gh auth status
+gh repo view dstrupl/gmic-affinity --json viewerPermission
+gh repo view dstrupl/homebrew-gmic-affinity --json viewerPermission
+git ls-remote git@github.com:dstrupl/homebrew-gmic-affinity.git HEAD
 ```
 
-You're done. The collaborator can now run
-`make release RELEASE_VERSION=vX.Y.Z` and the pipeline will auto-bump
-the cask in this repo on success.
+The maintainer should have `ADMIN` or `WRITE` permission on both repos.
+The release preflight repeats the reachability checks before building.
 
 ## After each release (automated)
 

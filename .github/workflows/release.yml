@@ -4,11 +4,11 @@
 # a GitHub Release asset, marked as a prerelease.
 #
 # Stable releases (vX.Y.Z without a hyphen) are NOT handled here. They
-# go through `make release` on the signing collaborator's machine,
+# go through `make release` on the maintainer's signing Mac,
 # which produces a Developer ID-signed + notarised + stapled bundle,
 # creates the GitHub release, and bumps the homebrew tap cask. CI
 # can't do that step because the Developer ID Application certificate
-# and notarytool keychain profile only live on the signer's machine
+# and notarytool keychain profile only live in the maintainer's keychain
 # (see release/notarisation/SIGNING.md).
 #
 # Why this split:

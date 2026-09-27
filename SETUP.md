@@ -83,3 +83,15 @@ Affinity Plugins folder:
 
 Folders whose parent doesn't exist are skipped, so machines with only
 one Affinity version installed still work.
+
+## 4. Stable-release signing (maintainer only)
+
+Ordinary development and local installation use ad-hoc signing and do not
+need a paid Apple account. Stable public releases are signed and notarised
+with the maintainer's Apple Developer Program identity. The one-time
+certificate, keychain-profile, and local configuration steps are documented
+in [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md).
+
+Signing credentials and certificate material must remain in the maintainer's
+local keychain. Never commit `.env.local`, Apple account credentials,
+app-specific passwords, certificate files, or private keys.

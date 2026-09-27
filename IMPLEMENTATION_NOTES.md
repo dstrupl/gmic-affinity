@@ -265,7 +265,7 @@ on a new SDK version.
 Local development uses ad-hoc signing (`codesign --force --deep --sign -`).
 Affinity Photo 2 accepts ad-hoc-signed bundles for local use; no Apple
 Developer ID is required. Stable distribution is handled by the
-collaborator-run release pipeline in
+maintainer-run release pipeline in
 [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md),
 which signs with Developer ID, notarises via `notarytool`, staples, and
 verifies Gatekeeper acceptance before publishing.
@@ -491,20 +491,21 @@ section disagree, the design wins.
 | Pipeline                | Tag shape  | Where it runs                              | Output                                                 |
 |-------------------------|------------|--------------------------------------------|--------------------------------------------------------|
 | Pre-release / RC        | `vX.Y.Z-*` | `.github/workflows/release.yml` (CI)       | Ad-hoc-signed zip on the GitHub Releases page          |
-| Stable (signed)         | `vX.Y.Z`   | Signing collaborator's Mac, `make release` | Notarised zip + GitHub release + Homebrew tap cask bump |
+| Stable (signed)         | `vX.Y.Z`   | Maintainer's signing Mac, `make release`    | Notarised zip + GitHub release + Homebrew tap cask bump |
 
 The split exists because Apple Developer ID material (the signing
-certificate, the notarytool credential profile) only lives on the
-collaborator's machine and intentionally never reaches CI. See
+certificate and the notarytool credential profile) only lives in the
+maintainer's local keychain and intentionally never reaches CI. See
 [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md)
-for the friend-facing setup and per-release walkthrough; design doc
+for the maintainer setup and per-release walkthrough; design doc
 §12 for the rationale.
 
-**Current stable status.** `v0.2.0` shipped on 2026-05-25 through the
-stable pipeline. The GitHub release is signed/notarised, the Homebrew
-tap cask was bumped to `0.2.0`, `brew install --cask gmic-affinity`
-installs successfully, and Affinity Photo 2 has been smoke-tested
-against the cask-installed plugin.
+**Stable-release history.** `v0.2.0` established the signed/notarised
+pipeline and Homebrew distribution on 2026-05-25. `v0.3.0` was published
+on 2026-06-29 and the tap was bumped to `0.3.0`. Releases through v0.3.0
+used the original signing collaborator; from v0.3.1 onward the maintainer
+uses their own Apple Developer Program identity. GitHub release state,
+the tap version, and functional smoke testing remain separate checks.
 
 **Tagging.** Use semver. Stable tags are bare (`v0.2.0`); pre-release
 tags use a hyphenated suffix (`v0.2.0-rc.1`, `v0.2.0-beta.2`). Prefer
@@ -541,7 +542,7 @@ configured) or 👤 (requires a human).
    runtime process. See design doc §3 (Phase 0) for the empirical
    checks gating this.
 
-### Stable release runbook (collaborator-driven)
+### Stable release runbook (maintainer-driven)
 
 This is what you do once a candidate has been vetted via an RC and
 the project is ready for a stable release.
@@ -550,19 +551,20 @@ the project is ready for a stable release.
    commit you want to release.
 2. 🤖 Bump release metadata to match the chosen version before the
    handoff: `Cargo.toml` `package.version` and
-   `Info.plist` `CFBundleShortVersionString` must equal `X.Y.Z`.
-   `release-preflight` enforces this for real releases.
+   `Info.plist` `CFBundleShortVersionString` must equal `X.Y.Z`;
+   `CFBundleGetInfoString` in `Info.plist` and
+   `en.lproj/InfoPlist.strings` must start with it; and
+   `CFBundleVersion` must be a positive integer build number.
+   `release-preflight` enforces these for real releases.
 3. 🤖 Make sure `main` is fully pushed:
    `git push origin main`.
-4. 👤 Ping the signing collaborator with:
-   - The version string (e.g. `v0.2.0`).
-   - A link to the latest green `ci.yml` run on `main`.
-   - A link to the most recent successful RC release (so they know
-     this isn't a cold first attempt).
-5. 👤 (collaborator) Runs `make release RELEASE_VERSION=vX.Y.Z` per
-   `release/notarisation/SIGNING.md`. Wall-clock time: ~5–10 minutes.
-   On success they tell you the GitHub release is live and the cask
-   was bumped.
+4. 👤 On the maintainer's signing Mac, confirm the Developer ID identity,
+   notarytool keychain profile, and gitignored `.env.local` are configured
+   per `release/notarisation/SIGNING.md`.
+5. 👤 Run `make release RELEASE_VERSION=vX.Y.Z`. Wall-clock time is
+   typically 5–10 minutes, mostly waiting for Apple's notary service.
+   Approve any keychain or Touch ID prompts. Stop before publication if
+   Gatekeeper does not report `source=Notarized Developer ID`.
 6. 🤖 Verify the GitHub release exists:
    ```bash
    gh release view vX.Y.Z

@@ -151,7 +151,7 @@ REZ_FLAGS := \
 
 # Per-developer signing/notarisation config. Sourced if present;
 # `make release` (the signed pipeline) requires it. The file is
-# gitignored. Friend-facing schema and setup walkthrough live in
+# gitignored. Maintainer setup and release walkthrough live in
 # release/notarisation/SIGNING.md. Operator-side: IMPLEMENTATION_NOTES.md
 # §11.
 -include .env.local
@@ -391,7 +391,7 @@ clean:
 # -------- release packaging --------
 #
 # Two pipelines live here. `make release` is the v0.2+ signed and
-# notarised pipeline run by the project's signing collaborator (with
+# notarised pipeline run locally by the project maintainer (with
 # Apple Developer ID + .env.local setup); it produces a notarised zip,
 # publishes a GitHub release, and bumps the homebrew tap cask. `make
 # release-unsigned` is the pre-v0.2 behaviour: build + zip + ad-hoc
@@ -406,7 +406,7 @@ clean:
 #       ├── install.command
 #       └── README.txt
 #
-# Friend-facing setup + per-release walkthrough: release/notarisation/SIGNING.md
+# Maintainer setup + per-release walkthrough: release/notarisation/SIGNING.md
 # Operator-side runbook: IMPLEMENTATION_NOTES.md §11
 # Design rationale: docs/design/2026-05-18-release-v0.1-distribution.md §2 + §12
 

@@ -4,13 +4,11 @@ Homebrew tap for [`gmic-affinity`](https://github.com/dstrupl/gmic-affinity) —
 a Photoshop-compatible filter plugin that bridges
 [G'MIC](https://gmic.eu/) into Affinity Photo on macOS.
 
-## Status: live as of v0.2.0
+## Status: live
 
-This tap is live. The v0.2.0 release produced a Developer ID-signed,
-notarised, and stapled `GmicFilter-v0.2.0.zip`; the release pipeline
-bumped the cask in `dstrupl/homebrew-gmic-affinity` to version
-`0.2.0` with SHA256
-`2288000f1016562e8f10a19b5f38d5b86de48941546289e71415126277cfbc62`.
+This tap is live. The v0.2.0 release established the Developer ID-signed,
+notarised, and stapled release path, and v0.3.0 subsequently shipped
+through the same GitHub Release and tap pipeline.
 Local smoke testing confirmed `brew install --cask gmic-affinity`
 installs into both Affinity plugin folders, and Affinity Photo 2 loads
 and runs the plugin.
@@ -24,7 +22,7 @@ brew offered as a workaround for unsigned bundles was removed in
 late 2025. Together those changes make this cask infeasible for
 v0.1, where the bundle is only ad-hoc-signed.
 
-Stable releases now use the collaborator-run signed release pipeline:
+Stable releases use the maintainer-run signed release pipeline:
 Developer ID signing, notarisation, stapling, GitHub Release publish,
 and tap bump are covered by the upstream runbook in
 [`release/notarisation/SIGNING.md`](../notarisation/SIGNING.md).

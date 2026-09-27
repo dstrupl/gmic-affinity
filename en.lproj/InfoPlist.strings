@@ -7,5 +7,5 @@
 
 CFBundleDisplayName    = "G'MIC";
 CFBundleName           = "G'MIC";
-CFBundleGetInfoString  = "0.1.0 (C) 2026 dstrupl. MIT-licensed.";
+CFBundleGetInfoString  = "0.3.1 (C) 2026 dstrupl. MIT-licensed.";
 NSHumanReadableCopyright = "(C) 2026 dstrupl. MIT-licensed.";

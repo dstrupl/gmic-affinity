@@ -4,7 +4,7 @@ A Rust-based Photoshop-compatible filter plugin (`.plugin`) for macOS that bridg
 [G'MIC](https://gmic.eu/) into [Affinity Photo 2](https://affinity.serif.com/photo/)
 and later versions (including Affinity by Canva v3).
 
-Status: **v0.2.0 released.** The plugin loads in Affinity Photo 2,
+Status: **released.** The plugin loads in Affinity Photo 2,
 appears as `Filters → Plugins → G'MIC → G'MIC...`, hands pixels through gmic
 end-to-end and writes the result back inline. Current public releases ship
 universal Developer ID-signed and notarised zips for both Affinity Photo 2 and
@@ -78,11 +78,13 @@ removed the `quarantine false` cask workaround and is ending support
 for casks that fail Apple Gatekeeper checks on **2026-09-01** (see
 [Homebrew/brew#20755](https://github.com/homebrew/brew/issues/20755)).
 
-v0.2.0 resolved that by moving stable releases to the collaborator-run
-Developer ID signing and notarisation pipeline documented in
+v0.2.0 resolved that by introducing the Developer ID signing and
+notarisation pipeline documented in
 [`release/notarisation/SIGNING.md`](./release/notarisation/SIGNING.md).
 The resulting Homebrew cask install path has been smoke-tested with
-Affinity Photo 2.
+Affinity Photo 2. Releases through v0.3.0 were signed through the original
+collaborator arrangement. The maintainer now holds an Apple Developer
+Program membership and signs subsequent stable releases directly.
 
 ## What it does
 
@@ -263,9 +265,9 @@ Pre-release tags (`vX.Y.Z-rc.N`, `vX.Y.Z-beta.N`) are CI-driven: push
 the tag and the `release` GitHub Actions workflow builds an
 ad-hoc-signed universal zip for testing.
 
-Stable tags (`vX.Y.Z`) are collaborator-driven: ask the signing
-collaborator to run `make release RELEASE_VERSION=vX.Y.Z` from a clean
-checkout. That local pipeline signs with Developer ID, notarises,
+Stable tags (`vX.Y.Z`) are maintainer-driven: from the maintainer's clean
+checkout, run `make release RELEASE_VERSION=vX.Y.Z`. That local pipeline
+signs with the maintainer's Developer ID, notarises,
 staples, verifies Gatekeeper acceptance, publishes the GitHub Release,
 and bumps the Homebrew tap cask. Full runbook:
 [IMPLEMENTATION_NOTES.md](./IMPLEMENTATION_NOTES.md) §11 and

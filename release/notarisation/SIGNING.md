@@ -1,18 +1,16 @@
-# Signing & releasing `gmic-affinity` — collaborator guide
+# Signing & releasing `gmic-affinity` — maintainer guide
 
-This document is for the Apple-developer collaborator who's helping the
-project ship signed, notarised macOS releases. It explains everything
-you need to do once on your machine, and the single command you run for
-each release after that.
+This document is for the project maintainer who owns the Apple Developer
+Program membership and publishes signed, notarised macOS releases. It
+explains the one-time setup on the maintainer's Mac and the command used
+for each stable release.
 
-If you're not the signing collaborator, you probably want one of these
-instead:
+If you're not preparing a stable release, use one of these instead:
 
 - [`README.md`](../../README.md) — what the project is and how end
   users install it.
 - [`IMPLEMENTATION_NOTES.md`](../../IMPLEMENTATION_NOTES.md) §11 —
-  the operator-side runbook (what the project lead does before/after
-  asking you to cut a release).
+  the operator runbook and verification checklist.
 - [`docs/design/2026-05-18-release-v0.1-distribution.md`](../../docs/design/2026-05-18-release-v0.1-distribution.md)
   §12 — why this signing dance is necessary at all (Homebrew dropped
   the `quarantine false` cask escape hatch in late 2025; from
@@ -21,9 +19,9 @@ instead:
 
 ## TL;DR
 
-Every release is `make release RELEASE_VERSION=vX.Y.Z` from a clean
-working tree on `main`. The Makefile does the build, signs with your
-Developer ID, submits to Apple's notary service, staples, verifies,
+Every stable release is `make release RELEASE_VERSION=vX.Y.Z` from a clean
+working tree on `main`. The Makefile does the build, signs with the
+maintainer's Developer ID, submits to Apple's notary service, staples, verifies,
 publishes a GitHub release, and bumps the Homebrew tap cask. You're
 done in ~5–10 minutes per release, most of which is Apple's notary
 queue.
@@ -32,10 +30,11 @@ The first time you run it there's a one-time setup (~30 minutes) to
 install certs, save credentials in your keychain, and write a small
 config file. That setup is the rest of this document.
 
-## Why we need you
+## Why signing stays local
 
-The project lead doesn't have an Apple Developer Program membership.
-Without one, we can't:
+The maintainer now has an Apple Developer Program membership and signs
+stable releases directly. The membership provides the two capabilities
+required for distribution outside the Mac App Store:
 
 1. Get a **Developer ID Application** certificate (the only signing
    identity Apple's notary service accepts for distributable Mac
@@ -43,18 +42,20 @@ Without one, we can't:
 2. Submit notarisation requests via `notarytool`, which authenticates
    against an Apple Developer team.
 
-Both happen on your machine, with material that lives in your
-keychain. Nothing leaves your machine. The signed and notarised
-binary you produce is then uploaded to GitHub by `gh` (using your
-GitHub auth) and the Homebrew tap cask is bumped with the new
-version + sha256.
+Both happen on the maintainer's Mac, with secret material stored in the
+local keychain. The signed and notarised binary is uploaded to GitHub by
+`gh`, and the Homebrew tap cask is bumped with the new version and SHA256.
+
+Releases through v0.3.0 used a trusted signing collaborator. Starting
+with v0.3.1, the maintainer's own Developer ID Application certificate
+and Apple Developer team are the release identity. Existing releases
+remain valid under the identity that originally signed them.
 
 Why we don't push the signing into CI: the Apple Developer ID
-certificate (and the app-specific password used for notarisation) are
-sensitive enough that we'd rather they only ever exist on a single
-trusted machine, encrypted in a keychain, than be uploaded as GitHub
-Action secrets. CI also can't access your TouchID-protected keychain
-items, which is what makes the local flow ergonomic. This is a
+certificate and notarisation credentials are sensitive enough that they
+remain on the maintainer's Mac, encrypted in a keychain, rather than being
+uploaded as GitHub Actions secrets. CI also can't access Touch ID-protected
+keychain items, which is what makes the local flow ergonomic. This is a
 deliberate trade-off — see §12 of the design doc.
 
 ## What you need (prerequisites)
@@ -66,8 +67,8 @@ worry about getting it perfect on the first try.
 
 ### Apple side
 
-- An **active Apple Developer Program membership** ($99/year). You
-  almost certainly already have this.
+- An **active Apple Developer Program membership** attached to the
+  maintainer's Apple Account.
 - An **Apple ID** with the membership attached. The Apple ID's email
   is what you'll authenticate `notarytool` with.
 - An **app-specific password** for that Apple ID, generated at
@@ -119,18 +120,17 @@ worry about getting it perfect on the first try.
 
 ### Repo access
 
-You need push access to two repos under the `dstrupl` GitHub account:
+The active `gh` account needs write access to both repositories:
 
 1. **`dstrupl/gmic-affinity`** — this repo. The release tag is
    created and pushed here, and the GitHub release with the zip
    asset is created here.
 2. **`dstrupl/homebrew-gmic-affinity`** — the Homebrew tap. The
    release pipeline clones this, bumps the cask file, and pushes
-   back. This repo already exists; the project lead only needs to
-   grant you push access before your first run. See
+   back. See
    [`release/homebrew-tap/PUBLISHING.md`](../homebrew-tap/PUBLISHING.md).
 
-Authenticate `gh` with the account that has push access to both:
+Authenticate `gh` as `dstrupl`, which owns both repositories:
 
 ```bash
 gh auth login          # follow the prompts
@@ -139,10 +139,8 @@ gh repo view dstrupl/gmic-affinity              # should print metadata
 gh repo view dstrupl/homebrew-gmic-affinity     # should also print metadata
 ```
 
-If `gh repo view dstrupl/homebrew-gmic-affinity` fails with "404 not
-found", either your GitHub account does not have access yet or the
-collaboration invite has not been accepted. Let the project lead know
-before continuing.
+If either `gh repo view` command fails, repair the active GitHub login or
+repository permissions before continuing.
 
 ## One-time setup
 
@@ -175,22 +173,23 @@ Xcode (see prerequisites above) and re-run.
 
 ### 3. Save your notary credentials in the keychain
 
-This is the only place your Apple ID and app-specific password are
-stored. They go into the macOS keychain encrypted; nothing is written
-to disk in plaintext, and nothing leaves the machine.
+This is the only local place the Apple ID and app-specific password are
+stored. They go into the macOS keychain encrypted and are not written to
+project files or shell history; `notarytool` uses them only to authenticate
+to Apple's notary service.
 
 ```bash
 xcrun notarytool store-credentials gmic-affinity-notary \
-    --apple-id     "you@example.com" \
-    --team-id      "TEAMID" \
-    --password     "xxxx-xxxx-xxxx-xxxx"
+    --apple-id "you@example.com" \
+    --team-id  "TEAMID"
 ```
 
 - `gmic-affinity-notary` is the **profile name** — it's the handle
   the Makefile uses to look the credentials up. If you change it, set
   `NOTARYTOOL_KEYCHAIN_PROFILE` in `.env.local` (next step) to match.
-- The `--password` is the app-specific password from
-  appleid.apple.com, _not_ your iCloud password.
+- When prompted, enter the app-specific password from appleid.apple.com,
+  _not_ the normal Apple Account password. Omitting `--password` keeps
+  the secret out of shell history and process listings.
 - `--team-id` is the 10-character Team ID from your Apple Developer
   membership page.
 
@@ -214,7 +213,7 @@ signing identity name. The file is gitignored (`.env.*` matches in
 
 ```bash
 cat > .env.local <<'EOF'
-# Per-developer signing config. Gitignored.
+# Maintainer signing config. Gitignored.
 # See release/notarisation/SIGNING.md.
 
 # The exact common name of your Developer ID Application cert,
@@ -296,9 +295,8 @@ You're done with setup. From now on, every release is one command.
 
 ## Per-release runbook
 
-This is what you do for each release after the project lead pings
-you. Total wall-clock time: ~5–10 minutes (most of it Apple's notary
-queue).
+This is what the maintainer does for each stable release. Total wall-clock
+time is typically 5–10 minutes, mostly Apple's notary queue.
 
 ### 1. Sync the working tree
 
@@ -319,13 +317,16 @@ on origin and reviewable.
 make release RELEASE_VERSION=vX.Y.Z
 ```
 
-Substitute `vX.Y.Z` with the actual semver tag the project lead
-chose, e.g. `v0.2.0`. **Do not invent a tag** — the lead picks the
-version per the release plan and tells you what to use.
+Substitute `vX.Y.Z` with the semver selected for the release, for example
+`v0.3.1`. Do not infer a version from the current tag: choose it explicitly
+and update `Cargo.toml`, `Cargo.lock`, `CFBundleShortVersionString`,
+`CFBundleGetInfoString` in both `Info.plist` and
+`en.lproj/InfoPlist.strings`, and the integer `CFBundleVersion` before
+running the pipeline.
 
-### 3. Approve TouchID prompts
+### 3. Approve Touch ID prompts
 
-You'll see two TouchID prompts during the run:
+You may see two Touch ID prompts during the run:
 
 1. Once when `codesign --sign` accesses your Developer ID Application
    private key (early, during the build phase).
@@ -349,7 +350,8 @@ That `source=Notarized Developer ID` line is the key one: it means
 Gatekeeper would accept this bundle on a fresh user's machine,
 which is the whole point of the exercise. If the line says anything
 else (`Unnotarized Developer ID`, `No Mac App Store`, etc.), do
-**not** push the release — let the project lead know.
+**not** publish or continue the release. Diagnose the signing or
+notarisation failure first.
 
 ### 5. Confirm the final summary
 
@@ -374,7 +376,8 @@ That means:
   pushed to `dstrupl/homebrew-gmic-affinity`.
 - A user running the two `brew` commands now installs your build.
 
-Tell the project lead the release is out.
+Record the GitHub release URL, cask version/SHA, and remaining functional
+smoke-test status.
 
 ## When something goes wrong
 
@@ -403,8 +406,8 @@ xcrun notarytool log <submission-id> \
 
 Apple's notarisation log is very specific about what's wrong (usually
 a missing hardened runtime flag, an unsigned executable inside the
-bundle, or an entitlement issue). Forward the log to the project
-lead — fixes go in the build/codesign step, not the notary step.
+bundle, or an entitlement issue). Fix the build/codesign step rather
+than repeatedly resubmitting the same rejected artifact.
 
 If `gh release create` fails because the tag already exists on
 GitHub, somebody (probably you, on a previous attempt) already
@@ -434,7 +437,7 @@ It's idempotent — safe to re-run.
   never leave the machine.
 - Your Apple ID app-specific password is stored in the keychain by
   `xcrun notarytool store-credentials`, encrypted at rest, accessible
-  only with your login password / TouchID. It's never read by the
+  only with your login password / Touch ID. It's never read by the
   Makefile.
 - `.gitignore` matches `.env.*`, so accidentally typing `git add .`
   won't stage `.env.local`. Verify with `git check-ignore -v
@@ -442,12 +445,11 @@ It's idempotent — safe to re-run.
 - The release pipeline doesn't store the signing identity, password,
   or any keychain item anywhere — it just exec's `codesign` and
   `xcrun notarytool` and lets macOS handle the secret material.
-- Revoking your participation later is one keychain delete away:
-  `security delete-certificate -c "Developer ID Application: Your Name (TEAMID)"`
-  and `xcrun notarytool delete-credentials gmic-affinity-notary`.
-  The project's published binaries remain valid (notarised ticket is
-  permanent); you just can't sign new ones from this machine
-  afterwards.
+- If this Mac is retired, remove the local certificate/private key and
+  `gmic-affinity-notary` keychain profile only after transferring or
+  recreating the release identity on the replacement Mac. Do not revoke
+  the Developer ID certificate merely to clean up one machine; revocation
+  has consequences for software signed with that certificate.
 
 ## Frequently asked
 
@@ -468,10 +470,9 @@ else needs to change.
 
 **Q: What if I want to sign a development build for myself, without
 notarising or publishing?**
-Use `make universal && make install` — that produces an ad-hoc-
-signed bundle and copies it into your local Affinity plugins
-folders. No GitHub release, no notarisation, no tap bump. The
-project lead does this all the time on their unsigned dev box.
+Use `make universal && make install` — that produces an ad-hoc-signed
+bundle and copies it into the local Affinity plugin folders. No GitHub
+release, notarisation, or tap bump occurs.
 
 **Q: How long does notarisation take?**
 Apple's queue is usually <1 minute for small Mach-O bundles like
@@ -480,6 +481,6 @@ worth checking [Apple's system status](https://developer.apple.com/system-status
 
 ## When in doubt
 
-Ping the project lead. The cost of pausing for a question is much
-lower than the cost of a mis-published release we then have to
-unpublish and re-version.
+Stop before `release-publish`. The cost of checking the certificate,
+notary result, metadata, or target commit is much lower than the cost of
+unpublishing and re-versioning a bad release.
