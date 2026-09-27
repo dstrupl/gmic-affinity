@@ -36,10 +36,25 @@ v3 (Affinity by Canva).
 
        Filters → Plugins → G'MIC → G'MIC…
 
+   If G'MIC appears but is greyed out, it is detected correctly but the
+   document format is unsupported. In Affinity v3 use:
+
+       Document → Setup → Convert Format / ICC Profile… → RGB/8
+
+   Converting reduces a 16/32-bit document to 8-bit; duplicate it first
+   if you need to preserve the higher-bit source.
+
 If the plugin is not detected, check:
 
    Affinity → Settings → Photoshop Plugins →
        "Allow unknown plugins to be used"   (must be ticked)
+
+If the picker opens but processing fails and the log reports "Library
+not loaded", repair a stale Homebrew gmic installation:
+
+       brew linkage --test gmic
+       brew reinstall gmic
+       gmic -version
 
 Logs:    ~/Library/Logs/gmic-affinity.log
 Issues:  https://github.com/dstrupl/gmic-affinity/issues

@@ -461,6 +461,10 @@ worth automating against Affinity itself.
 3. [ ] Open Affinity Photo 2, fresh launch, open an 8-bit RGB doc.
    Filter → Plugins → G'MIC → G'MIC…  Pick `Artistic / Paint Brush`
    with defaults. OK. Image transforms visibly. No crash.
+   If the picker opens but execution fails, run `brew linkage --test gmic`;
+   Homebrew can consider the formula installed even when a separately
+   upgraded library has left its executable with broken dylib references.
+   `brew reinstall gmic` repairs that state.
 4. [ ] Filter → Last Filter (`Cmd-F`). The same filter re-runs without
    the dialog. No crash.
 5. [ ] Quit Affinity. Relaunch. Open the dialog. Paint Brush is

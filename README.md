@@ -179,8 +179,23 @@ without opening the dialog.
   "Allow unknown plugins to be used" is ticked, and restart Affinity.
 - Filter does nothing visible: open `Console.app`, filter on
   `gmic-affinity`. Each `PluginMain` call logs its selector.
+- G'MIC appears in the menu but is greyed out: the plugin is already
+  detected; "Allow unknown plugins" is not the issue. Version 0.3.1 accepts
+  only 8-bit RGB documents. Check the format shown at the top right of
+  Affinity. In Affinity v3, use **Document → Setup → Convert Format / ICC
+  Profile… → RGB/8**. This reduces a 16/32-bit document to 8-bit, so duplicate
+  the document first if you need to preserve the higher-bit source.
 - `gmic exited with status N`: try the same filter directly from a shell
   on a small TIFF; verify it works.
+- The picker opens but processing reports a log error containing `Library
+  not loaded` (for example an OpenEXR library): the Homebrew `gmic` binary
+  is stale relative to one of its upgraded libraries. Repair and verify it:
+  ```bash
+  brew linkage --test gmic
+  brew reinstall gmic
+  gmic -version
+  ```
+  Re-run the filter after `brew linkage --test gmic` returns successfully.
 
 ## License
 
