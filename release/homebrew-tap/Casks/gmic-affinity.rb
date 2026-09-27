@@ -19,11 +19,10 @@ cask "gmic-affinity" do
   # is unrelated to this plugin; users who want it can grab it from
   # https://gmic.eu/download.html separately.
   depends_on formula: "gmic"
-  # `:big_sur` (bare symbol) is the modern lower-bound form. brew
-  # style rejects the older `">= :big_sur"` string-comparator shape
-  # under Homebrew/OSDependsOn — the bare symbol means "this macOS or
-  # later", which is what we want.
-  depends_on macos: :big_sur
+  # Current Homebrew rejects redundant minimum macOS versions under
+  # Homebrew/OSDependsOn. The bundle's LSMinimumSystemVersion remains the
+  # authoritative macOS 11 runtime floor.
+  depends_on :macos
 
   # Install one source bundle into both Affinity plugin folders. Homebrew
   # accepts two `artifact` stanzas pointing at the same source path; this

@@ -8,7 +8,8 @@
 #   1. Compute SHA256 of the release zip.
 #   2. Clone TAP_REPO_URL into a tempdir.
 #   3. Mutate Casks/gmic-affinity.rb in place (Python, since the
-#      v0.2-deferral block strip is multi-line).
+#      v0.2-deferral block strip is multi-line and Homebrew DSL
+#      compatibility may need normalization).
 #   4. `brew style` to confirm clean.
 #   5. Commit + push.
 #
@@ -107,6 +108,21 @@ text, n_sha = re.subn(r'(sha256\s+)"[^"]+"', replace_sha, text, count=1)
 if n_sha != 1:
     sys.exit(f"ERROR: failed to find/replace `sha256 \"...\"` in {cask_path}")
 print(f"  - sha256 \"{sha256}\"")
+
+# 4. Current Homebrew requires `depends_on :macos`; explicit minimum macOS
+#    versions supported by Homebrew itself are redundant and rejected by
+#    Homebrew/OSDependsOn. The bundle's LSMinimumSystemVersion remains the
+#    authoritative runtime floor. Normalize both historical forms so rerunning
+#    a release against an older live tap remains idempotent.
+text, n_macos = re.subn(
+    r"^  depends_on macos:\s*(?::big_sur|\">= :big_sur\")\s*$",
+    "  depends_on :macos",
+    text,
+    count=1,
+    flags=re.MULTILINE,
+)
+if n_macos:
+    print("  - normalized macOS dependency for current Homebrew DSL")
 
 Path(cask_path).write_text(text)
 PY
